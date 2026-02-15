@@ -36,11 +36,8 @@ class ScoreboardService {
       _isConnected = true;
       _state.setConnectionStatus("Connected");
 
-      _registerPaths();
-      _startHeartbeat();
-
       _channel!.stream.listen(
-        (message) {
+            (message) {
           _handleMessage(message);
         },
         onDone: () {
@@ -52,6 +49,9 @@ class ScoreboardService {
           _disconnectCleanup(error: error.toString());
         },
       );
+
+      _registerPaths();
+      _startHeartbeat();
     } catch (e) {
       // Catch initial connection errors (e.g. Connection Refused)
       _disconnectCleanup(error: e.toString());
