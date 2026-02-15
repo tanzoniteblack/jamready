@@ -159,6 +159,9 @@ class ScoreboardState extends ChangeNotifier {
         case 'Color(operator.bg)':
           team.colorBg = value.toString();
           break;
+        case 'Id':
+          team.serverId = value.toString();
+          break;
       }
     }
   }
@@ -208,6 +211,7 @@ class Clock {
 
 class Team {
   String id;
+  String serverId;
   String name;
   String alternateName;
   String uniformColor;
@@ -220,6 +224,7 @@ class Team {
 
   Team({
     required this.id,
+    this.serverId = '',
     this.name = 'Team',
     this.alternateName = '',
     this.uniformColor = '',

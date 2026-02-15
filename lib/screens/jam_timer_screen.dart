@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:roller_derby_scoreboard_flutter/styles/text_styles.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/scoreboard_state.dart';
 import '../services/scoreboard_service.dart';
@@ -129,9 +130,14 @@ class _JamTimerScreenState extends State<JamTimerScreen> {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 32),
+                    const SizedBox(height: 24),
 
-                    // Active Clock
+                    // Period / Intermission Clock (top group, like original web)
+                    _buildPeriodClockRow(state, isConnected),
+
+                    const SizedBox(height: 24),
+
+                    // Active Game Clock (Jam / Lineup / Timeout)
                     ClockDisplay(
                       clock: _determineActiveClock(state),
                       textColor: _determineAlertColor(state),
@@ -147,7 +153,11 @@ class _JamTimerScreenState extends State<JamTimerScreen> {
                       },
                     ),
 
-                    const SizedBox(height: 48),
+                    const SizedBox(height: 24),
+
+                    // Timeout Type Buttons (visible during timeout, like original web)
+                    if (state.labelStop == "End Timeout")
+                      _buildTimeoutTypeSection(state, isConnected),
 
                     // Controls
                     JamControls(
@@ -188,29 +198,369 @@ class _JamTimerScreenState extends State<JamTimerScreen> {
   }
 
   Clock _determineActiveClock(ScoreboardState state) {
-    if (state.clocks['Timeout']!.running || state.clocks['Timeout']!.time > 0) {
-      return state.clocks['Timeout']!;
-    }
-    if (state.inJam) {
+    // Original web implementation uses CSS to show only the first running clock
+    // in DOM order: Jam, Lineup, Timeout.
+    // CSS: [Clock]:not(.Running) { display: none; }
+    //      .Running ~ .Running { display: none; }
+    // Additionally, Jam clock gets InJam styling when InJam is true.
+
+    // Priority 1: Jam Clock - running OR InJam flag is true
+    if (state.clocks['Jam']!.running || state.inJam) {
       return state.clocks['Jam']!;
     }
-    // Handle 'Jam Ended but Lineup not started' state - Show Jam Clock at 0:00
-    if (state.clocks['Jam']!.time == 0 &&
-        state.clocks['Jam']!.time !=
-            state
-                .clocks['Lineup']!
-                .time && // Avoid ambiguity if both are 0 at start
-        !state.clocks['Lineup']!.running &&
-        !state.clocks['Intermission']!.running) {
-      return state.clocks['Jam']!;
-    }
+
+    // Priority 2: Lineup Clock - running (includes "Post Timeout" state)
     if (state.clocks['Lineup']!.running) {
       return state.clocks['Lineup']!;
     }
+
+    // Priority 3: Timeout Clock - running
+    if (state.clocks['Timeout']!.running) {
+      return state.clocks['Timeout']!;
+    }
+
+    // No Jam/Lineup/Timeout clocks running.
+    // Fall through to the Period/Intermission group logic:
+
     if (state.clocks['Intermission']!.running) {
       return state.clocks['Intermission']!;
     }
+
+    // Default: show Lineup (which will be at 0:00 pre-game)
     return state.clocks['Lineup']!;
+  }
+
+  Widget _buildPeriodClockRow(ScoreboardState state, bool isConnected) {
+    // Original web: show Intermission when running, otherwise show Period
+    final bool showIntermission = state.clocks['Intermission']!.running;
+    final clock = showIntermission
+        ? state.clocks['Intermission']!
+        : state.clocks['Period']!;
+
+    final String label = clock.displayName.isNotEmpty
+        ? "${clock.displayName} ${clock.number}"
+        : "${clock.name} ${clock.number}";
+
+    final contentColor = isConnected ? Colors.white70 : Colors.white24;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      decoration: BoxDecoration(
+        color: showIntermission
+            ? Colors.orange.withValues(alpha: 0.15)
+            : Colors.white.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: showIntermission
+              ? Colors.orange.withValues(alpha: 0.3)
+              : Colors.white.withValues(alpha: 0.1),
+        ),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            label.toUpperCase(),
+            style: AppTextStyles.clockLabel.copyWith(
+              color: contentColor,
+              fontSize: 14,
+            ),
+          ),
+          Row(
+            children: [
+              _buildMiniAdjustButton(
+                "-",
+                isConnected
+                    ? () {
+                        _service.send(
+                          "Set",
+                          "ScoreBoard.CurrentGame.Clock(${clock.name}).Time",
+                          "-1000",
+                          flag: "change",
+                        );
+                      }
+                    : null,
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: Text(
+                  _formatTime(clock.time),
+                  style: AppTextStyles.buttonText.copyWith(
+                    color: contentColor,
+                    fontSize: 18,
+                    fontFamily: 'monospace',
+                  ),
+                ),
+              ),
+              _buildMiniAdjustButton(
+                "+",
+                isConnected
+                    ? () {
+                        _service.send(
+                          "Set",
+                          "ScoreBoard.CurrentGame.Clock(${clock.name}).Time",
+                          "+1000",
+                          flag: "change",
+                        );
+                      }
+                    : null,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMiniAdjustButton(String label, VoidCallback? onPressed) {
+    return SizedBox(
+      width: 32,
+      height: 32,
+      child: OutlinedButton(
+        onPressed: onPressed,
+        style: OutlinedButton.styleFrom(
+          padding: EdgeInsets.zero,
+          side: BorderSide(
+            color: onPressed != null ? Colors.white24 : Colors.white10,
+          ),
+          shape: const CircleBorder(),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: onPressed != null ? Colors.white60 : Colors.white24,
+            fontSize: 14,
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _formatTime(int milliseconds) {
+    int seconds = (milliseconds / 1000).ceil();
+    int minutes = (seconds / 60).floor();
+    int remainingSeconds = (seconds % 60);
+    return "${minutes.toString().padLeft(1, '0')}:${remainingSeconds.toString().padLeft(2, '0')}";
+  }
+
+  Widget _buildTimeoutTypeSection(ScoreboardState state, bool isConnected) {
+    // Determine current timeout owner to highlight the active button.
+    final owner = state.timeoutOwner;
+    // OfficialReview can be boolean true/false or string "true"/"false"
+    final isOr =
+        state.officialReview == "true" || state.officialReview == "True";
+
+    // TimeoutOwner is a UUID, match against team serverId
+    final bool isTeam1TO =
+        owner.isNotEmpty && owner == state.team1.serverId && !isOr;
+    final bool isTeam2TO =
+        owner.isNotEmpty && owner == state.team2.serverId && !isOr;
+    final bool isOfficialTO = owner == "O";
+    final bool isTeam1OR =
+        owner.isNotEmpty && owner == state.team1.serverId && isOr;
+    final bool isTeam2OR =
+        owner.isNotEmpty && owner == state.team2.serverId && isOr;
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.amber.withValues(alpha: 0.3)),
+      ),
+      child: Column(
+        children: [
+          // Team Row
+          Row(
+            children: [
+              // Team 1 buttons
+              Expanded(
+                child: Column(
+                  children: [
+                    Text(
+                      state.team1.displayName,
+                      style: AppTextStyles.clockLabel.copyWith(
+                        fontSize: 12,
+                        color: Colors.white70,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 8),
+                    _buildInlineTimeoutButton(
+                      "Timeout",
+                      isActive: isTeam1TO,
+                      count: state.team1.timeouts,
+                      color: Colors.white,
+                      enabled: isConnected,
+                      onTap: () => _service.send(
+                        "Set",
+                        "ScoreBoard.CurrentGame.Team(1).Timeout",
+                        true,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    _buildInlineTimeoutButton(
+                      "Review",
+                      isActive: isTeam1OR,
+                      count: state.team1.officialReviews,
+                      color: Colors.blue.shade300,
+                      enabled: isConnected,
+                      onTap: () => _service.send(
+                        "Set",
+                        "ScoreBoard.CurrentGame.Team(1).OfficialReview",
+                        true,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              // Official Timeout (center)
+              Expanded(
+                child: _buildInlineTimeoutButton(
+                  "Official TO",
+                  isActive: isOfficialTO,
+                  color: Colors.amber,
+                  enabled: isConnected,
+                  onTap: () => _service.send(
+                    "Set",
+                    "ScoreBoard.CurrentGame.OfficialTimeout",
+                    true,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              // Team 2 buttons
+              Expanded(
+                child: Column(
+                  children: [
+                    Text(
+                      state.team2.displayName,
+                      style: AppTextStyles.clockLabel.copyWith(
+                        fontSize: 12,
+                        color: Colors.white70,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 8),
+                    _buildInlineTimeoutButton(
+                      "Timeout",
+                      isActive: isTeam2TO,
+                      count: state.team2.timeouts,
+                      color: Colors.white,
+                      enabled: isConnected,
+                      onTap: () => _service.send(
+                        "Set",
+                        "ScoreBoard.CurrentGame.Team(2).Timeout",
+                        true,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    _buildInlineTimeoutButton(
+                      "Review",
+                      isActive: isTeam2OR,
+                      count: state.team2.officialReviews,
+                      color: Colors.blue.shade300,
+                      enabled: isConnected,
+                      onTap: () => _service.send(
+                        "Set",
+                        "ScoreBoard.CurrentGame.Team(2).OfficialReview",
+                        true,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          // End Timeout button
+          SizedBox(
+            width: double.infinity,
+            height: 44,
+            child: ElevatedButton(
+              onPressed: isConnected
+                  ? () => _service.send(
+                      "Set",
+                      "ScoreBoard.CurrentGame.StopJam",
+                      true,
+                    )
+                  : null,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red.shade800,
+                disabledBackgroundColor: Colors.grey.shade800,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              child: Text(
+                "END TIMEOUT",
+                style: AppTextStyles.buttonText.copyWith(
+                  fontSize: 16,
+                  color: isConnected ? Colors.white : Colors.white38,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInlineTimeoutButton(
+    String label, {
+    required bool isActive,
+    int? count,
+    required Color color,
+    required bool enabled,
+    required VoidCallback onTap,
+  }) {
+    return SizedBox(
+      width: double.infinity,
+      height: 36,
+      child: OutlinedButton(
+        onPressed: enabled ? onTap : null,
+        style: OutlinedButton.styleFrom(
+          padding: const EdgeInsets.symmetric(horizontal: 4),
+          backgroundColor: isActive ? color.withValues(alpha: 0.2) : null,
+          side: BorderSide(
+            color: isActive ? color : Colors.white24,
+            width: isActive ? 2 : 1,
+          ),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Flexible(
+              child: Text(
+                label,
+                style: TextStyle(
+                  color: enabled
+                      ? (isActive ? color : Colors.white70)
+                      : Colors.white24,
+                  fontSize: 11,
+                  fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            if (count != null) ...[
+              const SizedBox(width: 4),
+              Text(
+                "$count",
+                style: TextStyle(
+                  color: enabled ? Colors.white : Colors.white24,
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
   }
 
   bool _isPrePeriod(ScoreboardState state) {
