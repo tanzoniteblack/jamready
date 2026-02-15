@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../styles/text_styles.dart';
+import 'swipe_button.dart';
 
 class JamControls extends StatelessWidget {
   final bool inJam;
@@ -63,24 +64,32 @@ class JamControls extends StatelessWidget {
         SizedBox(
           width: double.infinity,
           height: 80,
-          child: ElevatedButton(
-            onPressed: enabled ? onPressed : null,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: color,
-              disabledBackgroundColor: Colors.grey.shade800,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-              elevation: enabled ? 4 : 0,
-            ),
-            child: Text(
-              label.toUpperCase(),
-              style: AppTextStyles.buttonText.copyWith(
-                fontSize: 28,
-                color: enabled ? Colors.white : Colors.white38,
-              ),
-            ),
-          ),
+          child: isPrePeriod
+              ? SwipeButton(
+                  label: "Slide to Start Lineup",
+                  onConfirmed:
+                      onStopJam, // 'Stop Jam' triggers 'Start Lineup' logic in backend/callbacks
+                  color: Colors.orange.shade800,
+                  enabled: enabled,
+                )
+              : ElevatedButton(
+                  onPressed: enabled ? onPressed : null,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: color,
+                    disabledBackgroundColor: Colors.grey.shade800,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    elevation: enabled ? 4 : 0,
+                  ),
+                  child: Text(
+                    label.toUpperCase(),
+                    style: AppTextStyles.buttonText.copyWith(
+                      fontSize: 28,
+                      color: enabled ? Colors.white : Colors.white38,
+                    ),
+                  ),
+                ),
         ),
         const SizedBox(height: 24),
         SizedBox(
