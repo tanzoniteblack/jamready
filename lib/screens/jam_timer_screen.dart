@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/scoreboard_state.dart';
 import '../services/scoreboard_service.dart';
 import '../widgets/team_panel.dart';
 import '../widgets/clock_display.dart';
 import '../widgets/jam_controls.dart';
 import 'package:vibration/vibration.dart';
+import 'settings_screen.dart';
 
 class JamTimerScreen extends StatefulWidget {
   const JamTimerScreen({super.key});
@@ -16,17 +18,25 @@ class JamTimerScreen extends StatefulWidget {
 
 class _JamTimerScreenState extends State<JamTimerScreen> {
   late ScoreboardService _service;
-  // TODO: Move this to a settings screen or configuration file
-  final String _serverUrl = "ws://10.0.2.2:8000";
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final state = Provider.of<ScoreboardState>(context, listen: false);
-      _service = ScoreboardService(state);
-      _service.connect(_serverUrl);
+      _connectToServer();
     });
+  }
+
+  Future<void> _connectToServer() async {
+    final state = Provider.of<ScoreboardState>(context, listen: false);
+    _service = ScoreboardService(state);
+
+    final prefs = await SharedPreferences.getInstance();
+    final host = prefs.getString('server_host') ?? '10.0.2.2';
+    final port = prefs.getString('server_port') ?? '8000';
+    final url = "ws://$host:$port";
+
+    _service.connect(url);
   }
 
   @override
@@ -47,6 +57,15 @@ class _JamTimerScreenState extends State<JamTimerScreen> {
         centerTitle: true,
         backgroundColor: Colors.transparent,
         elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.settings, color: Colors.white70),
+          onPressed: () {
+            // Navigate to Settings Screen
+            Navigator.of(context).push(
+              MaterialPageRoute(builder: (context) => const SettingsScreen()),
+            );
+          },
+        ),
         actions: [
           Consumer<ScoreboardState>(
             builder: (context, state, _) {
@@ -82,7 +101,7 @@ class _JamTimerScreenState extends State<JamTimerScreen> {
           return RefreshIndicator(
             onRefresh: () async {
               _service.disconnect();
-              await _service.connect(_serverUrl);
+              await _connectToServer();
             },
             child: SingleChildScrollView(
               physics: const AlwaysScrollableScrollPhysics(),
@@ -134,6 +153,8 @@ class _JamTimerScreenState extends State<JamTimerScreen> {
                     JamControls(
                       inJam: state.inJam,
                       isPrePeriod: _isPrePeriod(state),
+                      isIntermission:
+                          state.clocks['Intermission']?.running ?? false,
                       startLabel: state.labelStart,
                       stopLabel: state.labelStop,
                       timeoutLabel: state.labelTimeout,

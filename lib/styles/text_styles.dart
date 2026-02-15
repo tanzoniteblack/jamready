@@ -31,4 +31,10 @@ class AppTextStyles {
     fontSize: 14,
     color: Colors.white60,
   );
+  static final TextStyle appBarTitle = GoogleFonts.outfit(
+    fontSize: 20,
+    fontWeight: FontWeight.bold,
+    letterSpacing: 2.0,
+    color: Colors.white,
+  );
 }

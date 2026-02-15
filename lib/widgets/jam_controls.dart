@@ -4,6 +4,7 @@ import '../styles/text_styles.dart';
 class JamControls extends StatelessWidget {
   final bool inJam;
   final bool isPrePeriod;
+  final bool isIntermission;
   final String startLabel;
   final String stopLabel;
   final String timeoutLabel;
@@ -17,6 +18,7 @@ class JamControls extends StatelessWidget {
     super.key,
     required this.inJam,
     this.isPrePeriod = false,
+    this.isIntermission = false,
     required this.startLabel,
     required this.stopLabel,
     required this.timeoutLabel,
@@ -54,6 +56,8 @@ class JamControls extends StatelessWidget {
       // We keep the label but disable the interaction
     }
 
+    final bool timeoutEnabled = enabled && !isIntermission;
+
     return Column(
       children: [
         SizedBox(
@@ -83,10 +87,10 @@ class JamControls extends StatelessWidget {
           width: double.infinity,
           height: 56,
           child: OutlinedButton(
-            onPressed: enabled ? onTimeout : null,
+            onPressed: timeoutEnabled ? onTimeout : null,
             style: OutlinedButton.styleFrom(
               side: BorderSide(
-                color: enabled ? Colors.amber : Colors.white12,
+                color: timeoutEnabled ? Colors.amber : Colors.white12,
                 width: 2,
               ),
               shape: RoundedRectangleBorder(
@@ -96,7 +100,7 @@ class JamControls extends StatelessWidget {
             child: Text(
               timeoutLabel.toUpperCase(),
               style: AppTextStyles.buttonText.copyWith(
-                color: enabled ? Colors.amber : Colors.white38,
+                color: timeoutEnabled ? Colors.amber : Colors.white38,
               ),
             ),
           ),

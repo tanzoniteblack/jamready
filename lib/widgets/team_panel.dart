@@ -19,10 +19,10 @@ class TeamPanel extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(enabled ? 0.05 : 0.02),
+        color: Colors.white.withValues(alpha: enabled ? 0.05 : 0.02),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: Colors.white.withOpacity(enabled ? 0.1 : 0.05),
+          color: Colors.white.withValues(alpha: enabled ? 0.1 : 0.05),
         ),
       ),
       child: Column(
