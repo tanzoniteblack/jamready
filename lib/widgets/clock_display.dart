@@ -18,9 +18,14 @@ class ClockDisplay extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    String label = clock.displayName.toUpperCase();
+    if (clock.name == 'Jam' && clock.number > 0) {
+      label += " ${clock.number}";
+    }
+
     return Column(
       children: [
-        Text(clock.displayName.toUpperCase(), style: AppTextStyles.clockLabel),
+        Text(label, style: AppTextStyles.clockLabel),
         const SizedBox(height: 8),
         Text(
           _formatTime(clock.time),

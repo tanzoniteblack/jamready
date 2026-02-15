@@ -154,7 +154,8 @@ class _JamTimerScreenState extends State<JamTimerScreen> {
                       inJam: state.inJam,
                       isPrePeriod: _isPrePeriod(state),
                       isIntermission:
-                          state.clocks['Intermission']?.running ?? false,
+                          (state.clocks['Intermission']?.running ?? false) ||
+                          (state.clocks['Period']?.number == 0),
                       startLabel: state.labelStart,
                       stopLabel: state.labelStop,
                       timeoutLabel: state.labelTimeout,
@@ -213,7 +214,9 @@ class _JamTimerScreenState extends State<JamTimerScreen> {
   }
 
   bool _isPrePeriod(ScoreboardState state) {
+    if (state.clocks['Period']?.number == 0) return true;
     if (state.clocks['Intermission']?.running == true) return true;
+
     bool anyClockRunning = state.clocks.values.any((c) => c.running);
     bool inTimeout =
         state.timeoutOwner.isNotEmpty ||

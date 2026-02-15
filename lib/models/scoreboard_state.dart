@@ -20,6 +20,7 @@ class ScoreboardState extends ChangeNotifier {
   };
 
   // Game State Flags
+  String gameId = "";
   bool inJam = false;
   bool noMoreJam = false;
   bool inOvertime = false;
@@ -59,6 +60,9 @@ class ScoreboardState extends ChangeNotifier {
       _updateLabel(path, value);
     } else {
       switch (path) {
+        case 'ScoreBoard.CurrentGame.Game':
+          gameId = value.toString();
+          break;
         case 'ScoreBoard.CurrentGame.InJam':
           inJam = value == true;
           break;
