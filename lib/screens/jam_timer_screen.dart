@@ -94,11 +94,19 @@ class _JamTimerScreenState extends State<JamTimerScreen> {
                     Row(
                       children: [
                         Expanded(
-                          child: TeamPanel(team: state.team1, isLeft: true),
+                          child: TeamPanel(
+                            team: state.team1,
+                            isLeft: true,
+                            enabled: isConnected,
+                          ),
                         ),
                         const SizedBox(width: 16),
                         Expanded(
-                          child: TeamPanel(team: state.team2, isLeft: false),
+                          child: TeamPanel(
+                            team: state.team2,
+                            isLeft: false,
+                            enabled: isConnected,
+                          ),
                         ),
                       ],
                     ),

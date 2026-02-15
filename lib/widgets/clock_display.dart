@@ -25,11 +25,13 @@ class ClockDisplay extends StatelessWidget {
         Text(
           _formatTime(clock.time),
           style: AppTextStyles.clockTime.copyWith(
-            color:
-                textColor ??
-                (clock.running || clock.time > 0
-                    ? Colors.white
-                    : Colors.white38),
+            color: !enabled
+                ? Colors
+                      .white12 // Very dim if disconnected
+                : textColor ??
+                      (clock.running || clock.time > 0
+                          ? Colors.white
+                          : Colors.white38),
           ),
         ),
         const SizedBox(height: 16),
