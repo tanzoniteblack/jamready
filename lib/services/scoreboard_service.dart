@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:web_socket_channel/status.dart' as status;
 import '../models/scoreboard_state.dart';
@@ -7,17 +8,28 @@ import '../models/scoreboard_state.dart';
 class ScoreboardService {
   WebSocketChannel? _channel;
   Timer? _heartbeatTimer;
+  Timer? _reconnectTimer;
   final ScoreboardState _state;
   bool _isConnected = false;
+  bool _isConnecting = false;
+  bool _manualDisconnect = false;
+  int _reconnectAttempts = 0;
+  String? _lastUrl;
+  final Random _random = Random();
 
   ScoreboardService(this._state);
 
   bool get isConnected => _isConnected;
 
   Future<void> connect(String url) async {
-    if (_isConnected) return;
+    if (_isConnected || _isConnecting) return;
+    _manualDisconnect = false;
+    _lastUrl = url;
+    _reconnectTimer?.cancel();
+    _reconnectTimer = null;
 
     try {
+      _isConnecting = true;
       _state.setConnectionStatus("Connecting...");
 
       // Ensure URL is valid
@@ -33,7 +45,15 @@ class ScoreboardService {
       // Wait for connection to be established
       await _channel!.ready;
 
+      if (_manualDisconnect) {
+        _channel?.sink.close(status.goingAway);
+        _disconnectCleanup();
+        return;
+      }
+
       _isConnected = true;
+      _isConnecting = false;
+      _reconnectAttempts = 0;
       _state.setConnectionStatus("Connected");
 
       _channel!.stream.listen(
@@ -43,10 +63,12 @@ class ScoreboardService {
         onDone: () {
           print("Connection closed");
           _disconnectCleanup();
+          _scheduleReconnect();
         },
         onError: (error) {
           print("Connection error: $error");
           _disconnectCleanup(error: error.toString());
+          _scheduleReconnect();
         },
       );
 
@@ -54,7 +76,9 @@ class ScoreboardService {
       _startHeartbeat();
     } catch (e) {
       // Catch initial connection errors (e.g. Connection Refused)
+      _isConnecting = false;
       _disconnectCleanup(error: e.toString());
+      _scheduleReconnect();
     }
   }
 
@@ -126,17 +150,43 @@ class ScoreboardService {
   }
 
   void disconnect() {
+    _manualDisconnect = true;
+    _reconnectTimer?.cancel();
+    _reconnectTimer = null;
     _channel?.sink.close(status.goingAway);
     _disconnectCleanup();
   }
 
   void _disconnectCleanup({String? error}) {
     _isConnected = false;
+    _isConnecting = false;
     _heartbeatTimer?.cancel();
     _channel = null;
     _state.setConnectionStatus(
       error != null ? "Error: $error" : "Disconnected",
     );
+  }
+
+  void _scheduleReconnect() {
+    if (_manualDisconnect || _lastUrl == null) return;
+    if (_reconnectTimer != null || _isConnected || _isConnecting) return;
+
+    final baseDelaySeconds = 1 << _reconnectAttempts;
+    final cappedSeconds = baseDelaySeconds > 30 ? 30 : baseDelaySeconds;
+    final jitterMs = _random.nextInt(500);
+    final delay = Duration(seconds: cappedSeconds) +
+        Duration(milliseconds: jitterMs);
+
+    _reconnectAttempts += 1;
+    _state.setConnectionStatus(
+      "Reconnecting in ${delay.inSeconds}s...",
+    );
+
+    _reconnectTimer = Timer(delay, () {
+      _reconnectTimer = null;
+      if (_manualDisconnect || _lastUrl == null) return;
+      connect(_lastUrl!);
+    });
   }
 
   void _startHeartbeat() {
