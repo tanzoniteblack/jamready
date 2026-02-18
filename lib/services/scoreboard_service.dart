@@ -5,11 +5,14 @@ import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:web_socket_channel/status.dart' as status;
 import '../models/scoreboard_state.dart';
 
+typedef WebSocketChannelFactory = WebSocketChannel Function(Uri uri);
+
 class ScoreboardService {
   WebSocketChannel? _channel;
   Timer? _heartbeatTimer;
   Timer? _reconnectTimer;
   final ScoreboardState _state;
+  final WebSocketChannelFactory _channelFactory;
   bool _isConnected = false;
   bool _isConnecting = false;
   bool _manualDisconnect = false;
@@ -17,7 +20,10 @@ class ScoreboardService {
   String? _lastUrl;
   final Random _random = Random();
 
-  ScoreboardService(this._state);
+  ScoreboardService(
+    this._state, {
+    WebSocketChannelFactory? channelFactory,
+  }) : _channelFactory = channelFactory ?? WebSocketChannel.connect;
 
   bool get isConnected => _isConnected;
 
@@ -40,7 +46,7 @@ class ScoreboardService {
         queryParameters: {'source': 'companion', 'platform': 'mobile'},
       );
 
-      _channel = WebSocketChannel.connect(wsUrl);
+      _channel = _channelFactory(wsUrl);
 
       // Wait for connection to be established
       await _channel!.ready;
