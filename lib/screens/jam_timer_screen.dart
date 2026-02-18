@@ -19,6 +19,8 @@ class JamTimerScreen extends StatefulWidget {
 
 class _JamTimerScreenState extends State<JamTimerScreen> {
   late ScoreboardService _service;
+  bool _showUndo = false;
+  bool _useReplace = false;
 
   @override
   void initState() {
@@ -118,6 +120,11 @@ class _JamTimerScreenState extends State<JamTimerScreen> {
                             team: state.team1,
                             isLeft: true,
                             enabled: isConnected,
+                            onRetainedToggle: (val) => _service.send(
+                              "Set",
+                              "ScoreBoard.CurrentGame.Team(1).RetainedOfficialReview",
+                              val,
+                            ),
                           ),
                         ),
                         const SizedBox(width: 16),
@@ -126,6 +133,11 @@ class _JamTimerScreenState extends State<JamTimerScreen> {
                             team: state.team2,
                             isLeft: false,
                             enabled: isConnected,
+                            onRetainedToggle: (val) => _service.send(
+                              "Set",
+                              "ScoreBoard.CurrentGame.Team(2).RetainedOfficialReview",
+                              val,
+                            ),
                           ),
                         ),
                       ],
@@ -187,6 +199,10 @@ class _JamTimerScreenState extends State<JamTimerScreen> {
                         true,
                       ),
                     ),
+
+                    // Undo / Replace Section
+                    if (state.labelUndo != "No Action")
+                      _buildUndoSection(state, isConnected),
                   ],
                 ),
               ),
@@ -577,6 +593,120 @@ class _JamTimerScreenState extends State<JamTimerScreen> {
       return true;
     }
     return false;
+  }
+
+  Widget _buildUndoSection(ScoreboardState state, bool isConnected) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 24),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.03),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Show Undo toggle row
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    "UNDO CONTROLS",
+                    style: AppTextStyles.clockLabel.copyWith(
+                      fontSize: 11,
+                      color: Colors.white38,
+                      letterSpacing: 1,
+                    ),
+                  ),
+                ),
+                SizedBox(
+                  height: 28,
+                  child: Switch(
+                    value: _showUndo,
+                    onChanged: (val) => setState(() => _showUndo = val),
+                    activeColor: Colors.amber,
+                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                ),
+              ],
+            ),
+            if (_showUndo) ...[
+              const SizedBox(height: 12),
+              // Replace info text
+              if (state.labelReplaced.isNotEmpty &&
+                  state.labelReplaced != "Replaced")
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Text(
+                    'Replace "${state.labelReplaced}" with',
+                    style: AppTextStyles.clockLabel.copyWith(
+                      fontSize: 11,
+                      color: Colors.white54,
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
+                ),
+              // Use Replace toggle
+              Row(
+                children: [
+                  Text(
+                    "Use Replace on Undo",
+                    style: TextStyle(color: Colors.white54, fontSize: 12),
+                  ),
+                  const Spacer(),
+                  SizedBox(
+                    height: 28,
+                    child: Switch(
+                      value: _useReplace,
+                      onChanged: (val) => setState(() => _useReplace = val),
+                      activeColor: Colors.orange,
+                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              // Undo / Replace button
+              SizedBox(
+                width: double.infinity,
+                height: 44,
+                child: ElevatedButton(
+                  onPressed: isConnected
+                      ? () => _service.send(
+                          "Set",
+                          _useReplace
+                              ? "ScoreBoard.CurrentGame.ClockReplace"
+                              : "ScoreBoard.CurrentGame.ClockUndo",
+                          true,
+                        )
+                      : null,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _useReplace
+                        ? Colors.orange.shade800
+                        : Colors.grey.shade800,
+                    disabledBackgroundColor: Colors.grey.shade900,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  child: Text(
+                    _useReplace
+                        ? "REPLACE: ${state.labelUndo}"
+                        : state.labelUndo.toUpperCase(),
+                    style: AppTextStyles.buttonText.copyWith(
+                      fontSize: 15,
+                      color: isConnected ? Colors.white : Colors.white38,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
   }
 
   // Track last alert state

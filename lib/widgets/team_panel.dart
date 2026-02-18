@@ -6,23 +6,43 @@ class TeamPanel extends StatelessWidget {
   final Team team;
   final bool isLeft;
   final bool enabled;
+  final ValueChanged<bool>? onRetainedToggle;
 
   const TeamPanel({
     super.key,
     required this.team,
     this.isLeft = true,
     this.enabled = true,
+    this.onRetainedToggle,
   });
+
+  Color? _parseColor(String hex) {
+    if (hex.isEmpty) return null;
+    hex = hex.replaceFirst('#', '');
+    if (hex.length == 6) hex = 'FF$hex';
+    if (hex.length == 8) {
+      final value = int.tryParse(hex, radix: 16);
+      if (value != null) return Color(value);
+    }
+    return null;
+  }
 
   @override
   Widget build(BuildContext context) {
+    final bgColor = _parseColor(team.colorBg);
+    final fgColor = _parseColor(team.colorFg);
+
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: enabled ? 0.05 : 0.02),
+        color:
+            bgColor?.withValues(alpha: 0.3) ??
+            Colors.white.withValues(alpha: enabled ? 0.05 : 0.02),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: Colors.white.withValues(alpha: enabled ? 0.1 : 0.05),
+          color:
+              bgColor?.withValues(alpha: 0.5) ??
+              Colors.white.withValues(alpha: enabled ? 0.1 : 0.05),
         ),
       ),
       child: Column(
@@ -32,15 +52,20 @@ class TeamPanel extends StatelessWidget {
         children: [
           Text(
             team.displayName,
-            style: AppTextStyles.teamName.copyWith(
-              color: enabled ? Colors.white : Colors.white38,
+            style: AppTextStyles.clockLabel.copyWith(
+              fontSize: 16,
+              color: fgColor ?? (enabled ? Colors.white70 : Colors.white38),
             ),
             overflow: TextOverflow.ellipsis,
           ),
-          const SizedBox(height: 8),
-          _buildStatRow("TIMEOUTS", team.timeouts.toString()),
-          const SizedBox(height: 4),
-          _buildStatRow("REVIEWS", team.officialReviews.toString()),
+          const SizedBox(height: 6),
+          _buildStatRow("TO", team.timeouts.toString()),
+          const SizedBox(height: 3),
+          _buildStatRow("OR", team.officialReviews.toString()),
+          if (onRetainedToggle != null) ...[
+            const SizedBox(height: 6),
+            _buildRetainedToggle(),
+          ],
         ],
       ),
     );
@@ -58,14 +83,14 @@ class TeamPanel extends StatelessWidget {
                 value,
                 style: AppTextStyles.clockLabel.copyWith(
                   color: valueColor,
-                  fontSize: 18,
+                  fontSize: 16,
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 6),
               Text(
                 label,
                 style: AppTextStyles.clockLabel.copyWith(
-                  fontSize: 12,
+                  fontSize: 10,
                   color: labelColor,
                 ),
               ),
@@ -74,19 +99,50 @@ class TeamPanel extends StatelessWidget {
               Text(
                 label,
                 style: AppTextStyles.clockLabel.copyWith(
-                  fontSize: 12,
+                  fontSize: 10,
                   color: labelColor,
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 6),
               Text(
                 value,
                 style: AppTextStyles.clockLabel.copyWith(
                   color: valueColor,
-                  fontSize: 18,
+                  fontSize: 16,
                 ),
               ),
             ],
+    );
+  }
+
+  Widget _buildRetainedToggle() {
+    final isActive = team.retainedOfficialReview;
+    return SizedBox(
+      height: 24,
+      child: OutlinedButton(
+        onPressed: enabled
+            ? () => onRetainedToggle?.call(!team.retainedOfficialReview)
+            : null,
+        style: OutlinedButton.styleFrom(
+          padding: const EdgeInsets.symmetric(horizontal: 6),
+          backgroundColor: isActive ? Colors.blue.withValues(alpha: 0.2) : null,
+          side: BorderSide(
+            color: isActive ? Colors.blue.shade300 : Colors.white24,
+            width: isActive ? 1.5 : 1,
+          ),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+        ),
+        child: Text(
+          "RET",
+          style: TextStyle(
+            color: enabled
+                ? (isActive ? Colors.blue.shade300 : Colors.white54)
+                : Colors.white24,
+            fontSize: 9,
+            fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
+          ),
+        ),
+      ),
     );
   }
 }
