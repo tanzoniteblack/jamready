@@ -128,6 +128,32 @@ Future<void> _ensurePrePeriod(WidgetTester tester) async {
   );
 }
 
+bool _isOfficialReview(ScoreboardState state) =>
+    state.officialReview == 'true' || state.officialReview == 'True';
+
+Future<void> _waitForTeamServerIds(WidgetTester tester) async {
+  await _pumpUntil(
+    tester,
+    () {
+      final state = _state(tester);
+      return state.team1.serverId.isNotEmpty &&
+          state.team2.serverId.isNotEmpty;
+    },
+  );
+}
+
+Future<void> _waitForTimeoutMode(WidgetTester tester) async {
+  await _pumpUntil(
+    tester,
+    () {
+      final state = _state(tester);
+      return state.clocks['Timeout']!.running ||
+          state.labelStop == 'End Timeout';
+    },
+    timeout: const Duration(seconds: 20),
+  );
+}
+
 Future<void> _swipeToStartLineup(WidgetTester tester) async {
   final handle = find.byIcon(Icons.double_arrow_rounded);
   final button = find.byType(SwipeButton);
@@ -220,5 +246,106 @@ void main() {
       final state = _state(tester);
       return !state.clocks['Jam']!.running && state.clocks['Lineup']!.running;
     }, timeout: const Duration(seconds: 20));
+  });
+
+  testWidgets('Timeout flow highlights controls and undo restores timeout',
+      (tester) async {
+    final client = await _launchAppAndConnect(tester);
+    addTearDown(client.close);
+    addTearDown(() async {
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump();
+    });
+
+    await client.startNewGame();
+    await _ensurePrePeriod(tester);
+    await _swipeToStartLineup(tester);
+    await _waitForTeamServerIds(tester);
+
+    await _tapJamControl(tester, _state(tester).labelTimeout);
+    await _waitForTimeoutMode(tester);
+    await _pumpUntil(
+      tester,
+      () => _state(tester).clocks['Timeout']!.running,
+      timeout: const Duration(seconds: 20),
+    );
+
+    final timeoutButtons = find.widgetWithText(OutlinedButton, 'Timeout');
+    final reviewButtons = find.widgetWithText(OutlinedButton, 'Review');
+    final officialTimeoutButton =
+        find.widgetWithText(OutlinedButton, 'Official TO');
+
+    await _pumpUntil(
+      tester,
+      () => timeoutButtons.evaluate().length >= 2 &&
+          reviewButtons.evaluate().length >= 2 &&
+          officialTimeoutButton.evaluate().isNotEmpty,
+    );
+
+    await tester.tap(timeoutButtons.first);
+    await tester.pump();
+    await _pumpUntil(tester, () {
+      final state = _state(tester);
+      return state.timeoutOwner == state.team1.serverId &&
+          !_isOfficialReview(state);
+    });
+
+    await tester.tap(timeoutButtons.at(1));
+    await tester.pump();
+    await _pumpUntil(tester, () {
+      final state = _state(tester);
+      return state.timeoutOwner == state.team2.serverId &&
+          !_isOfficialReview(state);
+    });
+
+    await tester.tap(officialTimeoutButton);
+    await tester.pump();
+    await _pumpUntil(
+      tester,
+      () => _state(tester).timeoutOwner == 'O',
+    );
+
+    await tester.tap(reviewButtons.first);
+    await tester.pump();
+    await _pumpUntil(tester, () {
+      final state = _state(tester);
+      return state.timeoutOwner == state.team1.serverId &&
+          _isOfficialReview(state);
+    });
+
+    await tester.tap(reviewButtons.at(1));
+    await tester.pump();
+    await _pumpUntil(tester, () {
+      final state = _state(tester);
+      return state.timeoutOwner == state.team2.serverId &&
+          _isOfficialReview(state);
+    });
+
+    await tester.tap(find.widgetWithText(ElevatedButton, 'END TIMEOUT'));
+    await tester.pump();
+    await _pumpUntil(tester, () {
+      final state = _state(tester);
+      return state.clocks['Lineup']!.running;
+    }, timeout: const Duration(seconds: 20));
+
+    await _pumpUntil(
+      tester,
+      () => _state(tester).labelUndo != 'No Action',
+    );
+    await tester.tap(find.byType(Switch).first);
+    await tester.pump();
+    await _pumpUntil(
+      tester,
+      () => find.text(_state(tester).labelUndo.toUpperCase())
+          .evaluate()
+          .isNotEmpty,
+    );
+    await tester.tap(find.text(_state(tester).labelUndo.toUpperCase()));
+    await tester.pump();
+    await _pumpUntil(
+      tester,
+      () => _state(tester).clocks['Timeout']!.running,
+      timeout: const Duration(seconds: 20),
+    );
   });
 }
