@@ -26,6 +26,7 @@ class _SwipeButtonState extends State<SwipeButton> {
   bool _confirmed = false;
   final double _height = 80.0;
   final double _handleWidth = 80.0;
+  final double _confirmThreshold = 0.7;
 
   @override
   Widget build(BuildContext context) {
@@ -89,7 +90,7 @@ class _SwipeButtonState extends State<SwipeButton> {
                   onHorizontalDragEnd: (details) {
                     if (!widget.enabled || _confirmed) return;
 
-                    if (_dragValue > maxDrag * 0.8) {
+                    if (_dragValue > maxDrag * _confirmThreshold) {
                       // Confirmed
                       setState(() {
                         _dragValue = maxDrag;

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
@@ -23,7 +24,11 @@ class ScoreboardTestClient {
     return ScoreboardTestClient(channel);
   }
 
-  void startNewGame() {
+  Future<void> startNewGame() async {
+    _channel.sink.add(jsonEncode({
+      'action': 'Register',
+      'paths': ['ScoreBoard.CurrentGame.Game'],
+    }));
     final message = {
       'action': 'StartNewGame',
       'data': {
@@ -45,6 +50,8 @@ class ScoreboardTestClient {
     };
 
     _channel.sink.add(jsonEncode(message));
+    // give the server a few seconds to actually get going
+    sleep(Duration(seconds: 2));
   }
 
   Future<void> close() async {
@@ -63,12 +70,12 @@ Uri _scoreboardWsUri(String host, int port) {
 
 String _scoreboardHost() {
   const host = String.fromEnvironment('SCOREBOARD_HOST');
-  return host.isNotEmpty ? host : '127.0.0.1';
+  return host.isNotEmpty ? host : 'ryan.local';
 }
 
 int _scoreboardPort() {
   const port = String.fromEnvironment('SCOREBOARD_PORT');
-  return int.tryParse(port) ?? 8000;
+  return int.tryParse(port) ?? 8001;
 }
 
 ScoreboardState _state(WidgetTester tester) {
@@ -154,7 +161,7 @@ void main() {
       await tester.pump();
     });
 
-    client.startNewGame();
+    await client.startNewGame();
     await _ensurePrePeriod(tester);
 
     await _swipeToStartLineup(tester);
@@ -176,7 +183,7 @@ void main() {
       await tester.pump();
     });
 
-    client.startNewGame();
+    await client.startNewGame();
     await _ensurePrePeriod(tester);
     await _swipeToStartLineup(tester);
 
@@ -196,7 +203,7 @@ void main() {
       await tester.pump();
     });
 
-    client.startNewGame();
+    await client.startNewGame();
     await _ensurePrePeriod(tester);
     await _swipeToStartLineup(tester);
     await _tapJamControl(tester, _state(tester).labelStart);

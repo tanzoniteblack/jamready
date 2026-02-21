@@ -52,7 +52,7 @@ class ScoreboardService {
       await _channel!.ready;
 
       if (_manualDisconnect) {
-        _channel?.sink.close(status.goingAway);
+        _closeChannel();
         _disconnectCleanup();
         return;
       }
@@ -159,8 +159,17 @@ class ScoreboardService {
     _manualDisconnect = true;
     _reconnectTimer?.cancel();
     _reconnectTimer = null;
-    _channel?.sink.close(status.goingAway);
+    _closeChannel();
     _disconnectCleanup();
+  }
+
+  void _closeChannel({int? code}) {
+    try {
+      _channel?.sink.close(code ?? status.normalClosure);
+    } on ArgumentError {
+      // Fallback for platforms that only accept 1000 or custom codes.
+      _channel?.sink.close();
+    }
   }
 
   void _disconnectCleanup({String? error}) {
