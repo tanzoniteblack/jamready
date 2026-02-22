@@ -91,7 +91,13 @@ class _ClockDisplayState extends State<ClockDisplay>
       ),
       child: Column(
         children: [
-          Text(label, style: AppTextStyles.clockLabel),
+          Text(
+            label,
+            style: AppTextStyles.clockLabel.copyWith(
+              fontSize: 22,
+              color: color,
+            ),
+          ),
           const SizedBox(height: 8),
           AnimatedBuilder(
             animation: _pulseAnimation,
