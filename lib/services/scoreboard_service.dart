@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
+import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:web_socket_channel/status.dart' as status;
 import '../models/scoreboard_state.dart';
@@ -61,6 +62,9 @@ class ScoreboardService {
       _isConnecting = false;
       _reconnectAttempts = 0;
       _state.setConnectionStatus("Connected");
+
+      // Keep screen awake while tracking a game
+      WakelockPlus.enable();
 
       _channel!.stream.listen(
             (message) {
@@ -180,6 +184,9 @@ class ScoreboardService {
     _state.setConnectionStatus(
       error != null ? "Error: $error" : "Disconnected",
     );
+
+    // Allow screen to sleep when disconnected
+    WakelockPlus.disable();
   }
 
   void _scheduleReconnect() {
