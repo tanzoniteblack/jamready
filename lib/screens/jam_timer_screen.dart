@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:roller_derby_scoreboard_flutter/styles/text_styles.dart';
+import 'package:roller_derby_jam_timer/styles/text_styles.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/scoreboard_state.dart';
 import '../services/scoreboard_service.dart';

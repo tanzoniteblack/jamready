@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
@@ -8,10 +7,10 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
-import 'package:roller_derby_scoreboard_flutter/main.dart' as app;
-import 'package:roller_derby_scoreboard_flutter/models/scoreboard_state.dart';
-import 'package:roller_derby_scoreboard_flutter/screens/jam_timer_screen.dart';
-import 'package:roller_derby_scoreboard_flutter/widgets/swipe_button.dart';
+import 'package:roller_derby_jam_timer/main.dart' as app;
+import 'package:roller_derby_jam_timer/models/scoreboard_state.dart';
+import 'package:roller_derby_jam_timer/screens/jam_timer_screen.dart';
+import 'package:roller_derby_jam_timer/widgets/swipe_button.dart';
 
 class ScoreboardTestClient {
   ScoreboardTestClient(this._channel);
