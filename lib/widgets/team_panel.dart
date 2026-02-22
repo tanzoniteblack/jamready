@@ -53,7 +53,7 @@ class TeamPanel extends StatelessWidget {
           Text(
             team.displayName,
             style: AppTextStyles.clockLabel.copyWith(
-              fontSize: 16,
+              fontSize: 22,
               color: fgColor ?? (enabled ? Colors.white70 : Colors.white38),
             ),
             overflow: TextOverflow.ellipsis,
@@ -83,14 +83,14 @@ class TeamPanel extends StatelessWidget {
                 value,
                 style: AppTextStyles.clockLabel.copyWith(
                   color: valueColor,
-                  fontSize: 16,
+                  fontSize: 18,
                 ),
               ),
               const SizedBox(width: 6),
               Text(
                 label,
                 style: AppTextStyles.clockLabel.copyWith(
-                  fontSize: 10,
+                  fontSize: 16,
                   color: labelColor,
                 ),
               ),
@@ -99,7 +99,7 @@ class TeamPanel extends StatelessWidget {
               Text(
                 label,
                 style: AppTextStyles.clockLabel.copyWith(
-                  fontSize: 10,
+                  fontSize: 16,
                   color: labelColor,
                 ),
               ),
@@ -108,7 +108,7 @@ class TeamPanel extends StatelessWidget {
                 value,
                 style: AppTextStyles.clockLabel.copyWith(
                   color: valueColor,
-                  fontSize: 16,
+                  fontSize: 18,
                 ),
               ),
             ],
