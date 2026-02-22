@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../styles/text_styles.dart';
@@ -27,9 +28,24 @@ class _SwipeButtonState extends State<SwipeButton>
   double _dragValue = 0.0;
   bool _confirmed = false;
   bool _isTouching = false;
+  Timer? _resetTimer;
   final double _height = 80.0;
   final double _handleWidth = 80.0;
   final double _confirmThreshold = 0.7;
+
+  @override
+  void dispose() {
+    _resetTimer?.cancel();
+    super.dispose();
+  }
+
+  void _resetState() {
+    setState(() {
+      _dragValue = 0.0;
+      _confirmed = false;
+      _isTouching = false;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -164,6 +180,13 @@ class _SwipeButtonState extends State<SwipeButton>
                         _confirmed = true;
                       });
                       widget.onConfirmed();
+
+                      // Auto-reset after 3 seconds if we're still showing
+                      // (server didn't respond or action failed)
+                      _resetTimer?.cancel();
+                      _resetTimer = Timer(const Duration(seconds: 3), () {
+                        if (mounted) _resetState();
+                      });
                     } else {
                       // Snap back
                       setState(() {
