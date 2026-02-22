@@ -61,7 +61,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
-  void _parseAndSetAddress(String scannedValue) {
+  Future<void> _parseAndSetAddress(String scannedValue) async {
     // Expected format: "host:port" e.g., "169.254.99.171:8000"
     // Also handle URLs like "http://169.254.99.171:8000"
     String value = scannedValue.trim();
@@ -82,20 +82,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
     // Split by colon to get host and port
     final parts = value.split(':');
     if (parts.isNotEmpty) {
-      setState(() {
-        _hostController.text = parts[0];
-        if (parts.length > 1) {
-          _portController.text = parts[1];
-        }
-      });
+      final host = parts[0];
+      final port = parts.length > 1 ? parts[1] : '8000';
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Loaded: ${parts[0]}:${parts.length > 1 ? parts[1] : _portController.text}'),
-          backgroundColor: Colors.green.shade700,
-          duration: const Duration(seconds: 2),
-        ),
-      );
+      // Save settings and connect automatically
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('server_host', host);
+      await prefs.setString('server_port', port);
+
+      if (mounted) {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (context) => const JamTimerScreen()),
+        );
+      }
     }
   }
 

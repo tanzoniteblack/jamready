@@ -2,7 +2,7 @@
     <uses-feature android:name="android.hardware.camera" android:required="false"/>
     <uses-permission android:name="android.permission.CAMERA" />
     <application
-        android:label="roller_derby_scoreboard_flutter"
+        android:label="roller_derby_jam_timer"
         android:name="${applicationName}"
         android:icon="@mipmap/launcher_icon"
         android:usesCleartextTraffic="true">
