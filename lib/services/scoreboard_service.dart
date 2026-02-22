@@ -1,12 +1,17 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
+import 'package:logger/logger.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:web_socket_channel/status.dart' as status;
 import '../models/scoreboard_state.dart';
 
 typedef WebSocketChannelFactory = WebSocketChannel Function(Uri uri);
+
+final _log = Logger(
+  printer: PrettyPrinter(methodCount: 0, printEmojis: false),
+);
 
 class ScoreboardService {
   WebSocketChannel? _channel;
@@ -71,12 +76,12 @@ class ScoreboardService {
           _handleMessage(message);
         },
         onDone: () {
-          print("Connection closed");
+          _log.i("Connection closed");
           _disconnectCleanup();
           _scheduleReconnect();
         },
         onError: (error) {
-          print("Connection error: $error");
+          _log.e("Connection error: $error");
           _disconnectCleanup(error: error.toString());
           _scheduleReconnect();
         },
@@ -154,7 +159,7 @@ class ScoreboardService {
       "ScoreBoard.CurrentGame.Label(Replaced)",
     ];
 
-    print("Registering paths");
+    _log.d("Registering paths");
     final message = {"action": "Register", "paths": paths};
     _channel?.sink.add(jsonEncode(message));
   }
@@ -221,7 +226,7 @@ class ScoreboardService {
   }
 
   void _handleMessage(dynamic message) {
-    print("Received message: $message");
+    _log.d("Received message: $message");
 
     // If we're receiving messages, we're definitely connected
     // This fixes edge cases where connection status gets out of sync
@@ -250,13 +255,13 @@ class ScoreboardService {
         }
       }
     } catch (e) {
-      print("Error parsing message: $e");
+      _log.e("Error parsing message: $e");
     }
   }
 
   void send(String action, String key, dynamic value, {String flag = ""}) {
     if (!_isConnected) {
-      print("Not connected to server");
+      _log.w("Not connected to server");
       return;
     }
 
@@ -267,7 +272,7 @@ class ScoreboardService {
       "flag": flag,
     });
 
-    print("Sending message: $message");
+    _log.d("Sending message: $message");
 
     _channel?.sink.add(message);
   }
