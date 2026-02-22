@@ -18,9 +18,12 @@ class JamTimerScreen extends StatefulWidget {
 }
 
 class _JamTimerScreenState extends State<JamTimerScreen> {
-  late ScoreboardService _service;
+  ScoreboardService? _service;
   bool _showUndo = false;
   bool _useReplace = false;
+
+  // "Healthy" color used when clock is in normal state (no alerts)
+  static final Color _healthyColor = Colors.green.shade400;
 
   @override
   void initState() {
@@ -30,8 +33,19 @@ class _JamTimerScreenState extends State<JamTimerScreen> {
     });
   }
 
-  Future<void> _connectToServer() async {
+  Future<void> _connectToServer({bool forceReconnect = false}) async {
     final state = Provider.of<ScoreboardState>(context, listen: false);
+
+    // If already connected, don't create a new service unless forced
+    if (_service != null && _service!.isConnected && !forceReconnect) {
+      return;
+    }
+
+    // Clean up existing service if forcing reconnect
+    if (forceReconnect && _service != null) {
+      _service!.disconnect();
+    }
+
     _service = ScoreboardService(state);
 
     final prefs = await SharedPreferences.getInstance();
@@ -39,12 +53,12 @@ class _JamTimerScreenState extends State<JamTimerScreen> {
     final port = prefs.getString('server_port') ?? '8000';
     final url = "ws://$host:$port";
 
-    _service.connect(url);
+    _service!.connect(url);
   }
 
   @override
   void dispose() {
-    _service.disconnect();
+    _service?.disconnect();
     super.dispose();
   }
 
@@ -53,9 +67,16 @@ class _JamTimerScreenState extends State<JamTimerScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFF121212),
       appBar: AppBar(
-        title: const Text(
-          "JAM TIMER",
-          style: TextStyle(fontWeight: FontWeight.bold),
+        title: Consumer<ScoreboardState>(
+          builder: (context, state, _) {
+            return Text(
+              "JAM TIMER",
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: _determineAlertColor(state),
+              ),
+            );
+          },
         ),
         centerTitle: true,
         backgroundColor: Colors.transparent,
@@ -103,8 +124,7 @@ class _JamTimerScreenState extends State<JamTimerScreen> {
 
           return RefreshIndicator(
             onRefresh: () async {
-              _service.disconnect();
-              await _connectToServer();
+              await _connectToServer(forceReconnect: true);
             },
             child: SingleChildScrollView(
               physics: const AlwaysScrollableScrollPhysics(),
@@ -120,7 +140,7 @@ class _JamTimerScreenState extends State<JamTimerScreen> {
                             team: state.team1,
                             isLeft: true,
                             enabled: isConnected,
-                            onRetainedToggle: (val) => _service.send(
+                            onRetainedToggle: (val) => _service?.send(
                               "Set",
                               "ScoreBoard.CurrentGame.Team(1).RetainedOfficialReview",
                               val,
@@ -133,7 +153,7 @@ class _JamTimerScreenState extends State<JamTimerScreen> {
                             team: state.team2,
                             isLeft: false,
                             enabled: isConnected,
-                            onRetainedToggle: (val) => _service.send(
+                            onRetainedToggle: (val) => _service?.send(
                               "Set",
                               "ScoreBoard.CurrentGame.Team(2).RetainedOfficialReview",
                               val,
@@ -156,7 +176,7 @@ class _JamTimerScreenState extends State<JamTimerScreen> {
                       enabled: isConnected,
                       onAdjust: (val) {
                         final active = _determineActiveClock(state);
-                        _service.send(
+                        _service?.send(
                           "Set",
                           "ScoreBoard.CurrentGame.Clock(${active.name}).Time",
                           val,
@@ -183,17 +203,17 @@ class _JamTimerScreenState extends State<JamTimerScreen> {
                       timeoutLabel: state.labelTimeout,
                       alertColor: _determineAlertColor(state),
                       enabled: isConnected,
-                      onStartJam: () => _service.send(
+                      onStartJam: () => _service?.send(
                         "Set",
                         "ScoreBoard.CurrentGame.StartJam",
                         true,
                       ),
-                      onStopJam: () => _service.send(
+                      onStopJam: () => _service?.send(
                         "Set",
                         "ScoreBoard.CurrentGame.StopJam",
                         true,
                       ),
-                      onTimeout: () => _service.send(
+                      onTimeout: () => _service?.send(
                         "Set",
                         "ScoreBoard.CurrentGame.Timeout",
                         true,
@@ -288,7 +308,7 @@ class _JamTimerScreenState extends State<JamTimerScreen> {
                 "-",
                 isConnected
                     ? () {
-                        _service.send(
+                        _service?.send(
                           "Set",
                           "ScoreBoard.CurrentGame.Clock(${clock.name}).Time",
                           "-1000",
@@ -312,7 +332,7 @@ class _JamTimerScreenState extends State<JamTimerScreen> {
                 "+",
                 isConnected
                     ? () {
-                        _service.send(
+                        _service?.send(
                           "Set",
                           "ScoreBoard.CurrentGame.Clock(${clock.name}).Time",
                           "+1000",
@@ -408,7 +428,7 @@ class _JamTimerScreenState extends State<JamTimerScreen> {
                       count: state.team1.timeouts,
                       color: Colors.white,
                       enabled: isConnected,
-                      onTap: () => _service.send(
+                      onTap: () => _service?.send(
                         "Set",
                         "ScoreBoard.CurrentGame.Team(1).Timeout",
                         true,
@@ -421,7 +441,7 @@ class _JamTimerScreenState extends State<JamTimerScreen> {
                       count: state.team1.officialReviews,
                       color: Colors.blue.shade300,
                       enabled: isConnected,
-                      onTap: () => _service.send(
+                      onTap: () => _service?.send(
                         "Set",
                         "ScoreBoard.CurrentGame.Team(1).OfficialReview",
                         true,
@@ -438,7 +458,7 @@ class _JamTimerScreenState extends State<JamTimerScreen> {
                   isActive: isOfficialTO,
                   color: Colors.amber,
                   enabled: isConnected,
-                  onTap: () => _service.send(
+                  onTap: () => _service?.send(
                     "Set",
                     "ScoreBoard.CurrentGame.OfficialTimeout",
                     true,
@@ -465,7 +485,7 @@ class _JamTimerScreenState extends State<JamTimerScreen> {
                       count: state.team2.timeouts,
                       color: Colors.white,
                       enabled: isConnected,
-                      onTap: () => _service.send(
+                      onTap: () => _service?.send(
                         "Set",
                         "ScoreBoard.CurrentGame.Team(2).Timeout",
                         true,
@@ -478,7 +498,7 @@ class _JamTimerScreenState extends State<JamTimerScreen> {
                       count: state.team2.officialReviews,
                       color: Colors.blue.shade300,
                       enabled: isConnected,
-                      onTap: () => _service.send(
+                      onTap: () => _service?.send(
                         "Set",
                         "ScoreBoard.CurrentGame.Team(2).OfficialReview",
                         true,
@@ -496,7 +516,7 @@ class _JamTimerScreenState extends State<JamTimerScreen> {
             height: 44,
             child: ElevatedButton(
               onPressed: isConnected
-                  ? () => _service.send(
+                  ? () => _service?.send(
                       "Set",
                       "ScoreBoard.CurrentGame.StopJam",
                       true,
@@ -674,7 +694,7 @@ class _JamTimerScreenState extends State<JamTimerScreen> {
                 height: 44,
                 child: ElevatedButton(
                   onPressed: isConnected
-                      ? () => _service.send(
+                      ? () => _service?.send(
                           "Set",
                           _useReplace
                               ? "ScoreBoard.CurrentGame.ClockReplace"
@@ -713,7 +733,7 @@ class _JamTimerScreenState extends State<JamTimerScreen> {
   int _lastAlertLevel = 0; // 0: None, 1: Low, 2: Warning, 3: High
   String _lastAlertClockName = "";
 
-  Color? _determineAlertColor(ScoreboardState state) {
+  Color _determineAlertColor(ScoreboardState state) {
     // Determine which clock is logically "active" for alerts
     Clock? activeClock;
     bool isCountUp = false;
@@ -745,7 +765,7 @@ class _JamTimerScreenState extends State<JamTimerScreen> {
     if (activeClock == null || (!activeClock.running && !allowStopped)) {
       _lastAlertLevel = 0;
       _lastAlertClockName = "";
-      return null;
+      return _healthyColor;
     }
 
     // Reset alert level if we switched clocks
@@ -824,8 +844,7 @@ class _JamTimerScreenState extends State<JamTimerScreen> {
     bool safe = isCountUp ? (time < duration - 10000) : (time > 10000);
     if (safe) {
       _lastAlertLevel = 0;
-      // return null not needed if we want to clear color
-      return null;
+      return _healthyColor;
     }
 
     // If we are in an alert zone but level is already set (or higher), return corresponding color
@@ -833,6 +852,6 @@ class _JamTimerScreenState extends State<JamTimerScreen> {
     if (_lastAlertLevel >= 2) return Colors.orange.shade800;
     if (_lastAlertLevel >= 1) return Colors.amber.shade700;
 
-    return null;
+    return _healthyColor;
   }
 }
