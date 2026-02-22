@@ -10,7 +10,7 @@ import '../models/scoreboard_state.dart';
 typedef WebSocketChannelFactory = WebSocketChannel Function(Uri uri);
 
 final _log = Logger(
-  printer: PrettyPrinter(methodCount: 0, printEmojis: false),
+  printer: PrettyPrinter(methodCount: 0, printEmojis: false, colors: true),
 );
 
 class ScoreboardService {

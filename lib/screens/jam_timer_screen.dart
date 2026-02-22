@@ -702,14 +702,29 @@ class _JamTimerScreenState extends State<JamTimerScreen>
   }
 
   bool _isPrePeriod(ScoreboardState state) {
+
+    // Before game starts (period 0)
     if (state.clocks['Period']?.number == 0) return true;
+
+    // During intermission
     if (state.clocks['Intermission']?.running == true) return true;
 
+    // Intermission just ended - time is 0, not running, lineup hasn't started
+    final intermission = state.clocks['Intermission'];
+    final lineup = state.clocks['Lineup'];
+    if (intermission != null &&
+        !intermission.running &&
+        intermission.time == 0 &&
+        intermission.number > 0 &&
+        lineup != null &&
+        !lineup.running &&
+        lineup.time == 0) {
+      return true;
+    }
+
+    // General case: no clocks running and not in jam/timeout
     bool anyClockRunning = state.clocks.values.any((c) => c.running);
-    bool inTimeout =
-        state.timeoutOwner.isNotEmpty ||
-        state.officialReview.isNotEmpty ||
-        state.clocks['Timeout']!.running;
+    bool inTimeout = state.clocks['Timeout']!.running;
 
     if (!anyClockRunning && !state.inJam && !inTimeout) {
       return true;
