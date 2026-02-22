@@ -17,7 +17,8 @@ class JamTimerScreen extends StatefulWidget {
   State<JamTimerScreen> createState() => _JamTimerScreenState();
 }
 
-class _JamTimerScreenState extends State<JamTimerScreen> {
+class _JamTimerScreenState extends State<JamTimerScreen>
+    with WidgetsBindingObserver {
   ScoreboardService? _service;
   bool _showUndo = false;
   bool _useReplace = false;
@@ -28,9 +29,19 @@ class _JamTimerScreenState extends State<JamTimerScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _connectToServer();
     });
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    if (state == AppLifecycleState.resumed) {
+      // App came back to foreground - reconnect to server
+      _connectToServer(forceReconnect: true);
+    }
   }
 
   Future<void> _connectToServer({bool forceReconnect = false}) async {
@@ -58,6 +69,7 @@ class _JamTimerScreenState extends State<JamTimerScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _service?.disconnect();
     super.dispose();
   }
@@ -823,6 +835,29 @@ class _JamTimerScreenState extends State<JamTimerScreen> {
   int _lastAlertLevel = 0; // 0: None, 1: Low, 2: Warning, 3: High
   String _lastAlertClockName = "";
   bool _wasInJam = false;
+  bool _alertsInitialized = false; // Skip haptics on first state load
+
+  void _triggerHaptic(int level) {
+    // Skip haptics until we've seen at least one state update
+    if (!_alertsInitialized) return;
+    if (_lastAlertLevel >= level) return;
+
+    _lastAlertLevel = level;
+    switch (level) {
+      case 1:
+        Vibration.vibrate(duration: 400);
+        break;
+      case 2:
+        Vibration.vibrate(
+          pattern: [0, 200, 100, 200],
+          intensities: [0, 255, 0, 255],
+        );
+        break;
+      case 3:
+        Vibration.vibrate(duration: 1000, amplitude: 255);
+        break;
+    }
+  }
 
   Color _determineAlertColor(ScoreboardState state) {
     // Determine which clock is logically "active" for alerts
@@ -849,13 +884,12 @@ class _JamTimerScreenState extends State<JamTimerScreen> {
     // Detect jam end transition (was in jam, now lineup is running)
     // This handles auto-end jams where we skip from 1s to lineup without seeing 0s
     if (_wasInJam && !state.inJam && state.clocks['Lineup']?.running == true) {
-      // Jam just ended and transitioned to lineup - trigger jam end haptic
-      if (_lastAlertLevel < 3) {
-        Vibration.vibrate(duration: 1000, amplitude: 255);
-        _lastAlertLevel = 3;
-      }
+      _triggerHaptic(3);
     }
     _wasInJam = state.inJam;
+
+    // Mark as initialized after first state (skip haptics on launch)
+    _alertsInitialized = true;
 
     // If no relevant clock is running, reset and return
     // SPECIAL CASE: Allow activeClock to be processed if it's the Jam clock at 0:00 (Limbo state), even if not running.
@@ -884,29 +918,15 @@ class _JamTimerScreenState extends State<JamTimerScreen> {
 
       if (time >= duration) {
         // High Alert (30s elapsed or more)
-        if (_lastAlertLevel < 3) {
-          Vibration.vibrate(duration: 1000, amplitude: 255);
-          _lastAlertLevel = 3;
-        }
+        _triggerHaptic(3);
         return Colors.red;
       } else if (time >= duration - 5000) {
-        // >= 25000
         // Warning Alert (25s elapsed)
-        if (_lastAlertLevel < 2) {
-          Vibration.vibrate(
-            pattern: [0, 200, 100, 200],
-            intensities: [0, 255, 0, 255],
-          );
-          _lastAlertLevel = 2;
-        }
+        _triggerHaptic(2);
         return Colors.orange.shade800;
       } else if (time >= duration - 10000) {
-        // >= 20000
         // Low Alert (20s elapsed)
-        if (_lastAlertLevel < 1) {
-          Vibration.vibrate(duration: 400);
-          _lastAlertLevel = 1;
-        }
+        _triggerHaptic(1);
         return Colors.amber.shade700;
       }
     } else {
@@ -915,27 +935,15 @@ class _JamTimerScreenState extends State<JamTimerScreen> {
 
       if (time <= 0) {
         // High Alert (0s remaining)
-        if (_lastAlertLevel < 3) {
-          Vibration.vibrate(duration: 1000, amplitude: 255);
-          _lastAlertLevel = 3;
-        }
+        _triggerHaptic(3);
         return Colors.red;
       } else if (time <= 5000) {
         // Warning Alert (5s remaining)
-        if (_lastAlertLevel < 2) {
-          Vibration.vibrate(
-            pattern: [0, 200, 100, 200],
-            intensities: [0, 255, 0, 255],
-          );
-          _lastAlertLevel = 2;
-        }
+        _triggerHaptic(2);
         return Colors.orange.shade800;
       } else if (time <= 10000) {
         // Low Alert (10s remaining)
-        if (_lastAlertLevel < 1) {
-          Vibration.vibrate(duration: 400);
-          _lastAlertLevel = 1;
-        }
+        _triggerHaptic(1);
         return Colors.amber.shade700;
       }
     }

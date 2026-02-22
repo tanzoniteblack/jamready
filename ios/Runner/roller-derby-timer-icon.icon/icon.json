@@ -6,6 +6,18 @@
     {
       "layers" : [
         {
+          "image-name" : "ChatGPT Image Feb 22, 2026 at 01_28_22 PM.png",
+          "name" : "ChatGPT Image Feb 22, 2026 at 01_28_22 PM",
+          "position" : {
+            "scale" : 1.1,
+            "translation-in-points" : [
+              -16.171875,
+              66.5625
+            ]
+          }
+        },
+        {
+          "hidden" : true,
           "image-name" : "ChatGPT Image Feb 22, 2026 at 01_11_04 PM.png",
           "name" : "ChatGPT Image Feb 22, 2026 at 01_11_04 PM",
           "position" : {
