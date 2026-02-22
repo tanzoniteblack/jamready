@@ -763,7 +763,7 @@ class _JamTimerScreenState extends State<JamTimerScreen>
                   child: Switch(
                     value: _showUndo,
                     onChanged: (val) => setState(() => _showUndo = val),
-                    activeColor: Colors.amber,
+                    activeThumbColor: Colors.amber,
                     materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   ),
                 ),
@@ -798,7 +798,7 @@ class _JamTimerScreenState extends State<JamTimerScreen>
                     child: Switch(
                       value: _useReplace,
                       onChanged: (val) => setState(() => _useReplace = val),
-                      activeColor: Colors.orange,
+                      activeThumbColor: Colors.orange,
                       materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                     ),
                   ),
