@@ -773,7 +773,7 @@ class _JamTimerScreenState extends State<JamTimerScreen>
       child: Column(
         children: [
           Text(
-            periodNumber == 0 ? "GAME" :"PERIOD $periodNumber",
+            periodNumber == 0 ? "GAME" : "PERIOD $periodNumber",
             style: AppTextStyles.clockLabel.copyWith(
               fontSize: 22,
               color: color,

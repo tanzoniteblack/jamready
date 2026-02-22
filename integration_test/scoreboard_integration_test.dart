@@ -53,6 +53,16 @@ class ScoreboardTestClient {
     sleep(Duration(seconds: 2));
   }
 
+  /// Sets a clock time on the server
+  void setClockTime(String gameId, String clockName, int timeMs) {
+    _channel.sink.add(jsonEncode({
+      'action': 'Set',
+      'key': 'ScoreBoard.Game($gameId).Clock($clockName).Time',
+      'value': timeMs.toString(),
+      'flag': '',
+    }));
+  }
+
   Future<void> close() async {
     await _channel.sink.close();
   }
@@ -358,5 +368,89 @@ void main() {
       () => _state(tester).clocks['Timeout']!.running,
       timeout: const Duration(seconds: 20),
     );
+  });
+
+  testWidgets('Pre-game shows GAME and READY instead of lineup clock',
+      (tester) async {
+    final client = await _launchAppAndConnect(tester);
+    addTearDown(client.close);
+    addTearDown(() async {
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump();
+    });
+
+    await client.startNewGame();
+    await _ensurePrePeriod(tester);
+
+    // Verify "GAME" and "READY" are displayed
+    await _pumpUntil(
+      tester,
+      () => find.text('GAME').evaluate().isNotEmpty &&
+          find.text('READY').evaluate().isNotEmpty,
+      timeout: const Duration(seconds: 10),
+    );
+
+    expect(find.text('GAME'), findsOneWidget);
+    expect(find.text('READY'), findsOneWidget);
+  });
+
+  testWidgets('Post-intermission shows PERIOD 2 and READY', (tester) async {
+    final client = await _launchAppAndConnect(tester);
+    addTearDown(client.close);
+    addTearDown(() async {
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump();
+    });
+
+    await client.startNewGame();
+    await _ensurePrePeriod(tester);
+    await _swipeToStartLineup(tester);
+
+    // Start the jam to begin period 1
+    await _tapJamControl(tester, _state(tester).labelStart);
+    await _pumpUntil(
+      tester,
+      () => _state(tester).clocks['Jam']!.running,
+      timeout: const Duration(seconds: 20),
+    );
+
+    // Get the game ID and set period clock to almost zero
+    final gameId = _state(tester).gameId;
+    client.setClockTime(gameId, 'Period', 1000);
+    await tester.pump(const Duration(milliseconds: 500));
+
+    // Stop the jam - this should trigger intermission since period is ending
+    await _tapJamControl(tester, _state(tester).labelStop);
+    await tester.pump(const Duration(seconds: 1));
+
+    // Wait for intermission to start
+    await _pumpUntil(
+      tester,
+      () => _state(tester).clocks['Intermission']!.running,
+      timeout: const Duration(seconds: 10),
+    );
+
+    // Set intermission clock to almost zero to speed it up
+    client.setClockTime(gameId, 'Intermission', 1000);
+    await tester.pump(const Duration(milliseconds: 500));
+
+    // Wait for intermission to end and ready state to appear
+    await _pumpUntil(
+      tester,
+      () => !_state(tester).clocks['Intermission']!.running &&
+          _state(tester).clocks['Intermission']!.time == 0,
+      timeout: const Duration(seconds: 10),
+    );
+
+    // Verify "PERIOD 2" and "READY" are displayed
+    await _pumpUntil(
+      tester,
+      () => find.text('PERIOD 2').evaluate().isNotEmpty &&
+          find.text('READY').evaluate().isNotEmpty,
+      timeout: const Duration(seconds: 10),
+    );
+
+    expect(find.text('PERIOD 2'), findsAtLeast(1));
+    expect(find.text('READY'), findsOneWidget);
   });
 }
