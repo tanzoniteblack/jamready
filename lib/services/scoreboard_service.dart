@@ -249,14 +249,15 @@ class ScoreboardService {
       return;
     }
 
-    print("Sending message: $action $key $value $flag");
-
-    final message = {
+    final message = jsonEncode({
       "action": action,
       "key": key,
       "value": value,
       "flag": flag,
-    };
-    _channel?.sink.add(jsonEncode(message));
+    });
+
+    print("Sending message: $message");
+
+    _channel?.sink.add(message);
   }
 }

@@ -822,6 +822,7 @@ class _JamTimerScreenState extends State<JamTimerScreen> {
   // Track last alert state
   int _lastAlertLevel = 0; // 0: None, 1: Low, 2: Warning, 3: High
   String _lastAlertClockName = "";
+  bool _wasInJam = false;
 
   Color _determineAlertColor(ScoreboardState state) {
     // Determine which clock is logically "active" for alerts
@@ -844,6 +845,17 @@ class _JamTimerScreenState extends State<JamTimerScreen> {
       isCountUp = true; // Lineup Clock counts UP
       duration = state.lineupDuration;
     }
+
+    // Detect jam end transition (was in jam, now lineup is running)
+    // This handles auto-end jams where we skip from 1s to lineup without seeing 0s
+    if (_wasInJam && !state.inJam && state.clocks['Lineup']?.running == true) {
+      // Jam just ended and transitioned to lineup - trigger jam end haptic
+      if (_lastAlertLevel < 3) {
+        Vibration.vibrate(duration: 1000, amplitude: 255);
+        _lastAlertLevel = 3;
+      }
+    }
+    _wasInJam = state.inJam;
 
     // If no relevant clock is running, reset and return
     // SPECIAL CASE: Allow activeClock to be processed if it's the Jam clock at 0:00 (Limbo state), even if not running.
