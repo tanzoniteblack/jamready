@@ -184,7 +184,7 @@ class _JamTimerScreenState extends State<JamTimerScreen>
                       const SizedBox(height: 24),
 
                     // Active Game Clock (Jam / Lineup / Timeout) or Ready indicator
-                    if (_isPostIntermission(state))
+                    if (_isReadyToStart(state))
                       _buildReadyToStartDisplay(state, isConnected)
                     else
                       ClockDisplay(
@@ -704,19 +704,30 @@ class _JamTimerScreenState extends State<JamTimerScreen>
     );
   }
 
-  /// Detects when intermission just ended but lineup hasn't started yet
-  bool _isPostIntermission(ScoreboardState state) {
+  /// Detects when ready to start a period (pre-game or post-intermission)
+  bool _isReadyToStart(ScoreboardState state) {
     final intermission = state.clocks['Intermission'];
     final lineup = state.clocks['Lineup'];
     final period = state.clocks['Period'];
-    return intermission != null &&
+
+    // Must have lineup and period not running
+    if (lineup == null || lineup.running) return false;
+    if (period == null || period.running) return false;
+
+    // Pre-game: Period 0, no clocks running yet
+    if (period.number == 0 && !lineup.running) {
+      return true;
+    }
+
+    // Post-intermission: Intermission completed (time=0, not running)
+    if (intermission != null &&
         !intermission.running &&
         intermission.time == 0 &&
-        intermission.number > 0 &&
-        lineup != null &&
-        !lineup.running &&
-        period != null &&
-        !period.running;
+        intermission.number > 0) {
+      return true;
+    }
+
+    return false;
   }
 
   bool _isPrePeriod(ScoreboardState state) {
@@ -728,7 +739,7 @@ class _JamTimerScreenState extends State<JamTimerScreen>
     if (state.clocks['Intermission']?.running == true) return true;
 
     // Intermission just ended - use the shared helper
-    if (_isPostIntermission(state)) {
+    if (_isReadyToStart(state)) {
       return true;
     }
 
@@ -762,7 +773,7 @@ class _JamTimerScreenState extends State<JamTimerScreen>
       child: Column(
         children: [
           Text(
-            "PERIOD $periodNumber",
+            periodNumber == 0 ? "GAME" :"PERIOD $periodNumber",
             style: AppTextStyles.clockLabel.copyWith(
               fontSize: 22,
               color: color,
