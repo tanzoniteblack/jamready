@@ -187,38 +187,37 @@ class _JamTimerScreenState extends State<JamTimerScreen> {
 
                     const SizedBox(height: 24),
 
-                    // Timeout Type Buttons (visible during timeout, like original web)
+                    // Timeout Type Buttons (visible during timeout) OR normal controls
                     if (state.labelStop == "End Timeout")
-                      _buildTimeoutTypeSection(state, isConnected),
-
-                    // Controls
-                    JamControls(
-                      inJam: state.inJam,
-                      isPrePeriod: _isPrePeriod(state),
-                      isIntermission:
-                          (state.clocks['Intermission']?.running ?? false) ||
-                          (state.clocks['Period']?.number == 0),
-                      startLabel: state.labelStart,
-                      stopLabel: state.labelStop,
-                      timeoutLabel: state.labelTimeout,
-                      alertColor: _determineAlertColor(state),
-                      enabled: isConnected,
-                      onStartJam: () => _service?.send(
-                        "Set",
-                        "ScoreBoard.CurrentGame.StartJam",
-                        true,
+                      _buildTimeoutTypeSection(state, isConnected)
+                    else
+                      JamControls(
+                        inJam: state.inJam,
+                        isPrePeriod: _isPrePeriod(state),
+                        isIntermission:
+                            (state.clocks['Intermission']?.running ?? false) ||
+                            (state.clocks['Period']?.number == 0),
+                        startLabel: state.labelStart,
+                        stopLabel: state.labelStop,
+                        timeoutLabel: state.labelTimeout,
+                        alertColor: _determineAlertColor(state),
+                        enabled: isConnected,
+                        onStartJam: () => _service?.send(
+                          "Set",
+                          "ScoreBoard.CurrentGame.StartJam",
+                          true,
+                        ),
+                        onStopJam: () => _service?.send(
+                          "Set",
+                          "ScoreBoard.CurrentGame.StopJam",
+                          true,
+                        ),
+                        onTimeout: () => _service?.send(
+                          "Set",
+                          "ScoreBoard.CurrentGame.Timeout",
+                          true,
+                        ),
                       ),
-                      onStopJam: () => _service?.send(
-                        "Set",
-                        "ScoreBoard.CurrentGame.StopJam",
-                        true,
-                      ),
-                      onTimeout: () => _service?.send(
-                        "Set",
-                        "ScoreBoard.CurrentGame.Timeout",
-                        true,
-                      ),
-                    ),
 
                     // Undo / Replace Section
                     if (state.labelUndo != "No Action")
@@ -397,203 +396,328 @@ class _JamTimerScreenState extends State<JamTimerScreen> {
     final bool isTeam2OR =
         owner.isNotEmpty && owner == state.team2.serverId && isOr;
 
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.05),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.amber.withValues(alpha: 0.3)),
-      ),
-      child: Column(
-        children: [
-          // Team Row
-          Row(
-            children: [
-              // Team 1 buttons
-              Expanded(
-                child: Column(
-                  children: [
-                    Text(
-                      state.team1.displayName,
-                      style: AppTextStyles.clockLabel.copyWith(
-                        fontSize: 12,
-                        color: Colors.white70,
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 8),
-                    _buildInlineTimeoutButton(
-                      "Timeout",
-                      isActive: isTeam1TO,
-                      count: state.team1.timeouts,
-                      color: Colors.white,
-                      enabled: isConnected,
-                      onTap: () => _service?.send(
-                        "Set",
-                        "ScoreBoard.CurrentGame.Team(1).Timeout",
-                        true,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    _buildInlineTimeoutButton(
-                      "Review",
-                      isActive: isTeam1OR,
-                      count: state.team1.officialReviews,
-                      color: Colors.blue.shade300,
-                      enabled: isConnected,
-                      onTap: () => _service?.send(
-                        "Set",
-                        "ScoreBoard.CurrentGame.Team(1).OfficialReview",
-                        true,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              // Official Timeout (center)
-              Expanded(
-                child: _buildInlineTimeoutButton(
-                  "Official TO",
-                  isActive: isOfficialTO,
-                  color: Colors.amber,
-                  enabled: isConnected,
-                  onTap: () => _service?.send(
-                    "Set",
-                    "ScoreBoard.CurrentGame.OfficialTimeout",
-                    true,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              // Team 2 buttons
-              Expanded(
-                child: Column(
-                  children: [
-                    Text(
-                      state.team2.displayName,
-                      style: AppTextStyles.clockLabel.copyWith(
-                        fontSize: 12,
-                        color: Colors.white70,
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 8),
-                    _buildInlineTimeoutButton(
-                      "Timeout",
-                      isActive: isTeam2TO,
-                      count: state.team2.timeouts,
-                      color: Colors.white,
-                      enabled: isConnected,
-                      onTap: () => _service?.send(
-                        "Set",
-                        "ScoreBoard.CurrentGame.Team(2).Timeout",
-                        true,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    _buildInlineTimeoutButton(
-                      "Review",
-                      isActive: isTeam2OR,
-                      count: state.team2.officialReviews,
-                      color: Colors.blue.shade300,
-                      enabled: isConnected,
-                      onTap: () => _service?.send(
-                        "Set",
-                        "ScoreBoard.CurrentGame.Team(2).OfficialReview",
-                        true,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
+    return Column(
+      children: [
+        // Official Timeout button (full width, top)
+        _buildTimeoutButton(
+          "OFFICIAL TIMEOUT",
+          isActive: isOfficialTO,
+          color: Colors.amber,
+          enabled: isConnected,
+          height: 56,
+          onTap: () => _service?.send(
+            "Set",
+            "ScoreBoard.CurrentGame.OfficialTimeout",
+            true,
           ),
-          const SizedBox(height: 12),
-          // End Timeout button
-          SizedBox(
-            width: double.infinity,
-            height: 44,
-            child: ElevatedButton(
-              onPressed: isConnected
-                  ? () => _service?.send(
+        ),
+
+        const SizedBox(height: 16),
+
+        // Team timeout/review rows
+        Row(
+          children: [
+            // Team 1 column
+            Expanded(
+              child: Column(
+                children: [
+                  Text(
+                    state.team1.displayName,
+                    style: AppTextStyles.clockLabel.copyWith(
+                      fontSize: 14,
+                      color: Colors.white70,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 10),
+                  _buildTimeoutButton(
+                    "TIMEOUT",
+                    isActive: isTeam1TO,
+                    count: state.team1.timeouts,
+                    color: Colors.white,
+                    enabled: isConnected,
+                    height: 48,
+                    onTap: () => _service?.send(
                       "Set",
-                      "ScoreBoard.CurrentGame.StopJam",
+                      "ScoreBoard.CurrentGame.Team(1).Timeout",
                       true,
-                    )
-                  : null,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.red.shade800,
-                disabledBackgroundColor: Colors.grey.shade800,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-              ),
-              child: Text(
-                "END TIMEOUT",
-                style: AppTextStyles.buttonText.copyWith(
-                  fontSize: 16,
-                  color: isConnected ? Colors.white : Colors.white38,
-                ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  _buildTimeoutButton(
+                    "REVIEW",
+                    isActive: isTeam1OR,
+                    count: state.team1.officialReviews,
+                    color: Colors.blue.shade300,
+                    enabled: isConnected,
+                    height: 48,
+                    onTap: () => _service?.send(
+                      "Set",
+                      "ScoreBoard.CurrentGame.Team(1).OfficialReview",
+                      true,
+                    ),
+                  ),
+                ],
               ),
             ),
-          ),
-        ],
-      ),
+            const SizedBox(width: 12),
+            // Team 2 column
+            Expanded(
+              child: Column(
+                children: [
+                  Text(
+                    state.team2.displayName,
+                    style: AppTextStyles.clockLabel.copyWith(
+                      fontSize: 14,
+                      color: Colors.white70,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 10),
+                  _buildTimeoutButton(
+                    "TIMEOUT",
+                    isActive: isTeam2TO,
+                    count: state.team2.timeouts,
+                    color: Colors.white,
+                    enabled: isConnected,
+                    height: 48,
+                    onTap: () => _service?.send(
+                      "Set",
+                      "ScoreBoard.CurrentGame.Team(2).Timeout",
+                      true,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  _buildTimeoutButton(
+                    "REVIEW",
+                    isActive: isTeam2OR,
+                    count: state.team2.officialReviews,
+                    color: Colors.blue.shade300,
+                    enabled: isConnected,
+                    height: 48,
+                    onTap: () => _service?.send(
+                      "Set",
+                      "ScoreBoard.CurrentGame.Team(2).OfficialReview",
+                      true,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+
+        const SizedBox(height: 20),
+
+        // End Timeout button (large, prominent)
+        _buildEndTimeoutButton(isConnected),
+      ],
     );
   }
 
-  Widget _buildInlineTimeoutButton(
+  Widget _buildTimeoutButton(
     String label, {
     required bool isActive,
     int? count,
     required Color color,
     required bool enabled,
+    required double height,
     required VoidCallback onTap,
   }) {
+    final highlightColor = Color.lerp(color, Colors.white, 0.2)!;
+    final shadowColor = Color.lerp(color, Colors.black, 0.3)!;
+
     return SizedBox(
       width: double.infinity,
-      height: 36,
-      child: OutlinedButton(
-        onPressed: enabled ? onTap : null,
-        style: OutlinedButton.styleFrom(
-          padding: const EdgeInsets.symmetric(horizontal: 4),
-          backgroundColor: isActive ? color.withValues(alpha: 0.2) : null,
-          side: BorderSide(
-            color: isActive ? color : Colors.white24,
-            width: isActive ? 2 : 1,
-          ),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      height: height,
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: enabled && isActive
+              ? [
+                  BoxShadow(
+                    color: color.withValues(alpha: 0.4),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ]
+              : [],
         ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Flexible(
-              child: Text(
-                label,
-                style: TextStyle(
-                  color: enabled
-                      ? (isActive ? color : Colors.white70)
-                      : Colors.white24,
-                  fontSize: 11,
-                  fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: enabled ? onTap : null,
+            borderRadius: BorderRadius.circular(12),
+            child: Ink(
+              decoration: BoxDecoration(
+                gradient: isActive && enabled
+                    ? LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [highlightColor, color, shadowColor],
+                        stops: const [0.0, 0.4, 1.0],
+                      )
+                    : LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Colors.white.withValues(alpha: 0.08),
+                          Colors.white.withValues(alpha: 0.03),
+                        ],
+                      ),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: isActive ? color : Colors.white24,
+                  width: isActive ? 2 : 1,
                 ),
-                overflow: TextOverflow.ellipsis,
+              ),
+              child: Container(
+                alignment: Alignment.center,
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Flexible(
+                      child: Text(
+                        label,
+                        style: TextStyle(
+                          color: enabled
+                              ? (isActive ? Colors.white : Colors.white70)
+                              : Colors.white24,
+                          fontSize: 14,
+                          fontWeight:
+                              isActive ? FontWeight.bold : FontWeight.w500,
+                          shadows: isActive
+                              ? [
+                                  Shadow(
+                                    color: Colors.black.withValues(alpha: 0.3),
+                                    blurRadius: 2,
+                                    offset: const Offset(0, 1),
+                                  ),
+                                ]
+                              : null,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    if (count != null) ...[
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: isActive
+                              ? Colors.black.withValues(alpha: 0.2)
+                              : Colors.white.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text(
+                          "$count",
+                          style: TextStyle(
+                            color: enabled
+                                ? (isActive ? Colors.white : Colors.white70)
+                                : Colors.white24,
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
               ),
             ),
-            if (count != null) ...[
-              const SizedBox(width: 4),
-              Text(
-                "$count",
-                style: TextStyle(
-                  color: enabled ? Colors.white : Colors.white24,
-                  fontSize: 11,
-                  fontWeight: FontWeight.bold,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEndTimeoutButton(bool isConnected) {
+    final color = Colors.red.shade700;
+    final highlightColor = Color.lerp(color, Colors.white, 0.15)!;
+    final shadowColor = Color.lerp(color, Colors.black, 0.25)!;
+
+    return SizedBox(
+      width: double.infinity,
+      height: 72,
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: isConnected
+              ? [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.4),
+                    blurRadius: 8,
+                    offset: const Offset(0, 4),
+                  ),
+                  BoxShadow(
+                    color: color.withValues(alpha: 0.3),
+                    blurRadius: 12,
+                    offset: const Offset(0, 2),
+                  ),
+                ]
+              : [],
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: isConnected
+                ? () => _service?.send(
+                      "Set",
+                      "ScoreBoard.CurrentGame.StopJam",
+                      true,
+                    )
+                : null,
+            borderRadius: BorderRadius.circular(16),
+            child: Ink(
+              decoration: BoxDecoration(
+                gradient: isConnected
+                    ? LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [highlightColor, color, shadowColor],
+                        stops: const [0.0, 0.4, 1.0],
+                      )
+                    : null,
+                color: isConnected ? null : Colors.grey.shade800,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(16),
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      Colors.white.withValues(alpha: isConnected ? 0.15 : 0.0),
+                      Colors.transparent,
+                      Colors.transparent,
+                      Colors.black.withValues(alpha: isConnected ? 0.1 : 0.0),
+                    ],
+                    stops: const [0.0, 0.3, 0.7, 1.0],
+                  ),
+                ),
+                alignment: Alignment.center,
+                child: Text(
+                  "END TIMEOUT",
+                  style: AppTextStyles.buttonText.copyWith(
+                    fontSize: 24,
+                    color: isConnected ? Colors.white : Colors.white38,
+                    shadows: isConnected
+                        ? [
+                            Shadow(
+                              color: Colors.black.withValues(alpha: 0.3),
+                              blurRadius: 2,
+                              offset: const Offset(0, 1),
+                            ),
+                          ]
+                        : null,
+                  ),
                 ),
               ),
-            ],
-          ],
+            ),
+          ),
         ),
       ),
     );

@@ -54,7 +54,6 @@ class JamControls extends StatelessWidget {
     // Disable buttons if not enabled
     if (!enabled) {
       color = Colors.grey.shade800;
-      // We keep the label but disable the interaction
     }
 
     final bool timeoutEnabled = enabled && !isIntermission;
@@ -67,54 +66,175 @@ class JamControls extends StatelessWidget {
           child: isPrePeriod
               ? SwipeButton(
                   label: "Slide to Start Lineup",
-                  onConfirmed:
-                      onStopJam, // 'Stop Jam' triggers 'Start Lineup' logic in backend/callbacks
+                  onConfirmed: onStopJam,
                   color: Colors.orange.shade800,
                   enabled: enabled,
                 )
-              : ElevatedButton(
-                  onPressed: enabled ? onPressed : null,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: color,
-                    disabledBackgroundColor: Colors.grey.shade800,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    elevation: enabled ? 4 : 0,
-                  ),
-                  child: Text(
-                    label.toUpperCase(),
-                    style: AppTextStyles.buttonText.copyWith(
-                      fontSize: 28,
-                      color: enabled ? Colors.white : Colors.white38,
-                    ),
-                  ),
+              : _buildDepthButton(
+                  label: label.toUpperCase(),
+                  color: color,
+                  enabled: enabled,
+                  onPressed: onPressed,
+                  fontSize: 28,
+                  height: 80,
                 ),
         ),
         const SizedBox(height: 24),
-        SizedBox(
-          width: double.infinity,
+        _buildDepthOutlinedButton(
+          label: timeoutLabel.toUpperCase(),
+          color: Colors.amber,
+          enabled: timeoutEnabled,
+          onPressed: onTimeout,
           height: 56,
-          child: OutlinedButton(
-            onPressed: timeoutEnabled ? onTimeout : null,
-            style: OutlinedButton.styleFrom(
-              side: BorderSide(
-                color: timeoutEnabled ? Colors.amber : Colors.white12,
-                width: 2,
-              ),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDepthButton({
+    required String label,
+    required Color color,
+    required bool enabled,
+    required VoidCallback onPressed,
+    double fontSize = 20,
+    double height = 56,
+  }) {
+    final highlightColor = Color.lerp(color, Colors.white, 0.2)!;
+    final shadowColor = Color.lerp(color, Colors.black, 0.3)!;
+
+    return Container(
+      height: height,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: enabled
+            ? [
+                // Bottom shadow for depth
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.4),
+                  blurRadius: 8,
+                  offset: const Offset(0, 4),
+                ),
+                // Subtle glow
+                BoxShadow(
+                  color: color.withValues(alpha: 0.3),
+                  blurRadius: 12,
+                  offset: const Offset(0, 2),
+                ),
+              ]
+            : [],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: enabled ? onPressed : null,
+          borderRadius: BorderRadius.circular(16),
+          child: Ink(
+            decoration: BoxDecoration(
+              gradient: enabled
+                  ? LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [highlightColor, color, shadowColor],
+                      stops: const [0.0, 0.4, 1.0],
+                    )
+                  : null,
+              color: enabled ? null : Colors.grey.shade800,
+              borderRadius: BorderRadius.circular(16),
             ),
-            child: Text(
-              timeoutLabel.toUpperCase(),
-              style: AppTextStyles.buttonText.copyWith(
-                color: timeoutEnabled ? Colors.amber : Colors.white38,
+            child: Container(
+              // Inner highlight overlay
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(16),
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    Colors.white.withValues(alpha: enabled ? 0.15 : 0.0),
+                    Colors.transparent,
+                    Colors.transparent,
+                    Colors.black.withValues(alpha: enabled ? 0.1 : 0.0),
+                  ],
+                  stops: const [0.0, 0.3, 0.7, 1.0],
+                ),
+              ),
+              alignment: Alignment.center,
+              child: Text(
+                label,
+                style: AppTextStyles.buttonText.copyWith(
+                  fontSize: fontSize,
+                  color: enabled ? Colors.white : Colors.white38,
+                  shadows: enabled
+                      ? [
+                          Shadow(
+                            color: Colors.black.withValues(alpha: 0.3),
+                            blurRadius: 2,
+                            offset: const Offset(0, 1),
+                          ),
+                        ]
+                      : null,
+                ),
               ),
             ),
           ),
         ),
-      ],
+      ),
+    );
+  }
+
+  Widget _buildDepthOutlinedButton({
+    required String label,
+    required Color color,
+    required bool enabled,
+    required VoidCallback onPressed,
+    double height = 56,
+  }) {
+    return Container(
+      height: height,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: enabled
+            ? [
+                BoxShadow(
+                  color: color.withValues(alpha: 0.2),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ]
+            : [],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: enabled ? onPressed : null,
+          borderRadius: BorderRadius.circular(12),
+          child: Ink(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  (enabled ? color : Colors.white12).withValues(alpha: 0.1),
+                  (enabled ? color : Colors.white12).withValues(alpha: 0.05),
+                ],
+              ),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: enabled ? color : Colors.white12,
+                width: 2,
+              ),
+            ),
+            child: Container(
+              alignment: Alignment.center,
+              child: Text(
+                label,
+                style: AppTextStyles.buttonText.copyWith(
+                  color: enabled ? color : Colors.white38,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
