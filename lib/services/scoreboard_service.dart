@@ -222,6 +222,17 @@ class ScoreboardService {
 
   void _handleMessage(dynamic message) {
     print("Received message: $message");
+
+    // If we're receiving messages, we're definitely connected
+    // This fixes edge cases where connection status gets out of sync
+    if (!_isConnected || _state.connectionStatus != "Connected") {
+      _isConnected = true;
+      _isConnecting = false;
+      _reconnectAttempts = 0;
+      _state.setConnectionStatus("Connected");
+      WakelockPlus.enable();
+    }
+
     try {
       final decoded = jsonDecode(message);
       if (decoded is Map<String, dynamic>) {
