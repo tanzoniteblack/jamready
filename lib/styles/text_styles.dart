@@ -9,7 +9,7 @@ class AppTextStyles {
   );
 
   static final TextStyle clockTime = GoogleFonts.robotoMono(
-    fontSize: 64,
+    fontSize: 96,
     fontWeight: FontWeight.w700,
     letterSpacing: -2.0,
     color: Colors.white,
