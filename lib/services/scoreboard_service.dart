@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:math';
+import 'dart:developer';
+import 'dart:math' hide log;
 import 'package:logger/logger.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
@@ -9,8 +10,19 @@ import '../models/scoreboard_state.dart';
 
 typedef WebSocketChannelFactory = WebSocketChannel Function(Uri uri);
 
+/// Allows parsing longer strings than the default console limit
+class LongStringOutput extends LogOutput {
+  @override
+  void output(OutputEvent event) {
+    // Use the built-in 'log' from dart:developer, which handles long strings
+    // without truncation in the console.
+    log(event.lines.join('\n'));
+  }
+}
+
 final _log = Logger(
   printer: PrettyPrinter(methodCount: 0, printEmojis: false, colors: true),
+  output: LongStringOutput(),
 );
 
 class ScoreboardService {

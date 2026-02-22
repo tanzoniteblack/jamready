@@ -183,21 +183,24 @@ class _JamTimerScreenState extends State<JamTimerScreen>
                     if (!(state.clocks['Intermission']?.running ?? false))
                       const SizedBox(height: 24),
 
-                    // Active Game Clock (Jam / Lineup / Timeout)
-                    ClockDisplay(
-                      clock: _determineActiveClock(state),
-                      textColor: _determineAlertColor(state),
-                      enabled: isConnected,
-                      onAdjust: (val) {
-                        final active = _determineActiveClock(state);
-                        _service?.send(
-                          "Set",
-                          "ScoreBoard.CurrentGame.Clock(${active.name}).Time",
-                          val,
-                          flag: "change",
-                        );
-                      },
-                    ),
+                    // Active Game Clock (Jam / Lineup / Timeout) or Ready indicator
+                    if (_isPostIntermission(state))
+                      _buildReadyToStartDisplay(state, isConnected)
+                    else
+                      ClockDisplay(
+                        clock: _determineActiveClock(state),
+                        textColor: _determineAlertColor(state),
+                        enabled: isConnected,
+                        onAdjust: (val) {
+                          final active = _determineActiveClock(state);
+                          _service?.send(
+                            "Set",
+                            "ScoreBoard.CurrentGame.Clock(${active.name}).Time",
+                            val,
+                            flag: "change",
+                          );
+                        },
+                      ),
 
                     const SizedBox(height: 24),
 
@@ -701,6 +704,21 @@ class _JamTimerScreenState extends State<JamTimerScreen>
     );
   }
 
+  /// Detects when intermission just ended but lineup hasn't started yet
+  bool _isPostIntermission(ScoreboardState state) {
+    final intermission = state.clocks['Intermission'];
+    final lineup = state.clocks['Lineup'];
+    final period = state.clocks['Period'];
+    return intermission != null &&
+        !intermission.running &&
+        intermission.time == 0 &&
+        intermission.number > 0 &&
+        lineup != null &&
+        !lineup.running &&
+        period != null &&
+        !period.running;
+  }
+
   bool _isPrePeriod(ScoreboardState state) {
 
     // Before game starts (period 0)
@@ -709,16 +727,8 @@ class _JamTimerScreenState extends State<JamTimerScreen>
     // During intermission
     if (state.clocks['Intermission']?.running == true) return true;
 
-    // Intermission just ended - time is 0, not running, lineup hasn't started
-    final intermission = state.clocks['Intermission'];
-    final lineup = state.clocks['Lineup'];
-    if (intermission != null &&
-        !intermission.running &&
-        intermission.time == 0 &&
-        intermission.number > 0 &&
-        lineup != null &&
-        !lineup.running &&
-        lineup.time == 0) {
+    // Intermission just ended - use the shared helper
+    if (_isPostIntermission(state)) {
       return true;
     }
 
@@ -730,6 +740,45 @@ class _JamTimerScreenState extends State<JamTimerScreen>
       return true;
     }
     return false;
+  }
+
+  Widget _buildReadyToStartDisplay(ScoreboardState state, bool isConnected) {
+    final periodNumber = (state.clocks['Period']?.number ?? 1);
+    final color = isConnected ? _healthyColor : Colors.white12;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        color: _healthyColor.withValues(alpha: 0.05),
+        boxShadow: [
+          BoxShadow(
+            color: _healthyColor.withValues(alpha: 0.15),
+            blurRadius: 24,
+            spreadRadius: 2,
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          Text(
+            "PERIOD $periodNumber",
+            style: AppTextStyles.clockLabel.copyWith(
+              fontSize: 22,
+              color: color,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            "READY",
+            style: AppTextStyles.clockTime.copyWith(color: color),
+          ),
+          const SizedBox(height: 16),
+          // Spacer to match ClockDisplay height (same as adjust buttons row)
+          const SizedBox(height: 48),
+        ],
+      ),
+    );
   }
 
   Widget _buildUndoSection(ScoreboardState state, bool isConnected) {
