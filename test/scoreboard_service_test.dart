@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:async/src/stream_sink_transformer.dart';
 import 'package:fake_async/fake_async.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:stream_channel/stream_channel.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
@@ -119,6 +120,8 @@ class TestWebSocketChannel implements WebSocketChannel {
 }
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   test('connect registers paths and starts heartbeat', () {
     fakeAsync((async) {
       final state = ScoreboardState();

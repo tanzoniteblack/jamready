@@ -108,7 +108,9 @@ Future<ScoreboardTestClient> _launchAppAndConnect(
   });
 
   app.main();
-  await tester.pumpAndSettle();
+  // Use pump() instead of pumpAndSettle() because the clock display
+  // has a continuously running pulse animation that never settles
+  await tester.pump(const Duration(seconds: 1));
 
   await _pumpUntil(
     tester,
@@ -154,15 +156,24 @@ Future<void> _waitForTimeoutMode(WidgetTester tester) async {
 }
 
 Future<void> _swipeToStartLineup(WidgetTester tester) async {
-  final handle = find.byIcon(Icons.double_arrow_rounded);
   final button = find.byType(SwipeButton);
+  print('Found swipe button: $button');
+  expect(button, findsOneWidget, reason: 'SwipeButton should be visible');
 
-  final handleRect = tester.getRect(handle);
   final buttonRect = tester.getRect(button);
-  final maxDrag = buttonRect.width - handleRect.width;
+  // Handle is 80px wide, starts at left edge
+  const handleWidth = 80.0;
+  final handleCenter = Offset(
+    buttonRect.left + handleWidth / 2,
+    buttonRect.center.dy,
+  );
+  final dragDistance = buttonRect.width - handleWidth;
 
-  await tester.drag(handle, Offset(maxDrag * 0.9, 0));
-  await tester.pumpAndSettle();
+  print('Going to drag: $handleCenter to $dragDistance');
+  // Use dragFrom with absolute coordinates for more reliable dragging
+  await tester.dragFrom(handleCenter, Offset(dragDistance * 0.9, 0));
+  // Use pump() instead of pumpAndSettle() due to continuous animations
+  await tester.pump(const Duration(milliseconds: 500));
 }
 
 Future<void> _tapJamControl(
@@ -269,10 +280,11 @@ void main() {
       timeout: const Duration(seconds: 20),
     );
 
-    final timeoutButtons = find.widgetWithText(OutlinedButton, 'Timeout');
-    final reviewButtons = find.widgetWithText(OutlinedButton, 'Review');
-    final officialTimeoutButton =
-        find.widgetWithText(OutlinedButton, 'Official TO');
+    // Find timeout menu buttons by their InkWell widgets containing the text
+    // The new menu uses custom InkWell buttons with uppercase text
+    final timeoutButtons = find.widgetWithText(InkWell, 'TIMEOUT');
+    final reviewButtons = find.widgetWithText(InkWell, 'REVIEW');
+    final officialTimeoutButton = find.widgetWithText(InkWell, 'OFFICIAL TIMEOUT');
 
     await _pumpUntil(
       tester,
@@ -320,7 +332,7 @@ void main() {
           _isOfficialReview(state);
     });
 
-    await tester.tap(find.widgetWithText(ElevatedButton, 'END TIMEOUT'));
+    await tester.tap(find.widgetWithText(InkWell, 'END TIMEOUT'));
     await tester.pump();
     await _pumpUntil(tester, () {
       final state = _state(tester);
