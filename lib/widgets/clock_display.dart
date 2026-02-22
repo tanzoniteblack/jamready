@@ -64,35 +64,61 @@ class _ClockDisplayState extends State<ClockDisplay>
                 ? Colors.white
                 : Colors.white38);
 
-    return Column(
-      children: [
-        Text(label, style: AppTextStyles.clockLabel),
-        const SizedBox(height: 8),
-        AnimatedBuilder(
-          animation: _pulseAnimation,
-          builder: (context, child) {
-            return Transform.scale(
-              scale: _pulseAnimation.value,
-              child: child,
-            );
-          },
-          child: Text(
-            _formatTime(widget.clock.time),
-            style: AppTextStyles.clockTime.copyWith(color: color),
+    // Determine glow color based on clock type
+    Color? glowColor;
+    if (widget.enabled && widget.clock.running) {
+      if (widget.clock.name == 'Intermission') {
+        glowColor = Colors.orange;
+      } else if (widget.clock.name == 'Timeout') {
+        glowColor = Colors.red;
+      }
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        color: glowColor?.withValues(alpha: 0.05),
+        boxShadow: glowColor != null
+            ? [
+                BoxShadow(
+                  color: glowColor.withValues(alpha: 0.15),
+                  blurRadius: 24,
+                  spreadRadius: 2,
+                ),
+              ]
+            : null,
+      ),
+      child: Column(
+        children: [
+          Text(label, style: AppTextStyles.clockLabel),
+          const SizedBox(height: 8),
+          AnimatedBuilder(
+            animation: _pulseAnimation,
+            builder: (context, child) {
+              return Transform.scale(
+                scale: _pulseAnimation.value,
+                child: child,
+              );
+            },
+            child: Text(
+              _formatTime(widget.clock.time),
+              style: AppTextStyles.clockTime.copyWith(color: color),
+            ),
           ),
-        ),
-        const SizedBox(height: 16),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            _buildAdjustButton(
-                "-1", widget.enabled ? () => widget.onAdjust("-1000") : null),
-            const SizedBox(width: 24),
-            _buildAdjustButton(
-                "+1", widget.enabled ? () => widget.onAdjust("+1000") : null),
-          ],
-        ),
-      ],
+          const SizedBox(height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              _buildAdjustButton(
+                  "-1", widget.enabled ? () => widget.onAdjust("-1000") : null),
+              const SizedBox(width: 24),
+              _buildAdjustButton(
+                  "+1", widget.enabled ? () => widget.onAdjust("+1000") : null),
+            ],
+          ),
+        ],
+      ),
     );
   }
 

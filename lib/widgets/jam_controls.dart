@@ -99,8 +99,8 @@ class JamControls extends StatelessWidget {
     double fontSize = 20,
     double height = 56,
   }) {
-    final highlightColor = Color.lerp(color, Colors.white, 0.2)!;
-    final shadowColor = Color.lerp(color, Colors.black, 0.3)!;
+    final highlightColor = Color.lerp(color, Colors.white, 0.1)!;
+    final shadowColor = Color.lerp(color, Colors.black, 0.15)!;
 
     return Container(
       height: height,
@@ -108,16 +108,9 @@ class JamControls extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         boxShadow: enabled
             ? [
-                // Bottom shadow for depth
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.4),
-                  blurRadius: 8,
-                  offset: const Offset(0, 4),
-                ),
-                // Subtle glow
-                BoxShadow(
-                  color: color.withValues(alpha: 0.3),
-                  blurRadius: 12,
+                  color: Colors.black.withValues(alpha: 0.25),
+                  blurRadius: 4,
                   offset: const Offset(0, 2),
                 ),
               ]
@@ -135,43 +128,19 @@ class JamControls extends StatelessWidget {
                       begin: Alignment.topCenter,
                       end: Alignment.bottomCenter,
                       colors: [highlightColor, color, shadowColor],
-                      stops: const [0.0, 0.4, 1.0],
+                      stops: const [0.0, 0.5, 1.0],
                     )
                   : null,
               color: enabled ? null : Colors.grey.shade800,
               borderRadius: BorderRadius.circular(16),
             ),
             child: Container(
-              // Inner highlight overlay
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(16),
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    Colors.white.withValues(alpha: enabled ? 0.15 : 0.0),
-                    Colors.transparent,
-                    Colors.transparent,
-                    Colors.black.withValues(alpha: enabled ? 0.1 : 0.0),
-                  ],
-                  stops: const [0.0, 0.3, 0.7, 1.0],
-                ),
-              ),
               alignment: Alignment.center,
               child: Text(
                 label,
                 style: AppTextStyles.buttonText.copyWith(
                   fontSize: fontSize,
                   color: enabled ? Colors.white : Colors.white38,
-                  shadows: enabled
-                      ? [
-                          Shadow(
-                            color: Colors.black.withValues(alpha: 0.3),
-                            blurRadius: 2,
-                            offset: const Offset(0, 1),
-                          ),
-                        ]
-                      : null,
                 ),
               ),
             ),
@@ -195,9 +164,9 @@ class JamControls extends StatelessWidget {
         boxShadow: enabled
             ? [
                 BoxShadow(
-                  color: color.withValues(alpha: 0.2),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2),
+                  color: color.withValues(alpha: 0.15),
+                  blurRadius: 4,
+                  offset: const Offset(0, 1),
                 ),
               ]
             : [],
@@ -209,14 +178,7 @@ class JamControls extends StatelessWidget {
           borderRadius: BorderRadius.circular(12),
           child: Ink(
             decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  (enabled ? color : Colors.white12).withValues(alpha: 0.1),
-                  (enabled ? color : Colors.white12).withValues(alpha: 0.05),
-                ],
-              ),
+              color: (enabled ? color : Colors.white12).withValues(alpha: 0.08),
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
                 color: enabled ? color : Colors.white12,

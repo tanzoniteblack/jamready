@@ -164,10 +164,12 @@ class _JamTimerScreenState extends State<JamTimerScreen> {
                     ),
                     const SizedBox(height: 24),
 
-                    // Period / Intermission Clock (top group, like original web)
-                    _buildPeriodClockRow(state, isConnected),
+                    // Period / Intermission Clock (hide during intermission since main clock shows it)
+                    if (!(state.clocks['Intermission']?.running ?? false))
+                      _buildPeriodClockRow(state, isConnected),
 
-                    const SizedBox(height: 24),
+                    if (!(state.clocks['Intermission']?.running ?? false))
+                      const SizedBox(height: 24),
 
                     // Active Game Clock (Jam / Lineup / Timeout)
                     ClockDisplay(
@@ -524,8 +526,13 @@ class _JamTimerScreenState extends State<JamTimerScreen> {
     required double height,
     required VoidCallback onTap,
   }) {
-    final highlightColor = Color.lerp(color, Colors.white, 0.2)!;
-    final shadowColor = Color.lerp(color, Colors.black, 0.3)!;
+    // For light colors like amber/yellow, use dark text when active
+    final bool useDarkText = isActive &&
+        (color == Colors.amber || color.computeLuminance() > 0.5);
+    final textColor = useDarkText ? Colors.black87 : Colors.white;
+
+    final highlightColor = Color.lerp(color, Colors.white, 0.08)!;
+    final shadowColor = Color.lerp(color, Colors.black, 0.12)!;
 
     return SizedBox(
       width: double.infinity,
@@ -536,8 +543,8 @@ class _JamTimerScreenState extends State<JamTimerScreen> {
           boxShadow: enabled && isActive
               ? [
                   BoxShadow(
-                    color: color.withValues(alpha: 0.4),
-                    blurRadius: 8,
+                    color: color.withValues(alpha: 0.25),
+                    blurRadius: 4,
                     offset: const Offset(0, 2),
                   ),
                 ]
@@ -555,19 +562,13 @@ class _JamTimerScreenState extends State<JamTimerScreen> {
                         begin: Alignment.topCenter,
                         end: Alignment.bottomCenter,
                         colors: [highlightColor, color, shadowColor],
-                        stops: const [0.0, 0.4, 1.0],
+                        stops: const [0.0, 0.5, 1.0],
                       )
-                    : LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          Colors.white.withValues(alpha: 0.08),
-                          Colors.white.withValues(alpha: 0.03),
-                        ],
-                      ),
+                    : null,
+                color: isActive ? null : Colors.white.withValues(alpha: 0.06),
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                  color: isActive ? color : Colors.white24,
+                  color: isActive ? color : Colors.white30,
                   width: isActive ? 2 : 1,
                 ),
               ),
@@ -582,20 +583,11 @@ class _JamTimerScreenState extends State<JamTimerScreen> {
                         label,
                         style: TextStyle(
                           color: enabled
-                              ? (isActive ? Colors.white : Colors.white70)
-                              : Colors.white24,
+                              ? (isActive ? textColor : Colors.white)
+                              : Colors.white38,
                           fontSize: 14,
                           fontWeight:
                               isActive ? FontWeight.bold : FontWeight.w500,
-                          shadows: isActive
-                              ? [
-                                  Shadow(
-                                    color: Colors.black.withValues(alpha: 0.3),
-                                    blurRadius: 2,
-                                    offset: const Offset(0, 1),
-                                  ),
-                                ]
-                              : null,
                         ),
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -607,7 +599,9 @@ class _JamTimerScreenState extends State<JamTimerScreen> {
                             horizontal: 8, vertical: 2),
                         decoration: BoxDecoration(
                           color: isActive
-                              ? Colors.black.withValues(alpha: 0.2)
+                              ? (useDarkText
+                                  ? Colors.black.withValues(alpha: 0.15)
+                                  : Colors.black.withValues(alpha: 0.2))
                               : Colors.white.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(10),
                         ),
@@ -615,8 +609,8 @@ class _JamTimerScreenState extends State<JamTimerScreen> {
                           "$count",
                           style: TextStyle(
                             color: enabled
-                                ? (isActive ? Colors.white : Colors.white70)
-                                : Colors.white24,
+                                ? (isActive ? textColor : Colors.white)
+                                : Colors.white38,
                             fontSize: 14,
                             fontWeight: FontWeight.bold,
                           ),
@@ -635,8 +629,8 @@ class _JamTimerScreenState extends State<JamTimerScreen> {
 
   Widget _buildEndTimeoutButton(bool isConnected) {
     final color = Colors.red.shade700;
-    final highlightColor = Color.lerp(color, Colors.white, 0.15)!;
-    final shadowColor = Color.lerp(color, Colors.black, 0.25)!;
+    final highlightColor = Color.lerp(color, Colors.white, 0.1)!;
+    final shadowColor = Color.lerp(color, Colors.black, 0.15)!;
 
     return SizedBox(
       width: double.infinity,
@@ -647,13 +641,8 @@ class _JamTimerScreenState extends State<JamTimerScreen> {
           boxShadow: isConnected
               ? [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.4),
-                    blurRadius: 8,
-                    offset: const Offset(0, 4),
-                  ),
-                  BoxShadow(
-                    color: color.withValues(alpha: 0.3),
-                    blurRadius: 12,
+                    color: Colors.black.withValues(alpha: 0.25),
+                    blurRadius: 4,
                     offset: const Offset(0, 2),
                   ),
                 ]
@@ -677,42 +666,19 @@ class _JamTimerScreenState extends State<JamTimerScreen> {
                         begin: Alignment.topCenter,
                         end: Alignment.bottomCenter,
                         colors: [highlightColor, color, shadowColor],
-                        stops: const [0.0, 0.4, 1.0],
+                        stops: const [0.0, 0.5, 1.0],
                       )
                     : null,
                 color: isConnected ? null : Colors.grey.shade800,
                 borderRadius: BorderRadius.circular(16),
               ),
               child: Container(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(16),
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      Colors.white.withValues(alpha: isConnected ? 0.15 : 0.0),
-                      Colors.transparent,
-                      Colors.transparent,
-                      Colors.black.withValues(alpha: isConnected ? 0.1 : 0.0),
-                    ],
-                    stops: const [0.0, 0.3, 0.7, 1.0],
-                  ),
-                ),
                 alignment: Alignment.center,
                 child: Text(
                   "END TIMEOUT",
                   style: AppTextStyles.buttonText.copyWith(
                     fontSize: 24,
                     color: isConnected ? Colors.white : Colors.white38,
-                    shadows: isConnected
-                        ? [
-                            Shadow(
-                              color: Colors.black.withValues(alpha: 0.3),
-                              blurRadius: 2,
-                              offset: const Offset(0, 1),
-                            ),
-                          ]
-                        : null,
                   ),
                 ),
               ),
