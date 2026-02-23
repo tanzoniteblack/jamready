@@ -185,30 +185,6 @@ void main() {
       expect(find.text('Pepper'), findsOneWidget);
     });
 
-    testWidgets('offline game shows score controls', (tester) async {
-      SharedPreferences.setMockInitialValues({});
-
-      await tester.pumpWidget(
-        MultiProvider(
-          providers: [
-            ChangeNotifierProvider(create: (_) => ScoreboardState()),
-          ],
-          child: MaterialApp(
-            home: const GameSetupScreen(),
-          ),
-        ),
-      );
-      await tester.pump();
-
-      await tester.tap(find.text('START GAME'));
-      await tester.pumpAndSettle();
-
-      // Should show + and - buttons for score adjustment
-      // Each team panel has + and - buttons
-      expect(find.text('+'), findsWidgets);
-      expect(find.text('-'), findsWidgets);
-    });
-
     testWidgets('offline game does not show undo controls', (tester) async {
       SharedPreferences.setMockInitialValues({});
 

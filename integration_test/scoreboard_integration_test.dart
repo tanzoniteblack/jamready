@@ -70,6 +70,7 @@ class ScoreboardTestClient {
 
 Uri _scoreboardWsUri(String host, int port) {
   final base = Uri.parse('ws://$host:$port');
+  print('Connecting to: $base');
   return base.replace(
     scheme: base.scheme == 'https' ? 'wss' : 'ws',
     path: '/WS/',
