@@ -777,9 +777,9 @@ class _JamTimerScreenState extends State<JamTimerScreen>
             style: AppTextStyles.clockLabel.copyWith(
               fontSize: 22,
               color: color,
+              height: 1,
             ),
           ),
-          const SizedBox(height: 8),
           FittedBox(
             fit: BoxFit.scaleDown,
             child: Text(
@@ -787,7 +787,6 @@ class _JamTimerScreenState extends State<JamTimerScreen>
               style: AppTextStyles.clockTime.copyWith(color: color),
             ),
           ),
-          const SizedBox(height: 16),
           // Spacer to match ClockDisplay height (same as adjust buttons row)
           const SizedBox(height: 48),
         ],
