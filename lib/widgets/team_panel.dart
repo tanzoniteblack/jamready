@@ -59,9 +59,13 @@ class TeamPanel extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
           ),
           const SizedBox(height: 6),
-          _buildStatRow("TO", team.timeouts.toString()),
-          const SizedBox(height: 3),
-          _buildStatRow("OR", team.officialReviews.toString()),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              _buildStatRow("TO", team.timeouts.toString()),
+              _buildStatRow("OR", team.officialReviews.toString()),
+            ],
+          ),
           if (onRetainedToggle != null) ...[
             const SizedBox(height: 6),
             _buildRetainedToggle(),
@@ -77,41 +81,23 @@ class TeamPanel extends StatelessWidget {
 
     return Row(
       mainAxisSize: MainAxisSize.min,
-      children: isLeft
-          ? [
-              Text(
-                value,
-                style: AppTextStyles.clockLabel.copyWith(
-                  color: valueColor,
-                  fontSize: 16,
-                ),
-              ),
-              const SizedBox(width: 6),
-              Text(
-                label,
-                style: AppTextStyles.clockLabel.copyWith(
-                  fontSize: 14,
-                  color: labelColor,
-                ),
-              ),
-            ]
-          : [
-              Text(
-                label,
-                style: AppTextStyles.clockLabel.copyWith(
-                  fontSize: 14,
-                  color: labelColor,
-                ),
-              ),
-              const SizedBox(width: 6),
-              Text(
-                value,
-                style: AppTextStyles.clockLabel.copyWith(
-                  color: valueColor,
-                  fontSize: 16,
-                ),
-              ),
-            ],
+      children: [
+        Text(
+          value,
+          style: AppTextStyles.clockLabel.copyWith(
+            color: valueColor,
+            fontSize: 16,
+          ),
+        ),
+        const SizedBox(width: 6),
+        Text(
+          label,
+          style: AppTextStyles.clockLabel.copyWith(
+            fontSize: 14,
+            color: labelColor,
+          ),
+        ),
+      ],
     );
   }
 
