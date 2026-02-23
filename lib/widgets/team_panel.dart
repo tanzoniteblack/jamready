@@ -71,13 +71,10 @@ class TeamPanel extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               _buildStatRow("TO", team.timeouts.toString()),
+              if (onRetainedToggle != null) _buildRetainedToggle(),
               _buildStatRow("OR", team.officialReviews.toString()),
             ],
           ),
-          if (onRetainedToggle != null) ...[
-            const SizedBox(height: 6),
-            _buildRetainedToggle(),
-          ],
         ],
       ),
     );
@@ -161,6 +158,7 @@ class TeamPanel extends StatelessWidget {
     final isActive = team.retainedOfficialReview;
     return SizedBox(
       height: 24,
+      width: 30,
       child: OutlinedButton(
         onPressed: enabled
             ? () => onRetainedToggle?.call(!team.retainedOfficialReview)
