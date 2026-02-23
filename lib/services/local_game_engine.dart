@@ -46,6 +46,12 @@ class LocalGameEngine with WidgetsBindingObserver implements GameEngine {
   int _currentPeriod = 0;
   int _currentJam = 0;
 
+  // Internal clock state (precise millisecond values)
+  final Map<String, int> _internalClockTimes = {};
+
+  // Master clock for synchronization - tracks milliseconds since last full second
+  int _masterClockMs = 0;
+
   // Clock snapshot for background timing
   Map<String, int>? _backgroundClockSnapshot;
   Map<String, bool>? _backgroundRunningSnapshot;
@@ -125,31 +131,38 @@ class LocalGameEngine with WidgetsBindingObserver implements GameEngine {
 
   void _initializeClocks() {
     // Period clock - starts at period duration, counts down
-    _state.clocks['Period']!.time = ruleset.periodDurationMs;
+    final periodTime = _getDisplayTime(ruleset.periodDurationMs, false);
+    _state.clocks['Period']!.time = periodTime;
+    _internalClockTimes['Period'] = periodTime;
     _state.clocks['Period']!.running = false;
     _state.clocks['Period']!.number = 0;
     _state.clocks['Period']!.displayName = "Period";
 
     // Jam clock - starts at jam duration, counts down
-    _state.clocks['Jam']!.time = ruleset.jamDurationMs;
+    final jamTime = _getDisplayTime(ruleset.jamDurationMs, false);
+    _state.clocks['Jam']!.time = jamTime;
+    _internalClockTimes['Jam'] = jamTime;
     _state.clocks['Jam']!.running = false;
     _state.clocks['Jam']!.number = 0;
     _state.clocks['Jam']!.displayName = "Jam";
 
     // Lineup clock - starts at 0, counts up
     _state.clocks['Lineup']!.time = 0;
+    _internalClockTimes['Lineup'] = 0;
     _state.clocks['Lineup']!.running = false;
     _state.clocks['Lineup']!.number = 0;
     _state.clocks['Lineup']!.displayName = "Lineup";
 
     // Timeout clock - starts at 0, counts up
     _state.clocks['Timeout']!.time = 0;
+    _internalClockTimes['Timeout'] = 0;
     _state.clocks['Timeout']!.running = false;
     _state.clocks['Timeout']!.number = 0;
     _state.clocks['Timeout']!.displayName = "Timeout";
 
     // Intermission clock - varies by ruleset
     _state.clocks['Intermission']!.time = 0;
+    _internalClockTimes['Intermission'] = 0;
     _state.clocks['Intermission']!.running = false;
     _state.clocks['Intermission']!.number = 0;
     _state.clocks['Intermission']!.displayName = "Intermission";
@@ -168,9 +181,12 @@ class LocalGameEngine with WidgetsBindingObserver implements GameEngine {
     final elapsed = now.difference(_lastTickTime!).inMilliseconds;
     _lastTickTime = now;
 
-    bool stateChanged = false;
+    // Check if master clock crossed a second boundary
+    final oldMasterClockMs = _masterClockMs;
+    _masterClockMs = (_masterClockMs + elapsed) % 1000;
+    final crossedSecondBoundary = _masterClockMs < oldMasterClockMs;
 
-    // Update each running clock
+    // Update internal times for all running clocks
     for (final entry in _state.clocks.entries) {
       final clock = entry.value;
       if (!clock.running) continue;
@@ -178,22 +194,52 @@ class LocalGameEngine with WidgetsBindingObserver implements GameEngine {
       final clockName = entry.key;
       final isCountUp = clockName == 'Lineup' || clockName == 'Timeout';
 
+      // Update internal precise time
+      int newInternalTime = _internalClockTimes[clockName] ?? clock.time;
       if (isCountUp) {
-        clock.time += elapsed;
+        newInternalTime += elapsed;
       } else {
-        clock.time -= elapsed;
-        if (clock.time < 0) clock.time = 0;
+        newInternalTime -= elapsed;
+        if (newInternalTime < 0) newInternalTime = 0;
       }
-      stateChanged = true;
+      _internalClockTimes[clockName] = newInternalTime;
 
-      // Handle clock expiration
-      if (!isCountUp && clock.time <= 0) {
+      // Handle clock expiration (using internal time for precision)
+      if (!isCountUp && newInternalTime <= 0) {
         _handleClockExpiration(clockName);
       }
     }
 
-    if (stateChanged) {
+    // Update display times only when master clock crosses second boundary
+    if (crossedSecondBoundary) {
+      _updateAllDisplayTimes();
       _state.notify();
+    }
+  }
+
+  /// Update display times for all clocks based on their internal times.
+  /// Called only when master clock crosses a full second boundary.
+  void _updateAllDisplayTimes() {
+    for (final entry in _state.clocks.entries) {
+      final clockName = entry.key;
+      final clock = entry.value;
+      final internalTime = _internalClockTimes[clockName] ?? clock.time;
+      final isCountUp = clockName == 'Lineup' || clockName == 'Timeout';
+
+      clock.time = _getDisplayTime(internalTime, isCountUp);
+    }
+  }
+
+  /// Get display time for a clock.
+  /// - Countup clocks: floor to current full second
+  /// - Countdown clocks: ceil to next full second
+  int _getDisplayTime(int internalMs, bool isCountUp) {
+    if (isCountUp) {
+      // Floor to current second
+      return (internalMs / 1000).floor() * 1000;
+    } else {
+      // Ceil to next second
+      return (internalMs / 1000).ceil() * 1000;
     }
   }
 
@@ -224,11 +270,11 @@ class LocalGameEngine with WidgetsBindingObserver implements GameEngine {
     _backgroundedAt = DateTime.now();
     _tickTimer?.cancel();
 
-    // Snapshot clock states
+    // Snapshot clock states (use internal time for precision)
     _backgroundClockSnapshot = {};
     _backgroundRunningSnapshot = {};
     for (final entry in _state.clocks.entries) {
-      _backgroundClockSnapshot![entry.key] = entry.value.time;
+      _backgroundClockSnapshot![entry.key] = _internalClockTimes[entry.key] ?? entry.value.time;
       _backgroundRunningSnapshot![entry.key] = entry.value.running;
     }
   }
@@ -253,17 +299,22 @@ class LocalGameEngine with WidgetsBindingObserver implements GameEngine {
       final snapshotTime = _backgroundClockSnapshot![clockName]!;
       final isCountUp = clockName == 'Lineup' || clockName == 'Timeout';
 
+      int newInternalTime;
       if (isCountUp) {
-        clock.time = snapshotTime + elapsed;
+        newInternalTime = snapshotTime + elapsed;
       } else {
-        clock.time = snapshotTime - elapsed;
-        if (clock.time < 0) clock.time = 0;
+        newInternalTime = snapshotTime - elapsed;
+        if (newInternalTime < 0) newInternalTime = 0;
 
         // Handle expirations that occurred during background
-        if (clock.time <= 0 && snapshotTime > 0) {
+        if (newInternalTime <= 0 && snapshotTime > 0) {
           _handleClockExpiration(clockName);
         }
       }
+
+      // Update internal time and display time
+      _internalClockTimes[clockName] = newInternalTime;
+      clock.time = _getDisplayTime(newInternalTime, isCountUp);
     }
 
     _backgroundClockSnapshot = null;
@@ -304,7 +355,9 @@ class LocalGameEngine with WidgetsBindingObserver implements GameEngine {
 
     // Start jam
     _currentJam++;
-    _state.clocks['Jam']!.time = ruleset.jamDurationMs;
+    final jamTime = _getDisplayTime(ruleset.jamDurationMs, false);
+    _state.clocks['Jam']!.time = jamTime;
+    _internalClockTimes['Jam'] = jamTime;
     _state.clocks['Jam']!.number = _currentJam;
     _state.clocks['Jam']!.running = true;
     _state.clocks['Period']!.running = true;
@@ -350,6 +403,7 @@ class LocalGameEngine with WidgetsBindingObserver implements GameEngine {
 
   void _startLineup() {
     _state.clocks['Lineup']!.time = 0;
+    _internalClockTimes['Lineup'] = 0;
     _state.clocks['Lineup']!.running = true;
 
     _phase = GamePhase.lineup;
@@ -362,7 +416,9 @@ class LocalGameEngine with WidgetsBindingObserver implements GameEngine {
   void _startPeriod(int periodNumber) {
     _currentPeriod = periodNumber;
     _state.clocks['Period']!.number = periodNumber;
-    _state.clocks['Period']!.time = ruleset.periodDurationMs;
+    final periodTime = _getDisplayTime(ruleset.periodDurationMs, false);
+    _state.clocks['Period']!.time = periodTime;
+    _internalClockTimes['Period'] = periodTime;
     _state.clocks['Period']!.displayName = "Period";
 
     // Reset jam number if ruleset requires it
@@ -396,9 +452,10 @@ class LocalGameEngine with WidgetsBindingObserver implements GameEngine {
     }
 
     // Start intermission
-    final intermissionDuration =
-        ruleset.getIntermissionDurationMs(_currentPeriod);
+    final intermissionDuration = _getDisplayTime(
+        ruleset.getIntermissionDurationMs(_currentPeriod), false);
     _state.clocks['Intermission']!.time = intermissionDuration;
+    _internalClockTimes['Intermission'] = intermissionDuration;
     _state.clocks['Intermission']!.number = _currentPeriod;
     _state.clocks['Intermission']!.running = true;
     _state.clocks['Intermission']!.displayName = "Intermission";
@@ -410,6 +467,7 @@ class LocalGameEngine with WidgetsBindingObserver implements GameEngine {
   void _endIntermission() {
     _state.clocks['Intermission']!.running = false;
     _state.clocks['Intermission']!.time = 0;
+    _internalClockTimes['Intermission'] = 0;
 
     // Start next period
     _startPeriod(_currentPeriod + 1);
@@ -428,6 +486,7 @@ class LocalGameEngine with WidgetsBindingObserver implements GameEngine {
 
     // Start timeout clock
     _state.clocks['Timeout']!.time = 0;
+    _internalClockTimes['Timeout'] = 0;
     _state.clocks['Timeout']!.running = true;
 
     _phase = GamePhase.timeout;
@@ -497,8 +556,16 @@ class LocalGameEngine with WidgetsBindingObserver implements GameEngine {
     final clock = _state.clocks[clockName];
     if (clock == null) return;
 
-    clock.time += deltaMs;
-    if (clock.time < 0) clock.time = 0;
+    // Update internal time
+    final currentInternal = _internalClockTimes[clockName] ?? clock.time;
+    int newInternal = currentInternal + deltaMs;
+    if (newInternal < 0) newInternal = 0;
+
+    _internalClockTimes[clockName] = newInternal;
+
+    // Update display time (synchronized with master clock)
+    final isCountUp = clockName == 'Lineup' || clockName == 'Timeout';
+    clock.time = _getDisplayTime(newInternal, isCountUp);
 
     _state.notify();
   }
