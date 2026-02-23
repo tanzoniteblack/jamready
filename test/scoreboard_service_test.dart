@@ -3,13 +3,12 @@ import 'dart:convert';
 
 import 'package:async/src/stream_sink_transformer.dart';
 import 'package:fake_async/fake_async.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:stream_channel/stream_channel.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
 import 'package:roller_derby_jam_timer/models/scoreboard_state.dart';
-import 'package:roller_derby_jam_timer/services/scoreboard_service.dart';
+import 'package:roller_derby_jam_timer/services/remote_game_engine.dart';
 
 class FakeWebSocketSink implements WebSocketSink {
   final List<dynamic> sent = [];
@@ -133,7 +132,7 @@ void main() {
         ready: Future.value(),
       );
 
-      final service = ScoreboardService(
+      final service = RemoteGameEngine(
         state,
         channelFactory: (uri) => channel,
       );
@@ -172,7 +171,7 @@ void main() {
         ready: Future.value(),
       );
 
-      final service = ScoreboardService(
+      final service = RemoteGameEngine(
         state,
         channelFactory: (uri) => channel,
       );
@@ -201,7 +200,7 @@ void main() {
       final channels = <TestWebSocketChannel>[];
       StreamController<dynamic>? firstIncoming;
 
-      final service = ScoreboardService(
+      final service = RemoteGameEngine(
         state,
         channelFactory: (uri) {
           final incoming = StreamController<dynamic>();

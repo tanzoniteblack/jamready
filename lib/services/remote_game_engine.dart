@@ -7,6 +7,7 @@ import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:web_socket_channel/status.dart' as status;
 import '../models/scoreboard_state.dart';
+import 'game_engine.dart';
 
 typedef WebSocketChannelFactory = WebSocketChannel Function(Uri uri);
 
@@ -14,8 +15,6 @@ typedef WebSocketChannelFactory = WebSocketChannel Function(Uri uri);
 class LongStringOutput extends LogOutput {
   @override
   void output(OutputEvent event) {
-    // Use the built-in 'log' from dart:developer, which handles long strings
-    // without truncation in the console.
     log(event.lines.join('\n'));
   }
 }
@@ -25,7 +24,8 @@ final _log = Logger(
   output: LongStringOutput(),
 );
 
-class ScoreboardService {
+/// Remote game engine that connects to a CRG Scoreboard server via WebSocket.
+class RemoteGameEngine implements GameEngine {
   WebSocketChannel? _channel;
   Timer? _heartbeatTimer;
   Timer? _reconnectTimer;
@@ -38,12 +38,29 @@ class ScoreboardService {
   String? _lastUrl;
   final Random _random = Random();
 
-  ScoreboardService(
+  RemoteGameEngine(
     this._state, {
     WebSocketChannelFactory? channelFactory,
   }) : _channelFactory = channelFactory ?? WebSocketChannel.connect;
 
+  @override
+  bool get isActive => _isConnected;
+
+  @override
+  ScoreboardState get state => _state;
+
+  @override
+  bool get supportsUndo => true;
+
+  @override
+  bool get isLocal => false;
+
   bool get isConnected => _isConnected;
+
+  @override
+  Future<void> initialize() async {
+    // Remote engine is initialized via connect()
+  }
 
   Future<void> connect(String url) async {
     if (_isConnected || _isConnecting) return;
@@ -56,7 +73,6 @@ class ScoreboardService {
       _isConnecting = true;
       _state.setConnectionStatus("Connecting...");
 
-      // Ensure URL is valid
       final uri = Uri.parse(url);
       final wsUrl = uri.replace(
         scheme: uri.scheme == 'https' ? 'wss' : 'ws',
@@ -65,8 +81,6 @@ class ScoreboardService {
       );
 
       _channel = _channelFactory(wsUrl);
-
-      // Wait for connection to be established
       await _channel!.ready;
 
       if (_manualDisconnect) {
@@ -80,11 +94,10 @@ class ScoreboardService {
       _reconnectAttempts = 0;
       _state.setConnectionStatus("Connected");
 
-      // Keep screen awake while tracking a game
       WakelockPlus.enable();
 
       _channel!.stream.listen(
-            (message) {
+        (message) {
           _handleMessage(message);
         },
         onDone: () {
@@ -102,7 +115,6 @@ class ScoreboardService {
       _registerPaths();
       _startHeartbeat();
     } catch (e) {
-      // Catch initial connection errors (e.g. Connection Refused)
       _isConnecting = false;
       _disconnectCleanup(error: e.toString());
       _scheduleReconnect();
@@ -184,11 +196,15 @@ class ScoreboardService {
     _disconnectCleanup();
   }
 
+  @override
+  Future<void> dispose() async {
+    disconnect();
+  }
+
   void _closeChannel({int? code}) {
     try {
       _channel?.sink.close(code ?? status.normalClosure);
     } on ArgumentError {
-      // Fallback for platforms that only accept 1000 or custom codes.
       _channel?.sink.close();
     }
   }
@@ -202,7 +218,6 @@ class ScoreboardService {
       error != null ? "Error: $error" : "Disconnected",
     );
 
-    // Allow screen to sleep when disconnected
     WakelockPlus.disable();
   }
 
@@ -213,8 +228,8 @@ class ScoreboardService {
     final baseDelaySeconds = 1 << _reconnectAttempts;
     final cappedSeconds = baseDelaySeconds > 30 ? 30 : baseDelaySeconds;
     final jitterMs = _random.nextInt(500);
-    final delay = Duration(seconds: cappedSeconds) +
-        Duration(milliseconds: jitterMs);
+    final delay =
+        Duration(seconds: cappedSeconds) + Duration(milliseconds: jitterMs);
 
     _reconnectAttempts += 1;
     _state.setConnectionStatus(
@@ -240,8 +255,6 @@ class ScoreboardService {
   void _handleMessage(dynamic message) {
     _log.d("Received message: $message");
 
-    // If we're receiving messages, we're definitely connected
-    // This fixes edge cases where connection status gets out of sync
     if (!_isConnected || _state.connectionStatus != "Connected") {
       _isConnected = true;
       _isConnecting = false;
@@ -262,7 +275,6 @@ class ScoreboardService {
             decoded['data'].containsKey('state')) {
           _state.updateFromMap(decoded['data']['state']);
         } else {
-          // Fallback for direct key-value pairs or other formats
           _state.updateFromMap(decoded);
         }
       }
@@ -287,5 +299,73 @@ class ScoreboardService {
     _log.d("Sending message: $message");
 
     _channel?.sink.add(message);
+  }
+
+  // GameEngine implementation
+
+  @override
+  void startJam() {
+    send("Set", "ScoreBoard.CurrentGame.StartJam", true);
+  }
+
+  @override
+  void stopJam() {
+    send("Set", "ScoreBoard.CurrentGame.StopJam", true);
+  }
+
+  @override
+  void startTimeout() {
+    send("Set", "ScoreBoard.CurrentGame.Timeout", true);
+  }
+
+  @override
+  void endTimeout() {
+    send("Set", "ScoreBoard.CurrentGame.StopJam", true);
+  }
+
+  @override
+  void setTimeoutOwner(String owner, {bool isOfficialReview = false}) {
+    if (owner == 'O') {
+      send("Set", "ScoreBoard.CurrentGame.OfficialTimeout", true);
+    } else if (owner == '1') {
+      if (isOfficialReview) {
+        send("Set", "ScoreBoard.CurrentGame.Team(1).OfficialReview", true);
+      } else {
+        send("Set", "ScoreBoard.CurrentGame.Team(1).Timeout", true);
+      }
+    } else if (owner == '2') {
+      if (isOfficialReview) {
+        send("Set", "ScoreBoard.CurrentGame.Team(2).OfficialReview", true);
+      } else {
+        send("Set", "ScoreBoard.CurrentGame.Team(2).Timeout", true);
+      }
+    }
+  }
+
+  @override
+  void adjustClock(String clockName, int deltaMs) {
+    final value = deltaMs > 0 ? "+$deltaMs" : "$deltaMs";
+    send(
+      "Set",
+      "ScoreBoard.CurrentGame.Clock($clockName).Time",
+      value,
+      flag: "change",
+    );
+  }
+
+  @override
+  void adjustScore(int teamNumber, int delta) {
+    // Remote engine doesn't support direct score adjustment
+    // Score is managed by the server
+    _log.w("Score adjustment not supported in remote mode");
+  }
+
+  @override
+  void setRetainedReview(int teamNumber, bool retained) {
+    send(
+      "Set",
+      "ScoreBoard.CurrentGame.Team($teamNumber).RetainedOfficialReview",
+      retained,
+    );
   }
 }

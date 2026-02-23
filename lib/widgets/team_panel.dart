@@ -7,6 +7,8 @@ class TeamPanel extends StatelessWidget {
   final bool isLeft;
   final bool enabled;
   final ValueChanged<bool>? onRetainedToggle;
+  final bool showScoreControls;
+  final Function(int)? onScoreAdjust;
 
   const TeamPanel({
     super.key,
@@ -14,6 +16,8 @@ class TeamPanel extends StatelessWidget {
     this.isLeft = true,
     this.enabled = true,
     this.onRetainedToggle,
+    this.showScoreControls = false,
+    this.onScoreAdjust,
   });
 
   Color? _parseColor(String hex) {
@@ -58,6 +62,10 @@ class TeamPanel extends StatelessWidget {
             ),
             overflow: TextOverflow.ellipsis,
           ),
+          if (showScoreControls) ...[
+            const SizedBox(height: 8),
+            _buildScoreDisplay(fgColor),
+          ],
           const SizedBox(height: 6),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -71,6 +79,54 @@ class TeamPanel extends StatelessWidget {
             _buildRetainedToggle(),
           ],
         ],
+      ),
+    );
+  }
+
+  Widget _buildScoreDisplay(Color? fgColor) {
+    final scoreColor = fgColor ?? (enabled ? Colors.white : Colors.white38);
+
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        _buildScoreButton("-", enabled ? () => onScoreAdjust?.call(-1) : null),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          child: Text(
+            team.score.toString(),
+            style: AppTextStyles.clockLabel.copyWith(
+              fontSize: 32,
+              fontWeight: FontWeight.bold,
+              color: scoreColor,
+            ),
+          ),
+        ),
+        _buildScoreButton("+", enabled ? () => onScoreAdjust?.call(1) : null),
+      ],
+    );
+  }
+
+  Widget _buildScoreButton(String label, VoidCallback? onPressed) {
+    return SizedBox(
+      width: 36,
+      height: 36,
+      child: OutlinedButton(
+        onPressed: onPressed,
+        style: OutlinedButton.styleFrom(
+          padding: EdgeInsets.zero,
+          side: BorderSide(
+            color: onPressed != null ? Colors.white30 : Colors.white10,
+          ),
+          shape: const CircleBorder(),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: onPressed != null ? Colors.white70 : Colors.white24,
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
       ),
     );
   }
