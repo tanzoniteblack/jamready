@@ -96,9 +96,9 @@ class _ClockDisplayState extends State<ClockDisplay>
             style: AppTextStyles.clockLabel.copyWith(
               fontSize: 22,
               color: color,
+              height: 1.0,
             ),
           ),
-          const SizedBox(height: 8),
           AnimatedBuilder(
             animation: _pulseAnimation,
             builder: (context, child) {
@@ -112,7 +112,6 @@ class _ClockDisplayState extends State<ClockDisplay>
               style: AppTextStyles.clockTime.copyWith(color: color),
             ),
           ),
-          const SizedBox(height: 16),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
