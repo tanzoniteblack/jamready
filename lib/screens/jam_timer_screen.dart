@@ -95,6 +95,52 @@ class _JamTimerScreenState extends State<JamTimerScreen>
     super.dispose();
   }
 
+  Future<void> _navigateToHome(BuildContext context) async {
+    if (_isLocalMode) {
+      // Show confirmation dialog for local games
+      final shouldExit = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          backgroundColor: const Color(0xFF1E1E1E),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: const Text(
+            'End Game?',
+            style: TextStyle(color: Colors.white),
+          ),
+          content: const Text(
+            'Leaving will end the current game. This cannot be undone.',
+            style: TextStyle(color: Colors.white70),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('CANCEL'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              style: TextButton.styleFrom(
+                foregroundColor: Colors.red,
+              ),
+              child: const Text('END GAME'),
+            ),
+          ],
+        ),
+      );
+
+      if (shouldExit != true) return;
+    }
+
+    // Clean up current engine before navigating
+    _engine?.dispose();
+    if (mounted) {
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (context) => const SettingsScreen()),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -115,22 +161,61 @@ class _JamTimerScreenState extends State<JamTimerScreen>
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.settings, color: Colors.white70),
-          onPressed: () {
-            // Clean up current engine before navigating
-            _engine?.dispose();
-            Navigator.of(context).pushReplacement(
-              MaterialPageRoute(builder: (context) => const SettingsScreen()),
-            );
-          },
+          icon: Icon(
+            _isLocalMode ? Icons.home : Icons.settings,
+            color: Colors.white70,
+          ),
+          onPressed: () => _navigateToHome(context),
         ),
         actions: [
           Consumer<ScoreboardState>(
             builder: (context, state, _) {
-              Color statusColor;
               if (_isLocalMode) {
-                statusColor = Colors.orange;
-              } else if (state.connectionStatus == "Connected") {
+                // Show "LOCAL" badge for offline mode
+                return Padding(
+                  padding: const EdgeInsets.only(right: 12.0),
+                  child: Center(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.orange.withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(
+                          color: Colors.orange,
+                          width: 1,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.phonelink_off,
+                            color: Colors.orange,
+                            size: 14,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            'LOCAL',
+                            style: TextStyle(
+                              color: Colors.orange,
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              }
+
+              // Remote mode - show connection status dot
+              Color statusColor;
+              if (state.connectionStatus == "Connected") {
                 statusColor = Colors.green;
               } else if (state.connectionStatus.startsWith("Connecting")) {
                 statusColor = Colors.orange;
