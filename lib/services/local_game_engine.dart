@@ -336,7 +336,6 @@ class LocalGameEngine with WidgetsBindingObserver implements GameEngine {
 
   void _endJam() {
     _state.clocks['Jam']!.running = false;
-    _state.clocks['Period']!.running = false;
     _state.inJam = false;
 
     // Check if period ended
@@ -352,7 +351,6 @@ class LocalGameEngine with WidgetsBindingObserver implements GameEngine {
   void _startLineup() {
     _state.clocks['Lineup']!.time = 0;
     _state.clocks['Lineup']!.running = true;
-    _state.clocks['Period']!.running = true;
 
     _phase = GamePhase.lineup;
     _state.labelStart = "Start Jam";

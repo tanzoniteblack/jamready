@@ -99,25 +99,24 @@ class _ClockDisplayState extends State<ClockDisplay>
               height: 1.0,
             ),
           ),
-          AnimatedBuilder(
-            animation: _pulseAnimation,
-            builder: (context, child) {
-              return Transform.scale(
-                scale: _pulseAnimation.value,
-                child: child,
-              );
-            },
-            child: Text(
-              _formatTime(widget.clock.time),
-              style: AppTextStyles.clockTime.copyWith(color: color),
-            ),
-          ),
           Row(
-            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               _buildAdjustButton(
                   "-1", widget.enabled ? () => widget.onAdjust("-1000") : null),
-              const SizedBox(width: 24),
+              AnimatedBuilder(
+                animation: _pulseAnimation,
+                builder: (context, child) {
+                  return Transform.scale(
+                    scale: _pulseAnimation.value,
+                    child: child,
+                  );
+                },
+                child: Text(
+                  _formatTime(widget.clock.time),
+                  style: AppTextStyles.clockTime.copyWith(color: color),
+                ),
+              ),
               _buildAdjustButton(
                   "+1", widget.enabled ? () => widget.onAdjust("+1000") : null),
             ],
@@ -129,8 +128,8 @@ class _ClockDisplayState extends State<ClockDisplay>
 
   Widget _buildAdjustButton(String label, VoidCallback? onPressed) {
     return SizedBox(
-      width: 48,
-      height: 48,
+      width: 36,
+      height: 36,
       child: OutlinedButton(
         onPressed: onPressed,
         style: OutlinedButton.styleFrom(

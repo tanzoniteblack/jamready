@@ -264,10 +264,6 @@ class _JamTimerScreenState extends State<JamTimerScreen>
                             team: state.team1,
                             isLeft: true,
                             enabled: isEnabled,
-                            showScoreControls: _isLocalMode,
-                            onScoreAdjust: _isLocalMode
-                                ? (delta) => _engine?.adjustScore(1, delta)
-                                : null,
                             onRetainedToggle: (val) =>
                                 _engine?.setRetainedReview(1, val),
                           ),
@@ -278,10 +274,6 @@ class _JamTimerScreenState extends State<JamTimerScreen>
                             team: state.team2,
                             isLeft: false,
                             enabled: isEnabled,
-                            showScoreControls: _isLocalMode,
-                            onScoreAdjust: _isLocalMode
-                                ? (delta) => _engine?.adjustScore(2, delta)
-                                : null,
                             onRetainedToggle: (val) =>
                                 _engine?.setRetainedReview(2, val),
                           ),
@@ -847,7 +839,6 @@ class _JamTimerScreenState extends State<JamTimerScreen>
             ),
           ),
           const SizedBox(height: 16),
-          const SizedBox(height: 48),
         ],
       ),
     );

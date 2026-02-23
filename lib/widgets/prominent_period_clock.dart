@@ -38,9 +38,7 @@ class ProminentPeriodClock extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: Colors.white.withValues(alpha: 0.1),
-        ),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
       ),
       child: Column(
         children: [
@@ -51,20 +49,18 @@ class ProminentPeriodClock extends StatelessWidget {
               color: contentColor.withValues(alpha: 0.7),
             ),
           ),
-          const SizedBox(height: 4),
-          Text(
-            _formatTime(clock.time),
-            style: AppTextStyles.clockTime.copyWith(
-              fontSize: 56,
-              color: contentColor,
-            ),
-          ),
           const SizedBox(height: 8),
           Row(
-            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               _buildAdjustButton("-1", enabled ? () => onAdjust(-1000) : null),
-              const SizedBox(width: 24),
+              Text(
+                _formatTime(clock.time),
+                style: AppTextStyles.clockTime.copyWith(
+                  fontSize: 56,
+                  color: contentColor,
+                ),
+              ),
               _buildAdjustButton("+1", enabled ? () => onAdjust(1000) : null),
             ],
           ),
@@ -75,8 +71,8 @@ class ProminentPeriodClock extends StatelessWidget {
 
   Widget _buildAdjustButton(String label, VoidCallback? onPressed) {
     return SizedBox(
-      width: 44,
-      height: 44,
+      width: 36,
+      height: 36,
       child: OutlinedButton(
         onPressed: onPressed,
         style: OutlinedButton.styleFrom(
