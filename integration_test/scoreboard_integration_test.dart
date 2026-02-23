@@ -79,7 +79,7 @@ Uri _scoreboardWsUri(String host, int port) {
 
 String _scoreboardHost() {
   const host = String.fromEnvironment('SCOREBOARD_HOST');
-  return host.isNotEmpty ? host : 'ryan.local';
+  return host.isNotEmpty ? host : '192.168.0.111'; //'ryan.local';
 }
 
 int _scoreboardPort() {
@@ -192,6 +192,8 @@ Future<void> _tapJamControl(
 ) async {
   final target = find.text(label.toUpperCase());
   await _pumpUntil(tester, () => target.evaluate().isNotEmpty);
+  await tester.ensureVisible(target);
+  await tester.pump();
   await tester.tap(target);
   await tester.pump();
 }
@@ -342,7 +344,9 @@ void main() {
           _isOfficialReview(state);
     });
 
-    await tester.tap(find.widgetWithText(InkWell, 'END TIMEOUT'));
+    final endTimeoutButton = find.widgetWithText(InkWell, 'END TIMEOUT');
+    await tester.ensureVisible(endTimeoutButton);
+    await tester.tap(endTimeoutButton);
     await tester.pump();
     await _pumpUntil(tester, () {
       final state = _state(tester);
