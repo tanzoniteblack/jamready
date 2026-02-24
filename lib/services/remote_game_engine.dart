@@ -377,4 +377,9 @@ class RemoteGameEngine implements GameEngine {
       retained,
     );
   }
+
+  @override
+  void undo() {
+    send("Set", "ScoreBoard.CurrentGame.ClockUndo", true);
+  }
 }

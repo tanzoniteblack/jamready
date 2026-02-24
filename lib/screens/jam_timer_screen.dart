@@ -353,12 +353,10 @@ class _JamTimerScreenState extends State<JamTimerScreen>
                                 onTimeout: () => _engine?.startTimeout(),
                               ),
 
-                            // Undo Section at bottom (only for remote mode)
-                            if (!_isLocalMode) ...[
-                              SizedBox(height: 16 * scaleFactor),
-                              _buildUndoSection(state, isEnabled),
-                              SizedBox(height: 16 * scaleFactor),
-                            ],
+                            // Undo Section at bottom
+                            SizedBox(height: 16 * scaleFactor),
+                            _buildUndoSection(state, isEnabled),
+                            SizedBox(height: 16 * scaleFactor),
                           ],
                         ),
                       ),
@@ -874,8 +872,7 @@ class _JamTimerScreenState extends State<JamTimerScreen>
         color: Colors.grey.shade600,
         compact: true,
         onConfirmed: () {
-          final engine = _engine as RemoteGameEngine;
-          engine.send("Set", "ScoreBoard.CurrentGame.ClockUndo", true);
+          _engine?.undo();
         },
       ),
     );

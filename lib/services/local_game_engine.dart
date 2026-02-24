@@ -56,6 +56,10 @@ class LocalGameEngine with WidgetsBindingObserver implements GameEngine {
   Map<String, int>? _backgroundClockSnapshot;
   Map<String, bool>? _backgroundRunningSnapshot;
 
+  // Undo support - stores the last undoable action
+  _UndoAction? _lastAction;
+  DateTime? _actionTimestamp;
+
   LocalGameEngine(this._state, this._config);
 
   Ruleset get ruleset => _config.ruleset;
@@ -67,7 +71,7 @@ class LocalGameEngine with WidgetsBindingObserver implements GameEngine {
   ScoreboardState get state => _state;
 
   @override
-  bool get supportsUndo => false;
+  bool get supportsUndo => true;
 
   @override
   bool get isLocal => true;
@@ -213,7 +217,23 @@ class LocalGameEngine with WidgetsBindingObserver implements GameEngine {
     // Update display times only when master clock crosses second boundary
     if (crossedSecondBoundary) {
       _updateAllDisplayTimes();
+      _checkUndoValidity();
       _state.notify();
+    }
+  }
+
+  /// Check if the current undo action is still valid.
+  /// For unstop jam, if elapsed time would make jam clock <= 0, invalidate it.
+  void _checkUndoValidity() {
+    if (_lastAction == null || _actionTimestamp == null) return;
+
+    if (_lastAction!.type == _UndoType.unstopJam) {
+      final elapsed = DateTime.now().difference(_actionTimestamp!).inMilliseconds;
+      final projectedJamTime = (_lastAction!.jamTimeInternal ?? 0) - elapsed;
+
+      if (projectedJamTime <= 0) {
+        _clearUndo();
+      }
     }
   }
 
@@ -246,7 +266,7 @@ class LocalGameEngine with WidgetsBindingObserver implements GameEngine {
   void _handleClockExpiration(String clockName) {
     switch (clockName) {
       case 'Jam':
-        _endJam();
+        _endJam(fromExpiration: true);
         break;
       case 'Period':
         _endPeriod();
@@ -350,6 +370,14 @@ class LocalGameEngine with WidgetsBindingObserver implements GameEngine {
       return;
     }
 
+    // Record undo state before starting jam
+    _setUndoAction(
+      _UndoType.unstartJam,
+      lineupTime: _state.clocks['Lineup']!.time,
+      lineupTimeInternal: _internalClockTimes['Lineup'],
+      periodWasRunning: _state.clocks['Period']!.running,
+    );
+
     // Stop lineup clock
     _state.clocks['Lineup']!.running = false;
 
@@ -374,6 +402,14 @@ class LocalGameEngine with WidgetsBindingObserver implements GameEngine {
   @override
   void stopJam() {
     if (_phase == GamePhase.preGame) {
+      // Record undo state for "unstart lineup" at period start
+      _setUndoAction(
+        _UndoType.unstartLineup,
+        periodTime: _state.clocks['Period']!.time,
+        periodTimeInternal: _internalClockTimes['Period'],
+        periodNumber: 0,
+      );
+
       // "Start Lineup" - begin the period
       _startPeriod(1);
       _startLineup();
@@ -387,12 +423,24 @@ class LocalGameEngine with WidgetsBindingObserver implements GameEngine {
     }
   }
 
-  void _endJam() {
+  void _endJam({bool fromExpiration = false}) {
+    // Record undo state for "unstop jam" (only if manually stopped, not expired)
+    if (!fromExpiration) {
+      _setUndoAction(
+        _UndoType.unstopJam,
+        jamTime: _state.clocks['Jam']!.time,
+        jamTimeInternal: _internalClockTimes['Jam'],
+      );
+    } else {
+      _clearUndo();
+    }
+
     _state.clocks['Jam']!.running = false;
     _state.inJam = false;
 
     // Check if period ended
     if (_state.clocks['Period']!.time <= 0) {
+      _clearUndo(); // Can't undo if period ended
       _endPeriod();
       return;
     }
@@ -622,4 +670,138 @@ class LocalGameEngine with WidgetsBindingObserver implements GameEngine {
 
     _state.notify();
   }
+
+  @override
+  void undo() {
+    if (_lastAction == null || _actionTimestamp == null) return;
+
+    final action = _lastAction!;
+    final elapsed = DateTime.now().difference(_actionTimestamp!).inMilliseconds;
+
+    _lastAction = null;
+    _actionTimestamp = null;
+    _state.labelUndo = "No Action";
+
+    switch (action.type) {
+      case _UndoType.unstopJam:
+        // Calculate jam time accounting for elapsed time since stop
+        final newJamTimeInternal = (action.jamTimeInternal ?? 0) - elapsed;
+
+        // Don't allow undo if jam would have expired
+        if (newJamTimeInternal <= 0) return;
+
+        final newJamTime = _getDisplayTime(newJamTimeInternal, false);
+
+        // Restore jam state with adjusted time
+        _state.clocks['Lineup']!.running = false;
+        _state.clocks['Jam']!.time = newJamTime;
+        _internalClockTimes['Jam'] = newJamTimeInternal;
+        _state.clocks['Jam']!.running = true;
+        _state.clocks['Period']!.running = true;
+        _state.inJam = true;
+        _phase = GamePhase.jam;
+        _state.labelStop = "Stop Jam";
+        break;
+
+      case _UndoType.unstartJam:
+        // Go back to lineup
+        _state.clocks['Jam']!.running = false;
+        _state.clocks['Period']!.running = action.periodWasRunning!;
+        _state.clocks['Lineup']!.time = action.lineupTime!;
+        _internalClockTimes['Lineup'] = action.lineupTimeInternal!;
+        _state.clocks['Lineup']!.running = true;
+        _state.inJam = false;
+        _currentJam--;
+        _state.clocks['Jam']!.number = _currentJam;
+        _phase = GamePhase.lineup;
+        break;
+
+      case _UndoType.unstartLineup:
+        // Go back to pre-period state
+        _state.clocks['Lineup']!.running = false;
+        _state.clocks['Period']!.running = false;
+        if (action.periodTime != null) {
+          _state.clocks['Period']!.time = action.periodTime!;
+          _internalClockTimes['Period'] = action.periodTimeInternal!;
+        }
+        _state.clocks['Period']!.number = action.periodNumber!;
+        _currentPeriod = action.periodNumber!;
+        _phase = GamePhase.preGame;
+        break;
+    }
+
+    _state.notify();
+  }
+
+  void _clearUndo() {
+    _lastAction = null;
+    _actionTimestamp = null;
+    _state.labelUndo = "No Action";
+  }
+
+  void _setUndoAction(_UndoType type, {
+    int? jamTime,
+    int? jamTimeInternal,
+    int? lineupTime,
+    int? lineupTimeInternal,
+    int? periodTime,
+    int? periodTimeInternal,
+    int? periodNumber,
+    bool? periodWasRunning,
+  }) {
+    _actionTimestamp = DateTime.now();
+    _lastAction = _UndoAction(
+      type: type,
+      jamTime: jamTime,
+      jamTimeInternal: jamTimeInternal,
+      lineupTime: lineupTime,
+      lineupTimeInternal: lineupTimeInternal,
+      periodTime: periodTime,
+      periodTimeInternal: periodTimeInternal,
+      periodNumber: periodNumber,
+      periodWasRunning: periodWasRunning,
+    );
+
+    switch (type) {
+      case _UndoType.unstopJam:
+        _state.labelUndo = "UNDO: Unstop Jam";
+        break;
+      case _UndoType.unstartJam:
+        _state.labelUndo = "UNDO: Unstart Jam";
+        break;
+      case _UndoType.unstartLineup:
+        _state.labelUndo = "UNDO: Unstart Lineup";
+        break;
+    }
+  }
+}
+
+enum _UndoType {
+  unstopJam,
+  unstartJam,
+  unstartLineup,
+}
+
+class _UndoAction {
+  final _UndoType type;
+  final int? jamTime;
+  final int? jamTimeInternal;
+  final int? lineupTime;
+  final int? lineupTimeInternal;
+  final int? periodTime;
+  final int? periodTimeInternal;
+  final int? periodNumber;
+  final bool? periodWasRunning;
+
+  _UndoAction({
+    required this.type,
+    this.jamTime,
+    this.jamTimeInternal,
+    this.lineupTime,
+    this.lineupTimeInternal,
+    this.periodTime,
+    this.periodTimeInternal,
+    this.periodNumber,
+    this.periodWasRunning,
+  });
 }

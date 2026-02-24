@@ -59,4 +59,7 @@ abstract class GameEngine {
 
   /// Toggle retained official review for a team (only supported in local mode)
   void setRetainedReview(int teamNumber, bool retained);
+
+  /// Undo the last action (if supported)
+  void undo();
 }
