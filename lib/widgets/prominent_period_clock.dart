@@ -4,62 +4,40 @@ import '../models/scoreboard_state.dart';
 import '../styles/text_styles.dart';
 import 'time_edit_dialog.dart';
 
-class ClockDisplay extends StatefulWidget {
+/// A larger, more prominent period clock display for offline mode.
+class ProminentPeriodClock extends StatefulWidget {
   final Clock clock;
-  final Color? textColor;
   final bool enabled;
-  final Function(String) onAdjust;
+  final Function(int) onAdjust;
   final Function(int)? onSetTime;
 
-  const ClockDisplay({
+  const ProminentPeriodClock({
     super.key,
     required this.clock,
-    this.textColor,
     this.enabled = true,
     required this.onAdjust,
     this.onSetTime,
   });
 
   @override
-  State<ClockDisplay> createState() => _ClockDisplayState();
+  State<ProminentPeriodClock> createState() => _ProminentPeriodClockState();
 }
 
-class _ClockDisplayState extends State<ClockDisplay>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _pulseController;
-  late Animation<double> _pulseAnimation;
-
+class _ProminentPeriodClockState extends State<ProminentPeriodClock> {
   // Spam detection for showing long-press hint
   final List<DateTime> _recentPresses = [];
   bool _showLongPressHint = false;
   static bool _hintShownThisSession = false;
 
-  @override
-  void initState() {
-    super.initState();
-    _pulseController = AnimationController(
-      duration: const Duration(milliseconds: 2000),
-      vsync: this,
-    );
-
-    _pulseAnimation = Tween<double>(begin: 0.98, end: 1.03).animate(
-      CurvedAnimation(
-        parent: _pulseController,
-        curve: Curves.easeInOut,
-      ),
-    );
-
-    _pulseController.repeat(reverse: true);
-  }
-
-  @override
-  void dispose() {
-    _pulseController.dispose();
-    super.dispose();
+  String _formatTime(int milliseconds) {
+    int seconds = (milliseconds / 1000).ceil();
+    int minutes = (seconds / 60).floor();
+    int remainingSeconds = (seconds % 60);
+    return "${minutes.toString().padLeft(2, '0')}:${remainingSeconds.toString().padLeft(2, '0')}";
   }
 
   void _trackButtonPress() {
-    // Only track if long-press is available (local mode)
+    // Only track if long-press is available
     if (widget.onSetTime == null || _hintShownThisSession) return;
 
     final now = DateTime.now();
@@ -84,13 +62,13 @@ class _ClockDisplayState extends State<ClockDisplay>
     }
   }
 
-  void _handleAdjust(String value) {
+  void _handleAdjust(int delta) {
     _trackButtonPress();
-    widget.onAdjust(value);
+    widget.onAdjust(delta);
   }
 
   Future<void> _handleLongPress() async {
-    // Only allow long press time editing in local mode (when onSetTime is provided)
+    // Only allow long press time editing when onSetTime is provided
     if (!widget.enabled || widget.onSetTime == null) return;
 
     // Haptic feedback for long press
@@ -112,26 +90,11 @@ class _ClockDisplayState extends State<ClockDisplay>
 
   @override
   Widget build(BuildContext context) {
-    String label = widget.clock.displayName.toUpperCase();
-    if (widget.clock.name == 'Jam' && widget.clock.number > 0) {
-      label += " ${widget.clock.number}";
-    }
+    final label = widget.clock.displayName.isNotEmpty
+        ? "${widget.clock.displayName} ${widget.clock.number}"
+        : "${widget.clock.name} ${widget.clock.number}";
 
-    final color = !widget.enabled
-        ? Colors.white12
-        : widget.textColor ??
-            (widget.clock.running || widget.clock.time > 0
-                ? Colors.white
-                : Colors.white38);
-
-    Color? glowColor;
-    if (widget.enabled && widget.clock.running) {
-      if (widget.clock.name == 'Intermission') {
-        glowColor = Colors.orange;
-      } else if (widget.clock.name == 'Timeout') {
-        glowColor = Colors.red;
-      }
-    }
+    final contentColor = widget.enabled ? Colors.white : Colors.white38;
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -139,55 +102,36 @@ class _ClockDisplayState extends State<ClockDisplay>
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
           decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.05),
             borderRadius: BorderRadius.circular(16),
-            color: glowColor?.withValues(alpha: 0.05),
-            boxShadow: glowColor != null
-                ? [
-                    BoxShadow(
-                      color: glowColor.withValues(alpha: 0.15),
-                      blurRadius: 24,
-                      spreadRadius: 2,
-                    ),
-                  ]
-                : null,
+            border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                label,
+                label.toUpperCase(),
                 style: AppTextStyles.clockLabel.copyWith(
-                  fontSize: 18,
-                  color: color,
-                  height: 1.0,
+                  fontSize: 14,
+                  color: contentColor.withValues(alpha: 0.7),
                 ),
               ),
+              const SizedBox(height: 4),
               GestureDetector(
-                // Only enable long press for time editing in local mode
+                // Only enable long press for time editing when onSetTime is provided
                 onLongPress: widget.onSetTime != null ? _handleLongPress : null,
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    _buildAdjustButton(
-                        "-1", widget.enabled ? () => _handleAdjust("-1000") : null),
-                    AnimatedBuilder(
-                      animation: _pulseAnimation,
-                      builder: (context, child) {
-                        return Transform.scale(
-                          scale: _pulseAnimation.value,
-                          child: child,
-                        );
-                      },
-                      child: Text(
-                        _formatTime(widget.clock.time),
-                        style: AppTextStyles.clockTime.copyWith(
-                          color: color,
-                          fontSize: 72,
-                        ),
+                    _buildAdjustButton("-1", widget.enabled ? () => _handleAdjust(-1000) : null),
+                    Text(
+                      _formatTime(widget.clock.time),
+                      style: AppTextStyles.clockTime.copyWith(
+                        fontSize: 48,
+                        color: contentColor,
                       ),
                     ),
-                    _buildAdjustButton(
-                        "+1", widget.enabled ? () => _handleAdjust("+1000") : null),
+                    _buildAdjustButton("+1", widget.enabled ? () => _handleAdjust(1000) : null),
                   ],
                 ),
               ),
@@ -252,26 +196,11 @@ class _ClockDisplayState extends State<ClockDisplay>
         child: Text(
           label,
           style: TextStyle(
-            color: onPressed != null ? Colors.white : Colors.white24,
-            fontSize: 16,
+            color: onPressed != null ? Colors.white60 : Colors.white24,
+            fontSize: 14,
           ),
         ),
       ),
     );
-  }
-
-  String _formatTime(int milliseconds) {
-    int seconds = (milliseconds / 1000).ceil();
-    int minutes = (seconds / 60).floor();
-    int remainingSeconds = (seconds % 60);
-
-    if (milliseconds < 0) {
-      seconds = (milliseconds.abs() / 1000).floor();
-      minutes = (seconds / 60).floor();
-      remainingSeconds = (seconds % 60);
-      return "-${minutes.toString().padLeft(1, '0')}:${remainingSeconds.toString().padLeft(2, '0')}";
-    }
-
-    return "${minutes.toString().padLeft(1, '0')}:${remainingSeconds.toString().padLeft(2, '0')}";
   }
 }

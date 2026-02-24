@@ -70,6 +70,7 @@ class ScoreboardTestClient {
 
 Uri _scoreboardWsUri(String host, int port) {
   final base = Uri.parse('ws://$host:$port');
+  print('Connecting to: $base');
   return base.replace(
     scheme: base.scheme == 'https' ? 'wss' : 'ws',
     path: '/WS/',
@@ -112,15 +113,40 @@ Future<ScoreboardTestClient> _launchAppAndConnect(
   final host = _scoreboardHost();
   final port = _scoreboardPort();
 
-  SharedPreferences.setMockInitialValues({
-    'server_host': host,
-    'server_port': port.toString(),
-  });
+  SharedPreferences.setMockInitialValues({});
 
   app.main();
-  // Use pump() instead of pumpAndSettle() because the clock display
-  // has a continuously running pulse animation that never settles
+  // Wait for the settings screen to appear
   await tester.pump(const Duration(seconds: 1));
+
+  // Wait for settings screen to be visible
+  await _pumpUntil(
+    tester,
+    () => find.text('SETTINGS').evaluate().isNotEmpty,
+    timeout: const Duration(seconds: 10),
+  );
+
+  // Find and fill in the host field
+  final hostField = find.widgetWithText(TextFormField, 'Host / IP Address');
+  await tester.enterText(hostField, host);
+  await tester.pump();
+
+  // Find and fill in the port field
+  final portField = find.widgetWithText(TextFormField, 'Port');
+  await tester.enterText(portField, port.toString());
+  await tester.pump();
+
+  // Tap the CONNECT button
+  final connectButton = find.text('CONNECT');
+  await tester.tap(connectButton);
+  await tester.pump(const Duration(seconds: 1));
+
+  // Wait for navigation to JamTimerScreen and connection
+  await _pumpUntil(
+    tester,
+    () => find.byType(JamTimerScreen).evaluate().isNotEmpty,
+    timeout: const Duration(seconds: 10),
+  );
 
   await _pumpUntil(
     tester,

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../styles/text_styles.dart';
+import 'game_setup_screen.dart';
 import 'jam_timer_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -115,7 +116,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         backgroundColor: Colors.transparent,
         elevation: 0,
       ),
-      body: Padding(
+      body: SingleChildScrollView(
         padding: const EdgeInsets.all(24.0),
         child: Form(
           key: _formKey,
@@ -204,7 +205,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   return null;
                 },
               ),
-              const Spacer(),
+              const SizedBox(height: 32),
               SizedBox(
                 height: 56,
                 child: ElevatedButton(
@@ -218,11 +219,59 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   child: _isLoading
                       ? const CircularProgressIndicator(color: Colors.white)
                       : Text(
-                          "CONNECT",
-                          style: AppTextStyles.buttonText.copyWith(
-                            fontSize: 18,
-                          ),
-                        ),
+                    "CONNECT",
+                    style: AppTextStyles.buttonText.copyWith(
+                      fontSize: 18,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 32),
+              // Divider with "OR" text
+              Row(
+                children: [
+                  Expanded(child: Divider(color: Colors.white24)),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Text(
+                      "OR",
+                      style: AppTextStyles.clockLabel.copyWith(
+                        color: Colors.white38,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                  Expanded(child: Divider(color: Colors.white24)),
+                ],
+              ),
+
+              const SizedBox(height: 32),
+
+              // Offline Game Button
+              SizedBox(
+                height: 56,
+                child: OutlinedButton(
+                  onPressed: () {
+                    Navigator.of(context).pushReplacement(
+                      MaterialPageRoute(
+                        builder: (context) => const GameSetupScreen(),
+                      ),
+                    );
+                  },
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.orange,
+                    side: const BorderSide(color: Colors.orange, width: 2),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: Text(
+                    "START OFFLINE GAME",
+                    style: AppTextStyles.buttonText.copyWith(
+                      fontSize: 16,
+                      color: Colors.orange,
+                    ),
+                  ),
                 ),
               ),
               const SizedBox(height: 24),

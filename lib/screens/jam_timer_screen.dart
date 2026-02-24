@@ -3,15 +3,20 @@ import 'package:provider/provider.dart';
 import 'package:roller_derby_jam_timer/styles/text_styles.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/scoreboard_state.dart';
-import '../services/scoreboard_service.dart';
+import '../services/game_engine.dart';
+import '../services/remote_game_engine.dart';
 import '../widgets/team_panel.dart';
 import '../widgets/clock_display.dart';
 import '../widgets/jam_controls.dart';
+import '../widgets/prominent_period_clock.dart';
 import 'package:vibration/vibration.dart';
 import 'settings_screen.dart';
 
 class JamTimerScreen extends StatefulWidget {
-  const JamTimerScreen({super.key});
+  /// Optional game engine. If null, creates a RemoteGameEngine.
+  final GameEngine? engine;
+
+  const JamTimerScreen({super.key, this.engine});
 
   @override
   State<JamTimerScreen> createState() => _JamTimerScreenState();
@@ -19,59 +24,121 @@ class JamTimerScreen extends StatefulWidget {
 
 class _JamTimerScreenState extends State<JamTimerScreen>
     with WidgetsBindingObserver {
-  ScoreboardService? _service;
+  GameEngine? _engine;
   bool _showUndo = false;
   bool _useReplace = false;
 
   // "Healthy" color used when clock is in normal state (no alerts)
   static final Color _healthyColor = Colors.green.shade400;
 
+  bool get _isLocalMode => _engine?.isLocal ?? false;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _connectToServer();
-    });
+
+    if (widget.engine != null) {
+      _engine = widget.engine;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _engine!.initialize();
+      });
+    } else {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _connectToServer();
+      });
+    }
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
-    if (state == AppLifecycleState.resumed) {
-      // App came back to foreground - reconnect to server
+    // Only handle lifecycle for remote engine - local engine handles its own
+    if (!_isLocalMode && state == AppLifecycleState.resumed) {
       _connectToServer(forceReconnect: true);
     }
   }
 
   Future<void> _connectToServer({bool forceReconnect = false}) async {
+    if (_isLocalMode) return;
+
     final state = Provider.of<ScoreboardState>(context, listen: false);
 
     // If already connected, don't create a new service unless forced
-    if (_service != null && _service!.isConnected && !forceReconnect) {
+    if (_engine != null &&
+        _engine is RemoteGameEngine &&
+        (_engine as RemoteGameEngine).isConnected &&
+        !forceReconnect) {
       return;
     }
 
-    // Clean up existing service if forcing reconnect
-    if (forceReconnect && _service != null) {
-      _service!.disconnect();
+    // Clean up existing engine if forcing reconnect
+    if (forceReconnect && _engine != null) {
+      (_engine as RemoteGameEngine).disconnect();
     }
 
-    _service = ScoreboardService(state);
+    final remoteEngine = RemoteGameEngine(state);
+    _engine = remoteEngine;
 
     final prefs = await SharedPreferences.getInstance();
     final host = prefs.getString('server_host') ?? '10.0.2.2';
     final port = prefs.getString('server_port') ?? '8000';
     final url = "ws://$host:$port";
 
-    _service!.connect(url);
+    remoteEngine.connect(url);
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    _service?.disconnect();
+    _engine?.dispose();
     super.dispose();
+  }
+
+  Future<void> _navigateToHome(BuildContext context) async {
+    if (_isLocalMode) {
+      // Show confirmation dialog for local games
+      final shouldExit = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          backgroundColor: const Color(0xFF1E1E1E),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: const Text(
+            'End Game?',
+            style: TextStyle(color: Colors.white),
+          ),
+          content: const Text(
+            'Leaving will end the current game. This cannot be undone.',
+            style: TextStyle(color: Colors.white70),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('CANCEL'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              style: TextButton.styleFrom(
+                foregroundColor: Colors.red,
+              ),
+              child: const Text('END GAME'),
+            ),
+          ],
+        ),
+      );
+
+      if (shouldExit != true) return;
+    }
+
+    // Clean up current engine before navigating
+    _engine?.dispose();
+    if (context.mounted) {
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (context) => const SettingsScreen()),
+      );
+    }
   }
 
   @override
@@ -94,17 +161,59 @@ class _JamTimerScreenState extends State<JamTimerScreen>
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.settings, color: Colors.white70),
-          onPressed: () {
-            // Navigate to Settings Screen
-            Navigator.of(context).push(
-              MaterialPageRoute(builder: (context) => const SettingsScreen()),
-            );
-          },
+          icon: Icon(
+            _isLocalMode ? Icons.home : Icons.settings,
+            color: Colors.white70,
+          ),
+          onPressed: () => _navigateToHome(context),
         ),
         actions: [
           Consumer<ScoreboardState>(
             builder: (context, state, _) {
+              if (_isLocalMode) {
+                // Show "LOCAL" badge for offline mode
+                return Padding(
+                  padding: const EdgeInsets.only(right: 12.0),
+                  child: Center(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.orange.withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(
+                          color: Colors.orange,
+                          width: 1,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.phonelink_off,
+                            color: Colors.orange,
+                            size: 14,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            'LOCAL',
+                            style: TextStyle(
+                              color: Colors.orange,
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              }
+
+              // Remote mode - show connection status dot
               Color statusColor;
               if (state.connectionStatus == "Connected") {
                 statusColor = Colors.green;
@@ -132,11 +241,14 @@ class _JamTimerScreenState extends State<JamTimerScreen>
       ),
       body: Consumer<ScoreboardState>(
         builder: (context, state, _) {
-          final isConnected = state.connectionStatus == "Connected";
+          final isEnabled = _isLocalMode ||
+              state.connectionStatus == "Connected";
 
           return RefreshIndicator(
             onRefresh: () async {
-              await _connectToServer(forceReconnect: true);
+              if (!_isLocalMode) {
+                await _connectToServer(forceReconnect: true);
+              }
             },
             child: SingleChildScrollView(
               physics: const AlwaysScrollableScrollPhysics(),
@@ -151,12 +263,9 @@ class _JamTimerScreenState extends State<JamTimerScreen>
                           child: TeamPanel(
                             team: state.team1,
                             isLeft: true,
-                            enabled: isConnected,
-                            onRetainedToggle: (val) => _service?.send(
-                              "Set",
-                              "ScoreBoard.CurrentGame.Team(1).RetainedOfficialReview",
-                              val,
-                            ),
+                            enabled: isEnabled,
+                            onRetainedToggle: (val) =>
+                                _engine?.setRetainedReview(1, val),
                           ),
                         ),
                         const SizedBox(width: 16),
@@ -164,49 +273,54 @@ class _JamTimerScreenState extends State<JamTimerScreen>
                           child: TeamPanel(
                             team: state.team2,
                             isLeft: false,
-                            enabled: isConnected,
-                            onRetainedToggle: (val) => _service?.send(
-                              "Set",
-                              "ScoreBoard.CurrentGame.Team(2).RetainedOfficialReview",
-                              val,
-                            ),
+                            enabled: isEnabled,
+                            onRetainedToggle: (val) =>
+                                _engine?.setRetainedReview(2, val),
                           ),
                         ),
                       ],
                     ),
                     const SizedBox(height: 24),
 
-                    // Period / Intermission Clock (hide during intermission since main clock shows it)
-                    if (!(state.clocks['Intermission']?.running ?? false))
-                      _buildPeriodClockRow(state, isConnected),
+                    // Period / Intermission Clock
+                    // In local mode, show prominent period clock
+                    // In remote mode, show period clock row (unless intermission)
+                    if (_isLocalMode)
+                      _buildLocalModePeriodClock(state, isEnabled)
+                    else if (!(state.clocks['Intermission']?.running ?? false))
+                      _buildPeriodClockRow(state, isEnabled),
 
-                    if (!(state.clocks['Intermission']?.running ?? false))
+                    if (_isLocalMode ||
+                        !(state.clocks['Intermission']?.running ?? false))
                       const SizedBox(height: 24),
 
                     // Active Game Clock (Jam / Lineup / Timeout) or Ready indicator
                     if (_isReadyToStart(state))
-                      _buildReadyToStartDisplay(state, isConnected)
+                      _buildReadyToStartDisplay(state, isEnabled)
                     else
                       ClockDisplay(
                         clock: _determineActiveClock(state),
                         textColor: _determineAlertColor(state),
-                        enabled: isConnected,
+                        enabled: isEnabled,
                         onAdjust: (val) {
                           final active = _determineActiveClock(state);
-                          _service?.send(
-                            "Set",
-                            "ScoreBoard.CurrentGame.Clock(${active.name}).Time",
-                            val,
-                            flag: "change",
-                          );
+                          final delta = int.tryParse(val) ?? 0;
+                          _engine?.adjustClock(active.name, delta);
                         },
+                        // Only allow direct time setting in local mode
+                        onSetTime: _isLocalMode
+                            ? (timeMs) {
+                                final active = _determineActiveClock(state);
+                                _engine?.setClockTime(active.name, timeMs);
+                              }
+                            : null,
                       ),
 
                     const SizedBox(height: 24),
 
                     // Timeout Type Buttons (visible during timeout) OR normal controls
                     if (state.labelStop == "End Timeout")
-                      _buildTimeoutTypeSection(state, isConnected)
+                      _buildTimeoutTypeSection(state, isEnabled)
                     else
                       JamControls(
                         inJam: state.inJam,
@@ -218,27 +332,15 @@ class _JamTimerScreenState extends State<JamTimerScreen>
                         stopLabel: state.labelStop,
                         timeoutLabel: state.labelTimeout,
                         alertColor: _determineAlertColor(state),
-                        enabled: isConnected,
-                        onStartJam: () => _service?.send(
-                          "Set",
-                          "ScoreBoard.CurrentGame.StartJam",
-                          true,
-                        ),
-                        onStopJam: () => _service?.send(
-                          "Set",
-                          "ScoreBoard.CurrentGame.StopJam",
-                          true,
-                        ),
-                        onTimeout: () => _service?.send(
-                          "Set",
-                          "ScoreBoard.CurrentGame.Timeout",
-                          true,
-                        ),
+                        enabled: isEnabled,
+                        onStartJam: () => _engine?.startJam(),
+                        onStopJam: () => _engine?.stopJam(),
+                        onTimeout: () => _engine?.startTimeout(),
                       ),
 
-                    // Undo / Replace Section
-                    if (state.labelUndo != "No Action")
-                      _buildUndoSection(state, isConnected),
+                    // Undo / Replace Section (only for remote mode)
+                    if (!_isLocalMode && state.labelUndo != "No Action")
+                      _buildUndoSection(state, isEnabled),
                   ],
                 ),
               ),
@@ -249,19 +351,27 @@ class _JamTimerScreenState extends State<JamTimerScreen>
     );
   }
 
-  Clock _determineActiveClock(ScoreboardState state) {
-    // Original web implementation uses CSS to show only the first running clock
-    // in DOM order: Jam, Lineup, Timeout.
-    // CSS: [Clock]:not(.Running) { display: none; }
-    //      .Running ~ .Running { display: none; }
-    // Additionally, Jam clock gets InJam styling when InJam is true.
+  Widget _buildLocalModePeriodClock(ScoreboardState state, bool isEnabled) {
+    final bool showIntermission = state.clocks['Intermission']!.running;
+    final clock = showIntermission
+        ? state.clocks['Intermission']!
+        : state.clocks['Period']!;
 
+    return ProminentPeriodClock(
+      clock: clock,
+      enabled: isEnabled,
+      onAdjust: (delta) => _engine?.adjustClock(clock.name, delta),
+      onSetTime: (timeMs) => _engine?.setClockTime(clock.name, timeMs),
+    );
+  }
+
+  Clock _determineActiveClock(ScoreboardState state) {
     // Priority 1: Jam Clock - running OR InJam flag is true
     if (state.clocks['Jam']!.running || state.inJam) {
       return state.clocks['Jam']!;
     }
 
-    // Priority 2: Lineup Clock - running (includes "Post Timeout" state)
+    // Priority 2: Lineup Clock - running
     if (state.clocks['Lineup']!.running) {
       return state.clocks['Lineup']!;
     }
@@ -271,19 +381,16 @@ class _JamTimerScreenState extends State<JamTimerScreen>
       return state.clocks['Timeout']!;
     }
 
-    // No Jam/Lineup/Timeout clocks running.
-    // Fall through to the Period/Intermission group logic:
-
+    // Fall through to Period/Intermission
     if (state.clocks['Intermission']!.running) {
       return state.clocks['Intermission']!;
     }
 
-    // Default: show Lineup (which will be at 0:00 pre-game)
+    // Default: show Lineup
     return state.clocks['Lineup']!;
   }
 
-  Widget _buildPeriodClockRow(ScoreboardState state, bool isConnected) {
-    // Original web: show Intermission when running, otherwise show Period
+  Widget _buildPeriodClockRow(ScoreboardState state, bool isEnabled) {
     final bool showIntermission = state.clocks['Intermission']!.running;
     final clock = showIntermission
         ? state.clocks['Intermission']!
@@ -293,7 +400,7 @@ class _JamTimerScreenState extends State<JamTimerScreen>
         ? "${clock.displayName} ${clock.number}"
         : "${clock.name} ${clock.number}";
 
-    final contentColor = isConnected ? Colors.white70 : Colors.white24;
+    final contentColor = isEnabled ? Colors.white70 : Colors.white24;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
@@ -309,7 +416,7 @@ class _JamTimerScreenState extends State<JamTimerScreen>
         ),
       ),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Text(
             label.toUpperCase(),
@@ -318,46 +425,17 @@ class _JamTimerScreenState extends State<JamTimerScreen>
               fontSize: 14,
             ),
           ),
-          Row(
-            children: [
-              _buildMiniAdjustButton(
-                "-",
-                isConnected
-                    ? () {
-                        _service?.send(
-                          "Set",
-                          "ScoreBoard.CurrentGame.Clock(${clock.name}).Time",
-                          "-1000",
-                          flag: "change",
-                        );
-                      }
-                    : null,
+          SizedBox(width: 36),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Text(
+              _formatTime(clock.time),
+              style: AppTextStyles.buttonText.copyWith(
+                color: contentColor,
+                fontSize: 18,
+                fontFamily: 'monospace',
               ),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                child: Text(
-                  _formatTime(clock.time),
-                  style: AppTextStyles.buttonText.copyWith(
-                    color: contentColor,
-                    fontSize: 18,
-                    fontFamily: 'monospace',
-                  ),
-                ),
-              ),
-              _buildMiniAdjustButton(
-                "+",
-                isConnected
-                    ? () {
-                        _service?.send(
-                          "Set",
-                          "ScoreBoard.CurrentGame.Clock(${clock.name}).Time",
-                          "+1000",
-                          flag: "change",
-                        );
-                      }
-                    : null,
-              ),
-            ],
+            ),
           ),
         ],
       ),
@@ -395,38 +473,36 @@ class _JamTimerScreenState extends State<JamTimerScreen>
     return "${minutes.toString().padLeft(1, '0')}:${remainingSeconds.toString().padLeft(2, '0')}";
   }
 
-  Widget _buildTimeoutTypeSection(ScoreboardState state, bool isConnected) {
-    // Determine current timeout owner to highlight the active button.
+  Widget _buildTimeoutTypeSection(ScoreboardState state, bool isEnabled) {
     final owner = state.timeoutOwner;
-    // OfficialReview can be boolean true/false or string "true"/"false"
     final isOr =
         state.officialReview == "true" || state.officialReview == "True";
 
-    // TimeoutOwner is a UUID, match against team serverId
-    final bool isTeam1TO =
-        owner.isNotEmpty && owner == state.team1.serverId && !isOr;
-    final bool isTeam2TO =
-        owner.isNotEmpty && owner == state.team2.serverId && !isOr;
+    // For local mode, owner is '1' or '2', for remote it's a UUID
+    final bool isTeam1TO = _isLocalMode
+        ? (owner == '1' && !isOr)
+        : (owner.isNotEmpty && owner == state.team1.serverId && !isOr);
+    final bool isTeam2TO = _isLocalMode
+        ? (owner == '2' && !isOr)
+        : (owner.isNotEmpty && owner == state.team2.serverId && !isOr);
     final bool isOfficialTO = owner == "O";
-    final bool isTeam1OR =
-        owner.isNotEmpty && owner == state.team1.serverId && isOr;
-    final bool isTeam2OR =
-        owner.isNotEmpty && owner == state.team2.serverId && isOr;
+    final bool isTeam1OR = _isLocalMode
+        ? (owner == '1' && isOr)
+        : (owner.isNotEmpty && owner == state.team1.serverId && isOr);
+    final bool isTeam2OR = _isLocalMode
+        ? (owner == '2' && isOr)
+        : (owner.isNotEmpty && owner == state.team2.serverId && isOr);
 
     return Column(
       children: [
-        // Official Timeout button (full width, top)
+        // Official Timeout button
         _buildTimeoutButton(
           "OFFICIAL TIMEOUT",
           isActive: isOfficialTO,
           color: Colors.amber,
-          enabled: isConnected,
+          enabled: isEnabled,
           height: 56,
-          onTap: () => _service?.send(
-            "Set",
-            "ScoreBoard.CurrentGame.OfficialTimeout",
-            true,
-          ),
+          onTap: () => _engine?.setTimeoutOwner('O'),
         ),
 
         const SizedBox(height: 16),
@@ -452,13 +528,9 @@ class _JamTimerScreenState extends State<JamTimerScreen>
                     isActive: isTeam1TO,
                     count: state.team1.timeouts,
                     color: Colors.white,
-                    enabled: isConnected,
+                    enabled: isEnabled,
                     height: 48,
-                    onTap: () => _service?.send(
-                      "Set",
-                      "ScoreBoard.CurrentGame.Team(1).Timeout",
-                      true,
-                    ),
+                    onTap: () => _engine?.setTimeoutOwner('1'),
                   ),
                   const SizedBox(height: 8),
                   _buildTimeoutButton(
@@ -466,13 +538,10 @@ class _JamTimerScreenState extends State<JamTimerScreen>
                     isActive: isTeam1OR,
                     count: state.team1.officialReviews,
                     color: Colors.blue.shade300,
-                    enabled: isConnected,
+                    enabled: isEnabled,
                     height: 48,
-                    onTap: () => _service?.send(
-                      "Set",
-                      "ScoreBoard.CurrentGame.Team(1).OfficialReview",
-                      true,
-                    ),
+                    onTap: () =>
+                        _engine?.setTimeoutOwner('1', isOfficialReview: true),
                   ),
                 ],
               ),
@@ -496,13 +565,9 @@ class _JamTimerScreenState extends State<JamTimerScreen>
                     isActive: isTeam2TO,
                     count: state.team2.timeouts,
                     color: Colors.white,
-                    enabled: isConnected,
+                    enabled: isEnabled,
                     height: 48,
-                    onTap: () => _service?.send(
-                      "Set",
-                      "ScoreBoard.CurrentGame.Team(2).Timeout",
-                      true,
-                    ),
+                    onTap: () => _engine?.setTimeoutOwner('2'),
                   ),
                   const SizedBox(height: 8),
                   _buildTimeoutButton(
@@ -510,13 +575,10 @@ class _JamTimerScreenState extends State<JamTimerScreen>
                     isActive: isTeam2OR,
                     count: state.team2.officialReviews,
                     color: Colors.blue.shade300,
-                    enabled: isConnected,
+                    enabled: isEnabled,
                     height: 48,
-                    onTap: () => _service?.send(
-                      "Set",
-                      "ScoreBoard.CurrentGame.Team(2).OfficialReview",
-                      true,
-                    ),
+                    onTap: () =>
+                        _engine?.setTimeoutOwner('2', isOfficialReview: true),
                   ),
                 ],
               ),
@@ -526,8 +588,8 @@ class _JamTimerScreenState extends State<JamTimerScreen>
 
         const SizedBox(height: 20),
 
-        // End Timeout button (large, prominent)
-        _buildEndTimeoutButton(isConnected),
+        // End Timeout button
+        _buildEndTimeoutButton(isEnabled),
       ],
     );
   }
@@ -541,7 +603,6 @@ class _JamTimerScreenState extends State<JamTimerScreen>
     required double height,
     required VoidCallback onTap,
   }) {
-    // For light colors like amber/yellow, use dark text when active
     final bool useDarkText = isActive &&
         (color == Colors.amber || color.computeLuminance() > 0.5);
     final textColor = useDarkText ? Colors.black87 : Colors.white;
@@ -642,7 +703,7 @@ class _JamTimerScreenState extends State<JamTimerScreen>
     );
   }
 
-  Widget _buildEndTimeoutButton(bool isConnected) {
+  Widget _buildEndTimeoutButton(bool isEnabled) {
     final color = Colors.red.shade700;
     final highlightColor = Color.lerp(color, Colors.white, 0.1)!;
     final shadowColor = Color.lerp(color, Colors.black, 0.15)!;
@@ -653,7 +714,7 @@ class _JamTimerScreenState extends State<JamTimerScreen>
       child: Container(
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(16),
-          boxShadow: isConnected
+          boxShadow: isEnabled
               ? [
                   BoxShadow(
                     color: Colors.black.withValues(alpha: 0.25),
@@ -666,17 +727,11 @@ class _JamTimerScreenState extends State<JamTimerScreen>
         child: Material(
           color: Colors.transparent,
           child: InkWell(
-            onTap: isConnected
-                ? () => _service?.send(
-                      "Set",
-                      "ScoreBoard.CurrentGame.StopJam",
-                      true,
-                    )
-                : null,
+            onTap: isEnabled ? () => _engine?.endTimeout() : null,
             borderRadius: BorderRadius.circular(16),
             child: Ink(
               decoration: BoxDecoration(
-                gradient: isConnected
+                gradient: isEnabled
                     ? LinearGradient(
                         begin: Alignment.topCenter,
                         end: Alignment.bottomCenter,
@@ -684,7 +739,7 @@ class _JamTimerScreenState extends State<JamTimerScreen>
                         stops: const [0.0, 0.5, 1.0],
                       )
                     : null,
-                color: isConnected ? null : Colors.grey.shade800,
+                color: isEnabled ? null : Colors.grey.shade800,
                 borderRadius: BorderRadius.circular(16),
               ),
               child: Container(
@@ -693,7 +748,7 @@ class _JamTimerScreenState extends State<JamTimerScreen>
                   "END TIMEOUT",
                   style: AppTextStyles.buttonText.copyWith(
                     fontSize: 24,
-                    color: isConnected ? Colors.white : Colors.white38,
+                    color: isEnabled ? Colors.white : Colors.white38,
                   ),
                 ),
               ),
@@ -704,22 +759,20 @@ class _JamTimerScreenState extends State<JamTimerScreen>
     );
   }
 
-  /// Detects when ready to start a period (pre-game or post-intermission)
   bool _isReadyToStart(ScoreboardState state) {
     final intermission = state.clocks['Intermission'];
     final lineup = state.clocks['Lineup'];
     final period = state.clocks['Period'];
 
-    // Must have lineup and period not running
     if (lineup == null || lineup.running) return false;
     if (period == null || period.running) return false;
 
-    // Pre-game: Period 0, no clocks running yet
+    // Pre-game: Period 0
     if (period.number == 0 && !lineup.running) {
       return true;
     }
 
-    // Post-intermission: Intermission completed (time=0, not running)
+    // Post-intermission
     if (intermission != null &&
         !intermission.running &&
         intermission.time == 0 &&
@@ -731,19 +784,10 @@ class _JamTimerScreenState extends State<JamTimerScreen>
   }
 
   bool _isPrePeriod(ScoreboardState state) {
-
-    // Before game starts (period 0)
     if (state.clocks['Period']?.number == 0) return true;
-
-    // During intermission
     if (state.clocks['Intermission']?.running == true) return true;
+    if (_isReadyToStart(state)) return true;
 
-    // Intermission just ended - use the shared helper
-    if (_isReadyToStart(state)) {
-      return true;
-    }
-
-    // General case: no clocks running and not in jam/timeout
     bool anyClockRunning = state.clocks.values.any((c) => c.running);
     bool inTimeout = state.clocks['Timeout']!.running;
 
@@ -753,9 +797,9 @@ class _JamTimerScreenState extends State<JamTimerScreen>
     return false;
   }
 
-  Widget _buildReadyToStartDisplay(ScoreboardState state, bool isConnected) {
+  Widget _buildReadyToStartDisplay(ScoreboardState state, bool isEnabled) {
     final periodNumber = (state.clocks['Period']?.number ?? 1);
-    final color = isConnected ? _healthyColor : Colors.white12;
+    final color = isEnabled ? _healthyColor : Colors.white12;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
@@ -777,9 +821,9 @@ class _JamTimerScreenState extends State<JamTimerScreen>
             style: AppTextStyles.clockLabel.copyWith(
               fontSize: 22,
               color: color,
-              height: 1,
             ),
           ),
+          const SizedBox(height: 8),
           FittedBox(
             fit: BoxFit.scaleDown,
             child: Text(
@@ -787,14 +831,13 @@ class _JamTimerScreenState extends State<JamTimerScreen>
               style: AppTextStyles.clockTime.copyWith(color: color),
             ),
           ),
-          // Spacer to match ClockDisplay height (same as adjust buttons row)
-          const SizedBox(height: 48),
+          const SizedBox(height: 16),
         ],
       ),
     );
   }
 
-  Widget _buildUndoSection(ScoreboardState state, bool isConnected) {
+  Widget _buildUndoSection(ScoreboardState state, bool isEnabled) {
     return Padding(
       padding: const EdgeInsets.only(top: 24),
       child: Container(
@@ -807,7 +850,6 @@ class _JamTimerScreenState extends State<JamTimerScreen>
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Show Undo toggle row
             Row(
               children: [
                 Expanded(
@@ -833,7 +875,6 @@ class _JamTimerScreenState extends State<JamTimerScreen>
             ),
             if (_showUndo) ...[
               const SizedBox(height: 12),
-              // Replace info text
               if (state.labelReplaced.isNotEmpty &&
                   state.labelReplaced != "Replaced")
                 Padding(
@@ -847,7 +888,6 @@ class _JamTimerScreenState extends State<JamTimerScreen>
                     ),
                   ),
                 ),
-              // Use Replace toggle
               Row(
                 children: [
                   Text(
@@ -867,19 +907,21 @@ class _JamTimerScreenState extends State<JamTimerScreen>
                 ],
               ),
               const SizedBox(height: 10),
-              // Undo / Replace button
               SizedBox(
                 width: double.infinity,
                 height: 44,
                 child: ElevatedButton(
-                  onPressed: isConnected
-                      ? () => _service?.send(
-                          "Set",
-                          _useReplace
-                              ? "ScoreBoard.CurrentGame.ClockReplace"
-                              : "ScoreBoard.CurrentGame.ClockUndo",
-                          true,
-                        )
+                  onPressed: isEnabled
+                      ? () {
+                          final engine = _engine as RemoteGameEngine;
+                          engine.send(
+                            "Set",
+                            _useReplace
+                                ? "ScoreBoard.CurrentGame.ClockReplace"
+                                : "ScoreBoard.CurrentGame.ClockUndo",
+                            true,
+                          );
+                        }
                       : null,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: _useReplace
@@ -896,7 +938,7 @@ class _JamTimerScreenState extends State<JamTimerScreen>
                         : state.labelUndo.toUpperCase(),
                     style: AppTextStyles.buttonText.copyWith(
                       fontSize: 15,
-                      color: isConnected ? Colors.white : Colors.white38,
+                      color: isEnabled ? Colors.white : Colors.white38,
                     ),
                   ),
                 ),
@@ -909,13 +951,12 @@ class _JamTimerScreenState extends State<JamTimerScreen>
   }
 
   // Track last alert state
-  int _lastAlertLevel = 0; // 0: None, 1: Low, 2: Warning, 3: High
+  int _lastAlertLevel = 0;
   String _lastAlertClockName = "";
   bool _wasInJam = false;
-  bool _alertsInitialized = false; // Skip haptics on first state load
+  bool _alertsInitialized = false;
 
   void _triggerHaptic(int level) {
-    // Skip haptics until we've seen at least one state update
     if (!_alertsInitialized) return;
     if (_lastAlertLevel >= level) return;
 
@@ -937,39 +978,32 @@ class _JamTimerScreenState extends State<JamTimerScreen>
   }
 
   Color _determineAlertColor(ScoreboardState state) {
-    // Determine which clock is logically "active" for alerts
     Clock? activeClock;
     bool isCountUp = false;
     int duration = 0;
 
     if (state.inJam) {
       activeClock = state.clocks['Jam'];
-      isCountUp = false; // Jam Clock counts DOWN
+      isCountUp = false;
     } else if (state.clocks['Jam']!.time == 0 &&
         !state.clocks['Lineup']!.running &&
         !state.clocks['Timeout']!.running &&
         !state.clocks['Intermission']!.running) {
-      // Limbo: Jam ended (0:00), Lineup not started. Treat as Jam Clock active (High Alert)
       activeClock = state.clocks['Jam'];
       isCountUp = false;
     } else if (state.clocks['Lineup']?.running == true) {
       activeClock = state.clocks['Lineup'];
-      isCountUp = true; // Lineup Clock counts UP
+      isCountUp = true;
       duration = state.lineupDuration;
     }
 
-    // Detect jam end transition (was in jam, now lineup is running)
-    // This handles auto-end jams where we skip from 1s to lineup without seeing 0s
     if (_wasInJam && !state.inJam && state.clocks['Lineup']?.running == true) {
       _triggerHaptic(3);
     }
     _wasInJam = state.inJam;
 
-    // Mark as initialized after first state (skip haptics on launch)
     _alertsInitialized = true;
 
-    // If no relevant clock is running, reset and return
-    // SPECIAL CASE: Allow activeClock to be processed if it's the Jam clock at 0:00 (Limbo state), even if not running.
     bool allowStopped =
         activeClock != null &&
         activeClock.name == 'Jam' &&
@@ -981,7 +1015,6 @@ class _JamTimerScreenState extends State<JamTimerScreen>
       return _healthyColor;
     }
 
-    // Reset alert level if we switched clocks
     if (_lastAlertClockName != activeClock.name) {
       _lastAlertLevel = 0;
       _lastAlertClockName = activeClock.name;
@@ -990,51 +1023,35 @@ class _JamTimerScreenState extends State<JamTimerScreen>
     final time = activeClock.time;
 
     if (isCountUp) {
-      // LINEUP LOGIC (Count Up)
-      // Alerts at 20s (Low), 25s (Warning), 30s+ (High)
-
       if (time >= duration) {
-        // High Alert (30s elapsed or more)
         _triggerHaptic(3);
         return Colors.red;
       } else if (time >= duration - 5000) {
-        // Warning Alert (25s elapsed)
         _triggerHaptic(2);
         return Colors.orange.shade800;
       } else if (time >= duration - 10000) {
-        // Low Alert (20s elapsed)
         _triggerHaptic(1);
         return Colors.amber.shade700;
       }
     } else {
-      // JAM LOGIC (Count Down)
-      // Alerts at 10s (Low), 5s (Warning), 0s (High)
-
       if (time <= 0) {
-        // High Alert (0s remaining)
         _triggerHaptic(3);
         return Colors.red;
       } else if (time <= 5000) {
-        // Warning Alert (5s remaining)
         _triggerHaptic(2);
         return Colors.orange.shade800;
       } else if (time <= 10000) {
-        // Low Alert (10s remaining)
         _triggerHaptic(1);
         return Colors.amber.shade700;
       }
     }
 
-    // Reset if we are outside of alert zones
-    // For count up: < 20s (duration - 10000)
-    // For count down: > 10s
     bool safe = isCountUp ? (time < duration - 10000) : (time > 10000);
     if (safe) {
       _lastAlertLevel = 0;
       return _healthyColor;
     }
 
-    // If we are in an alert zone but level is already set (or higher), return corresponding color
     if (_lastAlertLevel >= 3) return Colors.red;
     if (_lastAlertLevel >= 2) return Colors.orange.shade800;
     if (_lastAlertLevel >= 1) return Colors.amber.shade700;

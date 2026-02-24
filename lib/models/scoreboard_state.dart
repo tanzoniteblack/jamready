@@ -51,6 +51,12 @@ class ScoreboardState extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Notify listeners of state changes.
+  /// Used by game engines to trigger UI updates.
+  void notify() {
+    notifyListeners();
+  }
+
   void _updateSinglePath(String path, dynamic value) {
     if (path.startsWith('ScoreBoard.CurrentGame.Clock(')) {
       _updateClock(path, value);
