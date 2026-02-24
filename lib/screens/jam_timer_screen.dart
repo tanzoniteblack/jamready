@@ -416,7 +416,7 @@ class _JamTimerScreenState extends State<JamTimerScreen>
         ),
       ),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Text(
             label.toUpperCase(),
@@ -425,32 +425,17 @@ class _JamTimerScreenState extends State<JamTimerScreen>
               fontSize: 14,
             ),
           ),
-          Row(
-            children: [
-              _buildMiniAdjustButton(
-                "-",
-                isEnabled
-                    ? () => _engine?.adjustClock(clock.name, -1000)
-                    : null,
+          SizedBox(width: 36),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Text(
+              _formatTime(clock.time),
+              style: AppTextStyles.buttonText.copyWith(
+                color: contentColor,
+                fontSize: 18,
+                fontFamily: 'monospace',
               ),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                child: Text(
-                  _formatTime(clock.time),
-                  style: AppTextStyles.buttonText.copyWith(
-                    color: contentColor,
-                    fontSize: 18,
-                    fontFamily: 'monospace',
-                  ),
-                ),
-              ),
-              _buildMiniAdjustButton(
-                "+",
-                isEnabled
-                    ? () => _engine?.adjustClock(clock.name, 1000)
-                    : null,
-              ),
-            ],
+            ),
           ),
         ],
       ),

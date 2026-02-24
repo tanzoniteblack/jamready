@@ -29,6 +29,11 @@ class _ClockDisplayState extends State<ClockDisplay>
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
 
+  // Spam detection for showing long-press hint
+  final List<DateTime> _recentPresses = [];
+  bool _showLongPressHint = false;
+  static bool _hintShownThisSession = false;
+
   @override
   void initState() {
     super.initState();
@@ -51,6 +56,37 @@ class _ClockDisplayState extends State<ClockDisplay>
   void dispose() {
     _pulseController.dispose();
     super.dispose();
+  }
+
+  void _trackButtonPress() {
+    // Only track if long-press is available (local mode)
+    if (widget.onSetTime == null || _hintShownThisSession) return;
+
+    final now = DateTime.now();
+    _recentPresses.add(now);
+
+    // Remove presses older than 3 seconds
+    _recentPresses.removeWhere(
+      (time) => now.difference(time).inMilliseconds > 3000,
+    );
+
+    // If 5+ presses in 3 seconds, show hint
+    if (_recentPresses.length >= 5 && !_showLongPressHint) {
+      setState(() => _showLongPressHint = true);
+      _hintShownThisSession = true;
+
+      // Auto-hide after 4 seconds
+      Future.delayed(const Duration(seconds: 4), () {
+        if (mounted) {
+          setState(() => _showLongPressHint = false);
+        }
+      });
+    }
+  }
+
+  void _handleAdjust(String value) {
+    _trackButtonPress();
+    widget.onAdjust(value);
   }
 
   Future<void> _handleLongPress() async {
@@ -97,63 +133,106 @@ class _ClockDisplayState extends State<ClockDisplay>
       }
     }
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
-        color: glowColor?.withValues(alpha: 0.05),
-        boxShadow: glowColor != null
-            ? [
-                BoxShadow(
-                  color: glowColor.withValues(alpha: 0.15),
-                  blurRadius: 24,
-                  spreadRadius: 2,
-                ),
-              ]
-            : null,
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            label,
-            style: AppTextStyles.clockLabel.copyWith(
-              fontSize: 18,
-              color: color,
-              height: 1.0,
-            ),
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            color: glowColor?.withValues(alpha: 0.05),
+            boxShadow: glowColor != null
+                ? [
+                    BoxShadow(
+                      color: glowColor.withValues(alpha: 0.15),
+                      blurRadius: 24,
+                      spreadRadius: 2,
+                    ),
+                  ]
+                : null,
           ),
-          GestureDetector(
-            // Only enable long press for time editing in local mode
-            onLongPress: widget.onSetTime != null ? _handleLongPress : null,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                _buildAdjustButton(
-                    "-1", widget.enabled ? () => widget.onAdjust("-1000") : null),
-                AnimatedBuilder(
-                  animation: _pulseAnimation,
-                  builder: (context, child) {
-                    return Transform.scale(
-                      scale: _pulseAnimation.value,
-                      child: child,
-                    );
-                  },
-                  child: Text(
-                    _formatTime(widget.clock.time),
-                    style: AppTextStyles.clockTime.copyWith(
-                      color: color,
-                      fontSize: 72,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                label,
+                style: AppTextStyles.clockLabel.copyWith(
+                  fontSize: 18,
+                  color: color,
+                  height: 1.0,
+                ),
+              ),
+              GestureDetector(
+                // Only enable long press for time editing in local mode
+                onLongPress: widget.onSetTime != null ? _handleLongPress : null,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    _buildAdjustButton(
+                        "-1", widget.enabled ? () => _handleAdjust("-1000") : null),
+                    AnimatedBuilder(
+                      animation: _pulseAnimation,
+                      builder: (context, child) {
+                        return Transform.scale(
+                          scale: _pulseAnimation.value,
+                          child: child,
+                        );
+                      },
+                      child: Text(
+                        _formatTime(widget.clock.time),
+                        style: AppTextStyles.clockTime.copyWith(
+                          color: color,
+                          fontSize: 72,
+                        ),
+                      ),
+                    ),
+                    _buildAdjustButton(
+                        "+1", widget.enabled ? () => _handleAdjust("+1000") : null),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        // Long-press hint
+        AnimatedSize(
+          duration: const Duration(milliseconds: 200),
+          child: _showLongPressHint
+              ? GestureDetector(
+                  onTap: () => setState(() => _showLongPressHint = false),
+                  child: Container(
+                    margin: const EdgeInsets.only(top: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: Colors.blue.withValues(alpha: 0.3),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.touch_app,
+                          size: 16,
+                          color: Colors.blue.shade300,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Tip: Long-press the time to jump to any value',
+                          style: TextStyle(
+                            color: Colors.blue.shade300,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                ),
-                _buildAdjustButton(
-                    "+1", widget.enabled ? () => widget.onAdjust("+1000") : null),
-              ],
-            ),
-          ),
-        ],
-      ),
+                )
+              : const SizedBox.shrink(),
+        ),
+      ],
     );
   }
 

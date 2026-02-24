@@ -82,14 +82,22 @@ class _TimeEditDialogState extends State<TimeEditDialog> {
 
   String get _formattedDifference {
     final diffSeconds = (_timeDifferenceMs / 1000).round();
-    final sign = diffSeconds >= 0 ? '+' : '';
     final absSeconds = diffSeconds.abs();
     final minutes = absSeconds ~/ 60;
     final seconds = absSeconds % 60;
+
+    String timeStr;
     if (minutes > 0) {
-      return '$sign$minutes:${seconds.toString().padLeft(2, '0')}';
+      timeStr = '$minutes:${seconds.toString().padLeft(2, '0')}';
+    } else {
+      timeStr = '${absSeconds}s';
     }
-    return '$sign${diffSeconds}s';
+
+    if (diffSeconds >= 0) {
+      return 'adds $timeStr';
+    } else {
+      return 'removes $timeStr';
+    }
   }
 
   void _handleSubmitTap() {
@@ -260,8 +268,8 @@ class _TimeEditDialogState extends State<TimeEditDialog> {
                     const SizedBox(width: 6),
                     Text(
                       _awaitingConfirmation
-                          ? 'Tap again to confirm $_formattedDifference'
-                          : 'Change: $_formattedDifference',
+                          ? 'Tap again to confirm'
+                          : 'This $_formattedDifference',
                       style: TextStyle(
                         color: _awaitingConfirmation ? Colors.red : Colors.orange,
                         fontSize: 12,

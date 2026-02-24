@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -5,9 +6,16 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:roller_derby_jam_timer/models/scoreboard_state.dart';
+import 'package:roller_derby_jam_timer/models/game_config.dart';
+import 'package:roller_derby_jam_timer/models/ruleset.dart';
 import 'package:roller_derby_jam_timer/screens/settings_screen.dart';
 import 'package:roller_derby_jam_timer/screens/game_setup_screen.dart';
+import 'package:roller_derby_jam_timer/screens/jam_timer_screen.dart';
+import 'package:roller_derby_jam_timer/services/local_game_engine.dart';
 import 'package:roller_derby_jam_timer/widgets/swipe_button.dart';
+import 'package:roller_derby_jam_timer/widgets/time_edit_dialog.dart';
+import 'package:roller_derby_jam_timer/widgets/prominent_period_clock.dart';
+import 'package:roller_derby_jam_timer/widgets/clock_display.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -276,6 +284,244 @@ void main() {
 
       // Check that the state shows offline game status
       expect(state.connectionStatus, 'Offline Game');
+    });
+
+    testWidgets('long press on clock opens time edit dialog', (tester) async {
+      SharedPreferences.setMockInitialValues({});
+
+      final state = ScoreboardState();
+      final config = GameConfig(
+        ruleset: Ruleset.wftda(),
+        team1Name: 'Home',
+        team2Name: 'Away',
+      );
+      final engine = LocalGameEngine(state, config);
+
+      await tester.pumpWidget(
+        MultiProvider(
+          providers: [
+            ChangeNotifierProvider.value(value: state),
+          ],
+          child: MaterialApp(
+            home: JamTimerScreen(engine: engine),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Find the prominent period clock and long press on the time display
+      final periodClock = find.byType(ProminentPeriodClock);
+      expect(periodClock, findsOneWidget);
+
+      // Long press on the clock time area
+      await tester.longPress(periodClock);
+      await tester.pumpAndSettle();
+
+      // Time edit dialog should appear
+      expect(find.byType(TimeEditDialog), findsOneWidget);
+      expect(find.text('CANCEL'), findsOneWidget);
+      expect(find.text('SET TIME'), findsOneWidget);
+
+      // Clean up
+      await engine.dispose();
+    });
+
+    testWidgets('period time adjustment before game start is preserved',
+        (tester) async {
+      SharedPreferences.setMockInitialValues({});
+
+      final state = ScoreboardState();
+      final config = GameConfig(
+        ruleset: Ruleset.wftda(),
+        team1Name: 'Home',
+        team2Name: 'Away',
+      );
+      final engine = LocalGameEngine(state, config);
+
+      await tester.pumpWidget(
+        MultiProvider(
+          providers: [
+            ChangeNotifierProvider.value(value: state),
+          ],
+          child: MaterialApp(
+            home: JamTimerScreen(engine: engine),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Initial period time should be 30:00 (1800000ms) for WFTDA
+      expect(state.clocks['Period']!.time, 30 * 60 * 1000);
+
+      // Adjust the period clock down by 5 minutes (300 seconds = 300000ms)
+      engine.adjustClock('Period', -5 * 60 * 1000);
+      await tester.pump();
+
+      // Period time should now be 25:00
+      expect(state.clocks['Period']!.time, 25 * 60 * 1000);
+
+      // Start lineup (slide to start)
+      engine.stopJam(); // This triggers _startPeriod(1) + _startLineup()
+      await tester.pump();
+
+      // Period time should still be 25:00 (preserved, not reset to 30:00)
+      expect(state.clocks['Period']!.time, 25 * 60 * 1000);
+      expect(state.clocks['Period']!.number, 1);
+
+      // Clean up
+      await engine.dispose();
+    });
+
+    testWidgets('period time resets after intermission for next period',
+        (tester) async {
+      SharedPreferences.setMockInitialValues({});
+
+      final state = ScoreboardState();
+      // Use a short period for testing
+      final shortRuleset = Ruleset.wftda().copyWith(
+        periodDurationMs: 5000, // 5 seconds
+        jamDurationMs: 2000, // 2 seconds
+      );
+      final config = GameConfig(
+        ruleset: shortRuleset,
+        team1Name: 'Home',
+        team2Name: 'Away',
+      );
+      final engine = LocalGameEngine(state, config);
+
+      await tester.pumpWidget(
+        MultiProvider(
+          providers: [
+            ChangeNotifierProvider.value(value: state),
+          ],
+          child: MaterialApp(
+            home: JamTimerScreen(engine: engine),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Start the game
+      engine.stopJam(); // Start lineup
+      await tester.pump();
+      expect(state.clocks['Period']!.number, 1);
+
+      // Manually set period clock to 0 to simulate end of period
+      engine.setClockTime('Period', 0);
+      await tester.pump();
+
+      // Start and end a jam to trigger period end
+      engine.startJam();
+      await tester.pump();
+      engine.stopJam(); // This should trigger _endPeriod -> intermission
+      await tester.pump();
+
+      // Should be in intermission
+      expect(state.clocks['Intermission']!.running, true);
+
+      // End intermission to start period 2
+      engine.startJam(); // This ends intermission and starts period 2
+      await tester.pump();
+
+      // Period 2 should have full time (reset to ruleset duration)
+      expect(state.clocks['Period']!.number, 2);
+      expect(state.clocks['Period']!.time, 5000); // Reset to 5 seconds
+
+      // Clean up
+      await engine.dispose();
+    });
+
+    testWidgets('spam detection shows long-press hint after rapid button presses',
+        (tester) async {
+      SharedPreferences.setMockInitialValues({});
+
+      final state = ScoreboardState();
+      final config = GameConfig(
+        ruleset: Ruleset.wftda(),
+        team1Name: 'Home',
+        team2Name: 'Away',
+      );
+      final engine = LocalGameEngine(state, config);
+
+      await tester.pumpWidget(
+        MultiProvider(
+          providers: [
+            ChangeNotifierProvider.value(value: state),
+          ],
+          child: MaterialApp(
+            home: JamTimerScreen(engine: engine),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Find the +1 button on the period clock
+      final plusButton = find.text('+1').first;
+      expect(plusButton, findsOneWidget);
+
+      // Initially no hint should be shown
+      expect(find.textContaining('Long-press'), findsNothing);
+
+      // Rapidly tap the +1 button 6 times
+      for (int i = 0; i < 6; i++) {
+        await tester.tap(plusButton);
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+      await tester.pump();
+
+      // Hint should now be visible
+      expect(find.textContaining('Long-press'), findsOneWidget);
+      expect(find.textContaining('jump to any value'), findsOneWidget);
+
+      // Wait for the auto-hide timer to complete (4 seconds)
+      await tester.pump(const Duration(seconds: 5));
+
+      // Hint should now be hidden
+      expect(find.textContaining('Long-press'), findsNothing);
+
+      // Clean up
+      await engine.dispose();
+    });
+
+    testWidgets('time edit dialog shows wheel pickers', (tester) async {
+      SharedPreferences.setMockInitialValues({});
+
+      final state = ScoreboardState();
+      final config = GameConfig(
+        ruleset: Ruleset.wftda(),
+        team1Name: 'Home',
+        team2Name: 'Away',
+      );
+      final engine = LocalGameEngine(state, config);
+
+      await tester.pumpWidget(
+        MultiProvider(
+          providers: [
+            ChangeNotifierProvider.value(value: state),
+          ],
+          child: MaterialApp(
+            home: JamTimerScreen(engine: engine),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Long press to open dialog
+      final periodClock = find.byType(ProminentPeriodClock);
+      await tester.longPress(periodClock);
+      await tester.pumpAndSettle();
+
+      // Dialog should have two CupertinoPicker widgets (minutes and seconds)
+      expect(find.byType(CupertinoPicker), findsNWidgets(2));
+
+      // Should show the colon separator
+      expect(find.text(':'), findsOneWidget);
+
+      // Clean up - dismiss dialog
+      await tester.tap(find.text('CANCEL'));
+      await tester.pumpAndSettle();
+
+      await engine.dispose();
     });
   });
 }

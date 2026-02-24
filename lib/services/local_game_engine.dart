@@ -416,9 +416,14 @@ class LocalGameEngine with WidgetsBindingObserver implements GameEngine {
   void _startPeriod(int periodNumber) {
     _currentPeriod = periodNumber;
     _state.clocks['Period']!.number = periodNumber;
-    final periodTime = _getDisplayTime(ruleset.periodDurationMs, false);
-    _state.clocks['Period']!.time = periodTime;
-    _internalClockTimes['Period'] = periodTime;
+
+    // Only reset period clock time for periods after the first
+    // (coming from intermission). For period 1, preserve any user adjustments.
+    if (periodNumber > 1) {
+      final periodTime = _getDisplayTime(ruleset.periodDurationMs, false);
+      _state.clocks['Period']!.time = periodTime;
+      _internalClockTimes['Period'] = periodTime;
+    }
     _state.clocks['Period']!.displayName = "Period";
 
     // Reset jam number if ruleset requires it
