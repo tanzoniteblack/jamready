@@ -354,6 +354,15 @@ class RemoteGameEngine implements GameEngine {
   }
 
   @override
+  void setClockTime(String clockName, int timeMs) {
+    send(
+      "Set",
+      "ScoreBoard.CurrentGame.Clock($clockName).Time",
+      timeMs.toString(),
+    );
+  }
+
+  @override
   void adjustScore(int teamNumber, int delta) {
     // Remote engine doesn't support direct score adjustment
     // Score is managed by the server

@@ -19,13 +19,65 @@ class _GameSetupScreenState extends State<GameSetupScreen> {
   final _team1Controller = TextEditingController(text: 'Salt');
   final _team2Controller = TextEditingController(text: 'Pepper');
 
-  final List<Ruleset> _rulesets = [
-    Ruleset.wftda(),
-    Ruleset.rdcl(),
-  ];
+  // Custom ruleset parameters (null means use base ruleset value)
+  int? _customPeriodCount;
+  int? _customPeriodDurationMinutes;
+  int? _customJamDurationSeconds;
+  bool _isCustomizing = false;
 
-  Ruleset get _selectedRuleset =>
-      _rulesets.firstWhere((r) => r.id == _selectedRulesetId);
+  final Map<String, Ruleset> _baseRulesets = {
+    'wftda': Ruleset.wftda(),
+    'rdcl': Ruleset.rdcl(),
+  };
+
+  Ruleset get _baseRuleset => _baseRulesets[_selectedRulesetId]!;
+
+  Ruleset get _selectedRuleset {
+    final base = _baseRuleset;
+    if (_customPeriodCount == null &&
+        _customPeriodDurationMinutes == null &&
+        _customJamDurationSeconds == null) {
+      return base;
+    }
+
+    // Create custom ruleset with modified values
+    return base.copyWith(
+      id: 'custom_${base.id}',
+      isBuiltIn: false,
+      periodCount: _customPeriodCount ?? base.periodCount,
+      periodDurationMs: _customPeriodDurationMinutes != null
+          ? _customPeriodDurationMinutes! * 60 * 1000
+          : base.periodDurationMs,
+      jamDurationMs: _customJamDurationSeconds != null
+          ? _customJamDurationSeconds! * 1000
+          : base.jamDurationMs,
+    );
+  }
+
+  void _selectRuleset(String id) {
+    setState(() {
+      _selectedRulesetId = id;
+      // Reset custom values when changing base ruleset
+      _customPeriodCount = null;
+      _customPeriodDurationMinutes = null;
+      _customJamDurationSeconds = null;
+      _isCustomizing = false;
+    });
+  }
+
+  bool get _hasCustomValues =>
+      _customPeriodCount != null ||
+      _customPeriodDurationMinutes != null ||
+      _customJamDurationSeconds != null;
+
+  void _resetCustomValues() {
+    setState(() {
+      _customPeriodCount = null;
+      _customPeriodDurationMinutes = null;
+      _customJamDurationSeconds = null;
+      _isCustomizing = false;
+    });
+  }
 
   @override
   void dispose() {
@@ -145,11 +197,11 @@ class _GameSetupScreenState extends State<GameSetupScreen> {
         border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
       ),
       child: Row(
-        children: _rulesets.map((ruleset) {
-          final isSelected = ruleset.id == _selectedRulesetId;
+        children: _baseRulesets.entries.map((entry) {
+          final isSelected = entry.key == _selectedRulesetId;
           return Expanded(
             child: GestureDetector(
-              onTap: () => setState(() => _selectedRulesetId = ruleset.id),
+              onTap: () => _selectRuleset(entry.key),
               child: Container(
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 decoration: BoxDecoration(
@@ -163,7 +215,7 @@ class _GameSetupScreenState extends State<GameSetupScreen> {
                 ),
                 child: Center(
                   child: Text(
-                    ruleset.name,
+                    entry.value.name,
                     style: AppTextStyles.buttonText.copyWith(
                       color: isSelected ? Colors.orange : Colors.white70,
                       fontWeight:
@@ -180,46 +232,297 @@ class _GameSetupScreenState extends State<GameSetupScreen> {
   }
 
   Widget _buildRulesetDetails() {
+    final base = _baseRuleset;
     final ruleset = _selectedRuleset;
     final periodMinutes = ruleset.periodDurationMs ~/ 60000;
     final jamSeconds = ruleset.jamDurationMs ~/ 1000;
 
+    final isCustom = _hasCustomValues;
+    final borderColor = isCustom
+        ? Colors.orange.withValues(alpha: 0.4)
+        : Colors.white.withValues(alpha: 0.08);
+    final bgColor = isCustom
+        ? Colors.orange.withValues(alpha: 0.05)
+        : Colors.white.withValues(alpha: 0.03);
+
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.03),
-        borderRadius: BorderRadius.circular(8),
+        color: bgColor,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: borderColor),
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
+      child: Column(
         children: [
-          _buildDetailItem(
-              "${ruleset.periodCount}x${periodMinutes}min", "Periods"),
-          _buildDetailItem("${jamSeconds}s", "Jams"),
-          _buildDetailItem("${ruleset.timeoutsPerGame}", "Timeouts"),
+          // Summary row - always visible, compact
+          _buildSummaryRow(ruleset, periodMinutes, jamSeconds),
+
+          // Customize toggle
+          const SizedBox(height: 12),
+          _buildCustomizeToggle(),
+
+          // Editable fields - shown when customizing
+          if (_isCustomizing) ...[
+            const SizedBox(height: 16),
+            _buildEditableFields(base, ruleset, periodMinutes, jamSeconds),
+          ],
+
+          // Reset button when customized
+          if (isCustom && !_isCustomizing) ...[
+            const SizedBox(height: 8),
+            _buildResetButton(),
+          ],
         ],
       ),
     );
   }
 
-  Widget _buildDetailItem(String value, String label) {
+  Widget _buildSummaryRow(Ruleset ruleset, int periodMinutes, int jamSeconds) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+      children: [
+        _buildSummaryChip(
+          "${ruleset.periodCount}×${periodMinutes}min",
+          "periods",
+          _customPeriodCount != null || _customPeriodDurationMinutes != null,
+        ),
+        Container(
+          width: 1,
+          height: 24,
+          color: Colors.white.withValues(alpha: 0.1),
+        ),
+        _buildSummaryChip(
+          "${jamSeconds}s",
+          "jams",
+          _customJamDurationSeconds != null,
+        ),
+        Container(
+          width: 1,
+          height: 24,
+          color: Colors.white.withValues(alpha: 0.1),
+        ),
+        _buildSummaryChip(
+          "${ruleset.timeoutsPerGame}",
+          "timeouts",
+          false,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSummaryChip(String value, String label, bool isModified) {
     return Column(
+      mainAxisSize: MainAxisSize.min,
       children: [
         Text(
           value,
           style: AppTextStyles.clockLabel.copyWith(
-            color: Colors.white,
-            fontSize: 16,
+            color: isModified ? Colors.orange : Colors.white,
+            fontSize: 14,
+            fontWeight: isModified ? FontWeight.bold : FontWeight.normal,
           ),
         ),
         Text(
           label,
-          style: AppTextStyles.clockLabel.copyWith(
+          style: TextStyle(
             color: Colors.white38,
-            fontSize: 12,
+            fontSize: 10,
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildCustomizeToggle() {
+    return GestureDetector(
+      onTap: () => setState(() => _isCustomizing = !_isCustomizing),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: _isCustomizing
+              ? Colors.orange.withValues(alpha: 0.15)
+              : Colors.white.withValues(alpha: 0.05),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: _isCustomizing
+                ? Colors.orange.withValues(alpha: 0.4)
+                : Colors.white.withValues(alpha: 0.1),
+          ),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              _isCustomizing ? Icons.tune : Icons.tune_outlined,
+              size: 16,
+              color: _isCustomizing ? Colors.orange : Colors.white54,
+            ),
+            const SizedBox(width: 6),
+            Text(
+              _isCustomizing ? "CUSTOMIZING" : "CUSTOMIZE",
+              style: TextStyle(
+                color: _isCustomizing ? Colors.orange : Colors.white54,
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 0.5,
+              ),
+            ),
+            const SizedBox(width: 4),
+            Icon(
+              _isCustomizing
+                  ? Icons.keyboard_arrow_up
+                  : Icons.keyboard_arrow_down,
+              size: 16,
+              color: _isCustomizing ? Colors.orange : Colors.white54,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEditableFields(
+      Ruleset base, Ruleset ruleset, int periodMinutes, int jamSeconds) {
+    return Column(
+      children: [
+        // Period count
+        _buildEditableRow(
+          label: "Number of periods",
+          value: "${ruleset.periodCount}",
+          isModified: _customPeriodCount != null,
+          onDecrement: () => setState(() {
+            _customPeriodCount =
+                (_customPeriodCount ?? base.periodCount) - 1;
+            if (_customPeriodCount! < 1) _customPeriodCount = 1;
+          }),
+          onIncrement: () => setState(() {
+            _customPeriodCount =
+                (_customPeriodCount ?? base.periodCount) + 1;
+            if (_customPeriodCount! > 10) _customPeriodCount = 10;
+          }),
+        ),
+        const SizedBox(height: 8),
+        // Period duration
+        _buildEditableRow(
+          label: "Period length",
+          value: "$periodMinutes min",
+          isModified: _customPeriodDurationMinutes != null,
+          onDecrement: () => setState(() {
+            _customPeriodDurationMinutes = (_customPeriodDurationMinutes ??
+                    base.periodDurationMs ~/ 60000) -
+                5;
+            if (_customPeriodDurationMinutes! < 5) {
+              _customPeriodDurationMinutes = 5;
+            }
+          }),
+          onIncrement: () => setState(() {
+            _customPeriodDurationMinutes = (_customPeriodDurationMinutes ??
+                    base.periodDurationMs ~/ 60000) +
+                5;
+            if (_customPeriodDurationMinutes! > 60) {
+              _customPeriodDurationMinutes = 60;
+            }
+          }),
+        ),
+        const SizedBox(height: 8),
+        // Jam duration
+        _buildEditableRow(
+          label: "Jam length",
+          value: "$jamSeconds sec",
+          isModified: _customJamDurationSeconds != null,
+          onDecrement: () => setState(() {
+            _customJamDurationSeconds =
+                (_customJamDurationSeconds ?? base.jamDurationMs ~/ 1000) - 15;
+            if (_customJamDurationSeconds! < 30) {
+              _customJamDurationSeconds = 30;
+            }
+          }),
+          onIncrement: () => setState(() {
+            _customJamDurationSeconds =
+                (_customJamDurationSeconds ?? base.jamDurationMs ~/ 1000) + 15;
+            if (_customJamDurationSeconds! > 180) {
+              _customJamDurationSeconds = 180;
+            }
+          }),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildEditableRow({
+    required String label,
+    required String value,
+    required bool isModified,
+    required VoidCallback onDecrement,
+    required VoidCallback onIncrement,
+  }) {
+    return Row(
+      children: [
+        Expanded(
+          child: Text(
+            label,
+            style: TextStyle(
+              color: isModified ? Colors.orange : Colors.white70,
+              fontSize: 13,
+            ),
+          ),
+        ),
+        _buildCompactButton(Icons.remove, onDecrement),
+        Container(
+          width: 64,
+          alignment: Alignment.center,
+          child: Text(
+            value,
+            style: TextStyle(
+              color: isModified ? Colors.orange : Colors.white,
+              fontSize: 14,
+              fontWeight: isModified ? FontWeight.bold : FontWeight.normal,
+            ),
+          ),
+        ),
+        _buildCompactButton(Icons.add, onIncrement),
+      ],
+    );
+  }
+
+  Widget _buildCompactButton(IconData icon, VoidCallback onPressed) {
+    return SizedBox(
+      width: 32,
+      height: 32,
+      child: IconButton(
+        onPressed: onPressed,
+        icon: Icon(icon, size: 16),
+        color: Colors.white70,
+        padding: EdgeInsets.zero,
+        style: IconButton.styleFrom(
+          backgroundColor: Colors.white.withValues(alpha: 0.1),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(6),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildResetButton() {
+    return GestureDetector(
+      onTap: _resetCustomValues,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.restore, size: 12, color: Colors.orange),
+          const SizedBox(width: 4),
+          Text(
+            "Reset to ${_baseRuleset.name} defaults",
+            style: TextStyle(
+              color: Colors.orange,
+              fontSize: 11,
+            ),
+          ),
+        ],
+      ),
     );
   }
 

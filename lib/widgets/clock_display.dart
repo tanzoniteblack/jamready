@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../models/scoreboard_state.dart';
 import '../styles/text_styles.dart';
+import 'time_edit_dialog.dart';
 
 class ClockDisplay extends StatefulWidget {
   final Clock clock;
   final Color? textColor;
   final bool enabled;
   final Function(String) onAdjust;
+  final Function(int)? onSetTime;
 
   const ClockDisplay({
     super.key,
@@ -14,6 +17,7 @@ class ClockDisplay extends StatefulWidget {
     this.textColor,
     this.enabled = true,
     required this.onAdjust,
+    this.onSetTime,
   });
 
   @override
@@ -33,7 +37,6 @@ class _ClockDisplayState extends State<ClockDisplay>
       vsync: this,
     );
 
-    // Subtle 1-2% scale pulse (0.99 to 1.01)
     _pulseAnimation = Tween<double>(begin: 0.98, end: 1.03).animate(
       CurvedAnimation(
         parent: _pulseController,
@@ -50,6 +53,29 @@ class _ClockDisplayState extends State<ClockDisplay>
     super.dispose();
   }
 
+  Future<void> _handleLongPress() async {
+    if (!widget.enabled) return;
+
+    // Haptic feedback for long press
+    await HapticFeedback.mediumImpact();
+
+    if (!mounted) return;
+
+    final newTimeMs = await TimeEditDialog.show(
+      context,
+      title: 'Set ${widget.clock.displayName.isNotEmpty ? widget.clock.displayName : widget.clock.name} Time',
+      currentTimeMs: widget.clock.time,
+    );
+
+    if (newTimeMs != null && widget.onSetTime != null) {
+      widget.onSetTime!(newTimeMs);
+    } else if (newTimeMs != null) {
+      // Calculate delta if onSetTime not provided
+      final delta = newTimeMs - widget.clock.time;
+      widget.onAdjust(delta > 0 ? '+$delta' : '$delta');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     String label = widget.clock.displayName.toUpperCase();
@@ -64,7 +90,6 @@ class _ClockDisplayState extends State<ClockDisplay>
                 ? Colors.white
                 : Colors.white38);
 
-    // Determine glow color based on clock type
     Color? glowColor;
     if (widget.enabled && widget.clock.running) {
       if (widget.clock.name == 'Intermission') {
@@ -75,7 +100,7 @@ class _ClockDisplayState extends State<ClockDisplay>
     }
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(16),
         color: glowColor?.withValues(alpha: 0.05),
@@ -90,36 +115,43 @@ class _ClockDisplayState extends State<ClockDisplay>
             : null,
       ),
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
           Text(
             label,
             style: AppTextStyles.clockLabel.copyWith(
-              fontSize: 22,
+              fontSize: 18,
               color: color,
               height: 1.0,
             ),
           ),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              _buildAdjustButton(
-                  "-1", widget.enabled ? () => widget.onAdjust("-1000") : null),
-              AnimatedBuilder(
-                animation: _pulseAnimation,
-                builder: (context, child) {
-                  return Transform.scale(
-                    scale: _pulseAnimation.value,
-                    child: child,
-                  );
-                },
-                child: Text(
-                  _formatTime(widget.clock.time),
-                  style: AppTextStyles.clockTime.copyWith(color: color),
+          GestureDetector(
+            onLongPress: _handleLongPress,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                _buildAdjustButton(
+                    "-1", widget.enabled ? () => widget.onAdjust("-1000") : null),
+                AnimatedBuilder(
+                  animation: _pulseAnimation,
+                  builder: (context, child) {
+                    return Transform.scale(
+                      scale: _pulseAnimation.value,
+                      child: child,
+                    );
+                  },
+                  child: Text(
+                    _formatTime(widget.clock.time),
+                    style: AppTextStyles.clockTime.copyWith(
+                      color: color,
+                      fontSize: 72,
+                    ),
+                  ),
                 ),
-              ),
-              _buildAdjustButton(
-                  "+1", widget.enabled ? () => widget.onAdjust("+1000") : null),
-            ],
+                _buildAdjustButton(
+                    "+1", widget.enabled ? () => widget.onAdjust("+1000") : null),
+              ],
+            ),
           ),
         ],
       ),

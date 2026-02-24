@@ -47,6 +47,11 @@ abstract class GameEngine {
   /// [deltaMs] is the change amount (can be negative)
   void adjustClock(String clockName, int deltaMs);
 
+  /// Set a clock to an absolute time (in milliseconds)
+  /// [clockName] is one of: 'Period', 'Jam', 'Lineup', 'Timeout', 'Intermission'
+  /// [timeMs] is the new time value
+  void setClockTime(String clockName, int timeMs);
+
   /// Adjust a team's score (only supported in local mode)
   /// [teamNumber] is 1 or 2
   /// [delta] is the score change (can be negative)

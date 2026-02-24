@@ -134,7 +134,7 @@ class _JamTimerScreenState extends State<JamTimerScreen>
 
     // Clean up current engine before navigating
     _engine?.dispose();
-    if (mounted) {
+    if (context.mounted) {
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(builder: (context) => const SettingsScreen()),
       );
@@ -307,6 +307,10 @@ class _JamTimerScreenState extends State<JamTimerScreen>
                           final delta = int.tryParse(val) ?? 0;
                           _engine?.adjustClock(active.name, delta);
                         },
+                        onSetTime: (timeMs) {
+                          final active = _determineActiveClock(state);
+                          _engine?.setClockTime(active.name, timeMs);
+                        },
                       ),
 
                     const SizedBox(height: 24),
@@ -354,6 +358,7 @@ class _JamTimerScreenState extends State<JamTimerScreen>
       clock: clock,
       enabled: isEnabled,
       onAdjust: (delta) => _engine?.adjustClock(clock.name, delta),
+      onSetTime: (timeMs) => _engine?.setClockTime(clock.name, timeMs),
     );
   }
 

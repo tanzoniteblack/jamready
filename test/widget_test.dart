@@ -1,21 +1,42 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
-import 'package:roller_derby_jam_timer/main.dart';
 import 'package:roller_derby_jam_timer/models/scoreboard_state.dart';
+import 'package:roller_derby_jam_timer/screens/settings_screen.dart';
+import 'package:roller_derby_jam_timer/screens/jam_timer_screen.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
+  setUpAll(() {
+    // Mock wakelock
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMessageHandler(
+      'dev.flutter.pigeon.wakelock_plus_platform_interface.WakelockPlusApi.toggle',
+      (ByteData? message) async {
+        return const StandardMessageCodec().encodeMessage(<Object?>[null]);
+      },
+    );
+  });
+
   testWidgets('Settings screen smoke test', (WidgetTester tester) async {
+    SharedPreferences.setMockInitialValues({});
+
     // Build the app with settings screen and required providers
     await tester.pumpWidget(
       MultiProvider(
         providers: [
           ChangeNotifierProvider(create: (_) => ScoreboardState()),
         ],
-        child: const MyApp(showSettings: true),
+        child: MaterialApp(
+          home: const SettingsScreen(),
+        ),
       ),
     );
+    await tester.pump();
 
     // Verify settings screen elements are present
     expect(find.text('SETTINGS'), findsOneWidget);
@@ -29,15 +50,20 @@ void main() {
   });
 
   testWidgets('Jam timer screen smoke test', (WidgetTester tester) async {
+    SharedPreferences.setMockInitialValues({});
+
     // Build the app with jam timer screen and required providers
     await tester.pumpWidget(
       MultiProvider(
         providers: [
           ChangeNotifierProvider(create: (_) => ScoreboardState()),
         ],
-        child: const MyApp(showSettings: false),
+        child: MaterialApp(
+          home: const JamTimerScreen(),
+        ),
       ),
     );
+    await tester.pump();
 
     // Verify jam timer screen elements are present
     expect(find.text('JAM TIMER'), findsOneWidget);

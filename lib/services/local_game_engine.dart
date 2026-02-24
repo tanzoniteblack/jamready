@@ -571,6 +571,24 @@ class LocalGameEngine with WidgetsBindingObserver implements GameEngine {
   }
 
   @override
+  void setClockTime(String clockName, int timeMs) {
+    final clock = _state.clocks[clockName];
+    if (clock == null) return;
+
+    // Set internal time directly
+    int newInternal = timeMs;
+    if (newInternal < 0) newInternal = 0;
+
+    _internalClockTimes[clockName] = newInternal;
+
+    // Update display time
+    final isCountUp = clockName == 'Lineup' || clockName == 'Timeout';
+    clock.time = _getDisplayTime(newInternal, isCountUp);
+
+    _state.notify();
+  }
+
+  @override
   void adjustScore(int teamNumber, int delta) {
     if (teamNumber == 1) {
       _state.team1.score += delta;

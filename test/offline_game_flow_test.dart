@@ -89,9 +89,9 @@ void main() {
       await tester.tap(find.text('RDCL'));
       await tester.pump();
 
-      // RDCL details should show 4x15min periods
-      expect(find.text('4x15min'), findsOneWidget);
-      expect(find.text('60s'), findsOneWidget); // 60s jams
+      // RDCL details should show 4×15min periods and 60s jams
+      expect(find.text('4×15min'), findsOneWidget); // periods summary
+      expect(find.text('60s'), findsOneWidget); // jam duration
     });
 
     testWidgets('default WFTDA ruleset shows correct details', (tester) async {
@@ -109,9 +109,9 @@ void main() {
       );
       await tester.pump();
 
-      // WFTDA details should show 2x30min periods
-      expect(find.text('2x30min'), findsOneWidget);
-      expect(find.text('120s'), findsOneWidget); // 2min jams
+      // WFTDA details should show 2×30min periods and 120s jams
+      expect(find.text('2×30min'), findsOneWidget); // periods summary
+      expect(find.text('120s'), findsOneWidget); // jam duration
     });
 
     testWidgets('can enter custom team names', (tester) async {
