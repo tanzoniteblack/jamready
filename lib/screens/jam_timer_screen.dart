@@ -239,14 +239,19 @@ class _JamTimerScreenState extends State<JamTimerScreen>
             builder: (context, constraints) {
               final availableHeight = constraints.maxHeight;
               // Determine scale factor for compact layouts
-              // Below 600px we start scaling down, minimum scale at 400px
+              // Below 600px: scale down (minimum 0.7 at 400px)
+              // Above 800px: scale up slightly (maximum 1.15 at 1000px)
               final scaleFactor = availableHeight < 600
                   ? (availableHeight / 600).clamp(0.7, 1.0)
-                  : 1.0;
+                  : availableHeight > 800
+                      ? (1.0 + (availableHeight - 800) / 1000 * 0.15).clamp(1.0, 1.15)
+                      : 1.0;
               final isCompact = availableHeight < 550;
 
-              return SingleChildScrollView(
-                physics: const ClampingScrollPhysics(),
+              final scrollView = SingleChildScrollView(
+                physics: _isLocalMode
+                    ? const ClampingScrollPhysics()
+                    : const AlwaysScrollableScrollPhysics(),
                 child: ConstrainedBox(
                   constraints: BoxConstraints(
                     minHeight: availableHeight,
@@ -363,7 +368,8 @@ class _JamTimerScreenState extends State<JamTimerScreen>
                           if (!_isLocalMode) ...[
                             SizedBox(height: 16 * scaleFactor),
                             _buildUndoSection(state, isEnabled),
-                            SizedBox(height: 16 * scaleFactor)
+                            // add padding from bottom of screen
+                            SizedBox(height: 16 * scaleFactor),
                           ],
                         ],
                       ),
@@ -371,6 +377,18 @@ class _JamTimerScreenState extends State<JamTimerScreen>
                   ),
                 ),
               );
+
+              // Wrap with RefreshIndicator for remote mode
+              if (!_isLocalMode) {
+                return RefreshIndicator(
+                  onRefresh: () async {
+                    await _connectToServer(forceReconnect: true);
+                  },
+                  child: scrollView,
+                );
+              }
+
+              return scrollView;
             },
           );
         },
