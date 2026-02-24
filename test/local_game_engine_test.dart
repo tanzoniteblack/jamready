@@ -62,7 +62,7 @@ void main() {
       expect(state.team1.officialReviews, 1);
       expect(state.connectionStatus, 'Offline Game');
       expect(engine.isLocal, true);
-      expect(engine.supportsUndo, false);
+      expect(engine.supportsUndo, true);
     });
 
     test('initializes with RDCL ruleset defaults', () async {

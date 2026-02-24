@@ -424,7 +424,29 @@ class LocalGameEngine with WidgetsBindingObserver implements GameEngine {
   }
 
   void _endJam({bool fromExpiration = false}) {
-    // Record undo state for "unstop jam" (only if manually stopped, not expired)
+    _state.clocks['Jam']!.running = false;
+    _state.inJam = false;
+
+    // Check if period ended (period expired while jam was running)
+    if (_state.clocks['Period']!.time <= 0) {
+      if (!fromExpiration) {
+        // Period ended because this jam was manually stopped – save undo so
+        // the operator can restore both the jam and the period.
+        _setUndoAction(
+          _UndoType.unstopJam,
+          jamTime: _state.clocks['Jam']!.time,
+          jamTimeInternal: _internalClockTimes['Jam'],
+          periodEndedDuringJam: true,
+          wasGameOver: _currentPeriod >= ruleset.periodCount,
+        );
+      } else {
+        _clearUndo();
+      }
+      _endPeriod();
+      return;
+    }
+
+    // Normal jam end
     if (!fromExpiration) {
       _setUndoAction(
         _UndoType.unstopJam,
@@ -434,18 +456,6 @@ class LocalGameEngine with WidgetsBindingObserver implements GameEngine {
     } else {
       _clearUndo();
     }
-
-    _state.clocks['Jam']!.running = false;
-    _state.inJam = false;
-
-    // Check if period ended
-    if (_state.clocks['Period']!.time <= 0) {
-      _clearUndo(); // Can't undo if period ended
-      _endPeriod();
-      return;
-    }
-
-    // Start lineup
     _startLineup();
   }
 
@@ -692,12 +702,32 @@ class LocalGameEngine with WidgetsBindingObserver implements GameEngine {
 
         final newJamTime = _getDisplayTime(newJamTimeInternal, false);
 
+        if (action.periodEndedDuringJam == true) {
+          // The jam stop also ended the period. Reverse the period end first.
+          if (action.wasGameOver == true) {
+            _state.noMoreJam = false;
+            _state.setConnectionStatus("Offline Game");
+          } else {
+            // Reverse intermission
+            _state.clocks['Intermission']!.running = false;
+            _state.clocks['Intermission']!.time = 0;
+            _internalClockTimes['Intermission'] = 0;
+          }
+          // Period remains at 0 and not running – it had already expired
+          _state.clocks['Period']!.time = 0;
+          _internalClockTimes['Period'] = 0;
+          _state.clocks['Period']!.running = false;
+          _state.clocks['Lineup']!.running = false;
+        } else {
+          // Normal unstop: period was still running
+          _state.clocks['Lineup']!.running = false;
+          _state.clocks['Period']!.running = true;
+        }
+
         // Restore jam state with adjusted time
-        _state.clocks['Lineup']!.running = false;
         _state.clocks['Jam']!.time = newJamTime;
         _internalClockTimes['Jam'] = newJamTimeInternal;
         _state.clocks['Jam']!.running = true;
-        _state.clocks['Period']!.running = true;
         _state.inJam = true;
         _phase = GamePhase.jam;
         _state.labelStop = "Stop Jam";
@@ -748,6 +778,8 @@ class LocalGameEngine with WidgetsBindingObserver implements GameEngine {
     int? periodTimeInternal,
     int? periodNumber,
     bool? periodWasRunning,
+    bool? periodEndedDuringJam,
+    bool? wasGameOver,
   }) {
     _actionTimestamp = DateTime.now();
     _lastAction = _UndoAction(
@@ -760,6 +792,8 @@ class LocalGameEngine with WidgetsBindingObserver implements GameEngine {
       periodTimeInternal: periodTimeInternal,
       periodNumber: periodNumber,
       periodWasRunning: periodWasRunning,
+      periodEndedDuringJam: periodEndedDuringJam,
+      wasGameOver: wasGameOver,
     );
 
     switch (type) {
@@ -792,6 +826,8 @@ class _UndoAction {
   final int? periodTimeInternal;
   final int? periodNumber;
   final bool? periodWasRunning;
+  final bool? periodEndedDuringJam;
+  final bool? wasGameOver;
 
   _UndoAction({
     required this.type,
@@ -803,5 +839,7 @@ class _UndoAction {
     this.periodTimeInternal,
     this.periodNumber,
     this.periodWasRunning,
+    this.periodEndedDuringJam,
+    this.wasGameOver,
   });
 }

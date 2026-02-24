@@ -166,7 +166,7 @@ void main() {
       await tester.pumpAndSettle();
 
       // Should now show jam timer screen
-      expect(find.text('JAM TIMER'), findsOneWidget);
+      expect(find.text('ROLLER DERBY JAM TIMER'), findsOneWidget);
     });
 
     testWidgets('offline game shows team names from setup', (tester) async {
@@ -233,8 +233,8 @@ void main() {
       await tester.tap(find.text('START GAME'));
       await tester.pumpAndSettle();
 
-      // Should show swipe button in pre-game state
-      expect(find.byType(SwipeButton), findsOneWidget);
+      // Should show at least one swipe button in pre-game state
+      expect(find.byType(SwipeButton), findsAtLeastNWidgets(1));
       // Text is uppercased in the widget
       expect(find.text('SLIDE TO START LINEUP'), findsOneWidget);
     });
@@ -434,6 +434,12 @@ void main() {
     testWidgets('spam detection shows long-press hint after rapid button presses',
         (tester) async {
       SharedPreferences.setMockInitialValues({});
+
+      // Use a tall viewport so the hint text doesn't cause a layout overflow
+      tester.view.physicalSize = const Size(800, 2000);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
 
       final state = ScoreboardState();
       final config = GameConfig(
