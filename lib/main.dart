@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:roller_derby_jam_timer/styles/track_background.dart';
 import 'models/scoreboard_state.dart';
 import 'screens/settings_screen.dart';
 
@@ -28,6 +29,9 @@ class MyApp extends StatelessWidget {
         scaffoldBackgroundColor: const Color(0xFF121212),
         useMaterial3: true,
       ),
+      builder: (context, child) {
+        return PremiumBackground(child: child ?? const SizedBox.shrink());
+      },
       home: const SettingsScreen(),
     );
   }
