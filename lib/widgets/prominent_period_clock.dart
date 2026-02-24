@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import 'package:vibration/vibration.dart';
 import '../models/scoreboard_state.dart';
 import '../styles/text_styles.dart';
 import 'time_edit_dialog.dart';
@@ -27,10 +27,11 @@ class ProminentPeriodClock extends StatelessWidget {
   }
 
   Future<void> _handleLongPress(BuildContext context) async {
-    if (!enabled) return;
+    // Only allow long press time editing when onSetTime is provided
+    if (!enabled || onSetTime == null) return;
 
     // Haptic feedback for long press
-    await HapticFeedback.mediumImpact();
+    Vibration.vibrate(duration: 50);
 
     if (!context.mounted) return;
 
@@ -38,16 +39,11 @@ class ProminentPeriodClock extends StatelessWidget {
       context,
       title: 'Set ${clock.displayName.isNotEmpty ? clock.displayName : clock.name} Time',
       currentTimeMs: clock.time,
+      getCurrentTimeMs: () => clock.time,
     );
 
     if (newTimeMs != null) {
-      if (onSetTime != null) {
-        onSetTime!(newTimeMs);
-      } else {
-        // Calculate delta
-        final delta = newTimeMs - clock.time;
-        onAdjust(delta);
-      }
+      onSetTime!(newTimeMs);
     }
   }
 
@@ -78,7 +74,8 @@ class ProminentPeriodClock extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           GestureDetector(
-            onLongPress: () => _handleLongPress(context),
+            // Only enable long press for time editing when onSetTime is provided
+            onLongPress: onSetTime != null ? () => _handleLongPress(context) : null,
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [

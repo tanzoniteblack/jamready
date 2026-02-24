@@ -307,10 +307,13 @@ class _JamTimerScreenState extends State<JamTimerScreen>
                           final delta = int.tryParse(val) ?? 0;
                           _engine?.adjustClock(active.name, delta);
                         },
-                        onSetTime: (timeMs) {
-                          final active = _determineActiveClock(state);
-                          _engine?.setClockTime(active.name, timeMs);
-                        },
+                        // Only allow direct time setting in local mode
+                        onSetTime: _isLocalMode
+                            ? (timeMs) {
+                                final active = _determineActiveClock(state);
+                                _engine?.setClockTime(active.name, timeMs);
+                              }
+                            : null,
                       ),
 
                     const SizedBox(height: 24),

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import 'package:vibration/vibration.dart';
 import '../models/scoreboard_state.dart';
 import '../styles/text_styles.dart';
 import 'time_edit_dialog.dart';
@@ -54,10 +54,11 @@ class _ClockDisplayState extends State<ClockDisplay>
   }
 
   Future<void> _handleLongPress() async {
-    if (!widget.enabled) return;
+    // Only allow long press time editing in local mode (when onSetTime is provided)
+    if (!widget.enabled || widget.onSetTime == null) return;
 
     // Haptic feedback for long press
-    await HapticFeedback.mediumImpact();
+    Vibration.vibrate(duration: 50);
 
     if (!mounted) return;
 
@@ -65,14 +66,11 @@ class _ClockDisplayState extends State<ClockDisplay>
       context,
       title: 'Set ${widget.clock.displayName.isNotEmpty ? widget.clock.displayName : widget.clock.name} Time',
       currentTimeMs: widget.clock.time,
+      getCurrentTimeMs: () => widget.clock.time,
     );
 
-    if (newTimeMs != null && widget.onSetTime != null) {
+    if (newTimeMs != null) {
       widget.onSetTime!(newTimeMs);
-    } else if (newTimeMs != null) {
-      // Calculate delta if onSetTime not provided
-      final delta = newTimeMs - widget.clock.time;
-      widget.onAdjust(delta > 0 ? '+$delta' : '$delta');
     }
   }
 
@@ -126,7 +124,8 @@ class _ClockDisplayState extends State<ClockDisplay>
             ),
           ),
           GestureDetector(
-            onLongPress: _handleLongPress,
+            // Only enable long press for time editing in local mode
+            onLongPress: widget.onSetTime != null ? _handleLongPress : null,
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [

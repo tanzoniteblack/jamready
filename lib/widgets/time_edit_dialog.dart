@@ -1,18 +1,21 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import '../styles/text_styles.dart';
 
-/// A dialog for editing clock time in MM:SS format.
+/// A dialog for editing clock time using wheel pickers.
 class TimeEditDialog extends StatefulWidget {
   final String title;
   final int currentTimeMs;
   final int? maxTimeMs;
+  /// Callback to get the live current time (for confirmation check)
+  final int Function()? getCurrentTimeMs;
 
   const TimeEditDialog({
     super.key,
     required this.title,
     required this.currentTimeMs,
     this.maxTimeMs,
+    this.getCurrentTimeMs,
   });
 
   /// Shows the dialog and returns the new time in milliseconds, or null if cancelled.
@@ -21,6 +24,7 @@ class TimeEditDialog extends StatefulWidget {
     required String title,
     required int currentTimeMs,
     int? maxTimeMs,
+    int Function()? getCurrentTimeMs,
   }) {
     return showDialog<int>(
       context: context,
@@ -28,6 +32,7 @@ class TimeEditDialog extends StatefulWidget {
         title: title,
         currentTimeMs: currentTimeMs,
         maxTimeMs: maxTimeMs,
+        getCurrentTimeMs: getCurrentTimeMs,
       ),
     );
   }
@@ -37,147 +42,238 @@ class TimeEditDialog extends StatefulWidget {
 }
 
 class _TimeEditDialogState extends State<TimeEditDialog> {
-  late TextEditingController _controller;
-  String? _errorText;
+  late int _selectedMinutes;
+  late int _selectedSeconds;
+  late FixedExtentScrollController _minutesController;
+  late FixedExtentScrollController _secondsController;
+  bool _awaitingConfirmation = false;
 
   @override
   void initState() {
     super.initState();
-    _controller = TextEditingController(text: _formatTime(widget.currentTimeMs));
-    // Select all text initially for easy replacement
-    _controller.selection = TextSelection(
-      baseOffset: 0,
-      extentOffset: _controller.text.length,
-    );
+    // Parse initial time
+    int totalSeconds = (widget.currentTimeMs / 1000).ceil();
+    if (totalSeconds < 0) totalSeconds = 0;
+    _selectedMinutes = totalSeconds ~/ 60;
+    _selectedSeconds = totalSeconds % 60;
+
+    _minutesController = FixedExtentScrollController(initialItem: _selectedMinutes);
+    _secondsController = FixedExtentScrollController(initialItem: _selectedSeconds);
   }
 
   @override
   void dispose() {
-    _controller.dispose();
+    _minutesController.dispose();
+    _secondsController.dispose();
     super.dispose();
   }
 
-  String _formatTime(int milliseconds) {
-    int totalSeconds = (milliseconds / 1000).ceil();
-    if (totalSeconds < 0) totalSeconds = 0;
-    int minutes = totalSeconds ~/ 60;
-    int seconds = totalSeconds % 60;
-    return "${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}";
+  int get _selectedTimeMs => (_selectedMinutes * 60 + _selectedSeconds) * 1000;
+
+  int get _currentLiveTimeMs =>
+      widget.getCurrentTimeMs?.call() ?? widget.currentTimeMs;
+
+  int get _timeDifferenceMs => _selectedTimeMs - _currentLiveTimeMs;
+
+  bool get _needsConfirmation {
+    final diff = _timeDifferenceMs.abs();
+    return diff > 15000; // More than 15 seconds difference
   }
 
-  int? _parseTime(String text) {
-    // Accept formats: MM:SS, M:SS, :SS, SS
-    final trimmed = text.trim();
-
-    // Handle MM:SS or M:SS format
-    final colonMatch = RegExp(r'^(\d{1,2}):(\d{2})$').firstMatch(trimmed);
-    if (colonMatch != null) {
-      final minutes = int.parse(colonMatch.group(1)!);
-      final seconds = int.parse(colonMatch.group(2)!);
-      if (seconds >= 60) return null;
-      return (minutes * 60 + seconds) * 1000;
+  String get _formattedDifference {
+    final diffSeconds = (_timeDifferenceMs / 1000).round();
+    final sign = diffSeconds >= 0 ? '+' : '';
+    final absSeconds = diffSeconds.abs();
+    final minutes = absSeconds ~/ 60;
+    final seconds = absSeconds % 60;
+    if (minutes > 0) {
+      return '$sign$minutes:${seconds.toString().padLeft(2, '0')}';
     }
-
-    // Handle just seconds (no colon)
-    final secondsMatch = RegExp(r'^(\d{1,3})$').firstMatch(trimmed);
-    if (secondsMatch != null) {
-      final seconds = int.parse(secondsMatch.group(1)!);
-      return seconds * 1000;
-    }
-
-    return null;
+    return '$sign${diffSeconds}s';
   }
 
-  void _validateAndSubmit() {
-    final timeMs = _parseTime(_controller.text);
-    if (timeMs == null) {
-      setState(() => _errorText = 'Use MM:SS format (e.g., 30:00)');
+  void _handleSubmitTap() {
+    if (widget.maxTimeMs != null && _selectedTimeMs > widget.maxTimeMs!) {
       return;
     }
 
-    if (widget.maxTimeMs != null && timeMs > widget.maxTimeMs!) {
-      final maxFormatted = _formatTime(widget.maxTimeMs!);
-      setState(() => _errorText = 'Maximum time is $maxFormatted');
+    if (_needsConfirmation && !_awaitingConfirmation) {
+      // First tap - enter confirmation state
+      setState(() => _awaitingConfirmation = true);
       return;
     }
 
-    Navigator.of(context).pop(timeMs);
+    // Either no confirmation needed, or this is the second tap
+    Navigator.of(context).pop(_selectedTimeMs);
+  }
+
+  void _onPickerChanged() {
+    // Reset confirmation state when picker values change
+    if (_awaitingConfirmation) {
+      setState(() => _awaitingConfirmation = false);
+    } else {
+      setState(() {});
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final maxMinutes = widget.maxTimeMs != null
+        ? (widget.maxTimeMs! / 60000).ceil()
+        : 99;
+
     return AlertDialog(
       backgroundColor: const Color(0xFF1E1E1E),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
       ),
+      contentPadding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
       title: Text(
         widget.title,
+        textAlign: TextAlign.center,
         style: AppTextStyles.clockLabel.copyWith(
-          fontSize: 18,
-          color: Colors.white,
+          fontSize: 16,
+          color: Colors.white70,
         ),
       ),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          TextField(
-            controller: _controller,
-            autofocus: true,
-            keyboardType: TextInputType.datetime,
-            textAlign: TextAlign.center,
-            style: AppTextStyles.clockTime.copyWith(
-              fontSize: 48,
-              color: Colors.white,
+          // Wheel pickers
+          SizedBox(
+            height: 180,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                // Minutes picker
+                SizedBox(
+                  width: 80,
+                  child: CupertinoPicker(
+                    scrollController: _minutesController,
+                    itemExtent: 50,
+                    diameterRatio: 1.2,
+                    selectionOverlay: Container(
+                      decoration: BoxDecoration(
+                        border: Border.symmetric(
+                          horizontal: BorderSide(
+                            color: Colors.orange.withValues(alpha: 0.3),
+                            width: 1,
+                          ),
+                        ),
+                      ),
+                    ),
+                    onSelectedItemChanged: (index) {
+                      _selectedMinutes = index;
+                      _onPickerChanged();
+                    },
+                    children: List.generate(
+                      maxMinutes + 1,
+                      (index) => Center(
+                        child: Text(
+                          index.toString().padLeft(2, '0'),
+                          style: AppTextStyles.clockTime.copyWith(
+                            fontSize: 36,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                // Colon separator
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  child: Text(
+                    ':',
+                    style: AppTextStyles.clockTime.copyWith(
+                      fontSize: 36,
+                      color: Colors.white54,
+                    ),
+                  ),
+                ),
+                // Seconds picker
+                SizedBox(
+                  width: 80,
+                  child: CupertinoPicker(
+                    scrollController: _secondsController,
+                    itemExtent: 50,
+                    diameterRatio: 1.2,
+                    selectionOverlay: Container(
+                      decoration: BoxDecoration(
+                        border: Border.symmetric(
+                          horizontal: BorderSide(
+                            color: Colors.orange.withValues(alpha: 0.3),
+                            width: 1,
+                          ),
+                        ),
+                      ),
+                    ),
+                    onSelectedItemChanged: (index) {
+                      _selectedSeconds = index;
+                      _onPickerChanged();
+                    },
+                    children: List.generate(
+                      60,
+                      (index) => Center(
+                        child: Text(
+                          index.toString().padLeft(2, '0'),
+                          style: AppTextStyles.clockTime.copyWith(
+                            fontSize: 36,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
-            decoration: InputDecoration(
-              hintText: '00:00',
-              hintStyle: AppTextStyles.clockTime.copyWith(
-                fontSize: 48,
-                color: Colors.white24,
-              ),
-              errorText: _errorText,
-              errorStyle: const TextStyle(color: Colors.redAccent),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: Colors.white24),
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: Colors.white24),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: Colors.orange, width: 2),
-              ),
-              errorBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: Colors.redAccent),
-              ),
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 16,
-                vertical: 12,
-              ),
-            ),
-            inputFormatters: [
-              FilteringTextInputFormatter.allow(RegExp(r'[\d:]')),
-              LengthLimitingTextInputFormatter(5),
-            ],
-            onSubmitted: (_) => _validateAndSubmit(),
-            onChanged: (_) {
-              if (_errorText != null) {
-                setState(() => _errorText = null);
-              }
-            },
           ),
-          const SizedBox(height: 8),
-          Text(
-            'Enter time as MM:SS',
-            style: TextStyle(
-              color: Colors.white38,
-              fontSize: 12,
+          // Difference indicator
+          if (_needsConfirmation)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: _awaitingConfirmation
+                      ? Colors.red.withValues(alpha: 0.15)
+                      : Colors.orange.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: _awaitingConfirmation
+                        ? Colors.red.withValues(alpha: 0.4)
+                        : Colors.orange.withValues(alpha: 0.3),
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      _awaitingConfirmation
+                          ? Icons.warning_rounded
+                          : Icons.access_time,
+                      size: 16,
+                      color: _awaitingConfirmation ? Colors.red : Colors.orange,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      _awaitingConfirmation
+                          ? 'Tap again to confirm $_formattedDifference'
+                          : 'Change: $_formattedDifference',
+                      style: TextStyle(
+                        color: _awaitingConfirmation ? Colors.red : Colors.orange,
+                        fontSize: 12,
+                        fontWeight: _awaitingConfirmation
+                            ? FontWeight.bold
+                            : FontWeight.normal,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
-          ),
         ],
       ),
       actions: [
@@ -189,11 +285,20 @@ class _TimeEditDialogState extends State<TimeEditDialog> {
           ),
         ),
         TextButton(
-          onPressed: _validateAndSubmit,
+          onPressed: _handleSubmitTap,
           style: TextButton.styleFrom(
-            foregroundColor: Colors.orange,
+            foregroundColor: _awaitingConfirmation
+                ? Colors.white
+                : (_needsConfirmation ? Colors.orange : Colors.white),
+            backgroundColor: _awaitingConfirmation
+                ? Colors.red
+                : (_needsConfirmation
+                    ? Colors.orange.withValues(alpha: 0.15)
+                    : null),
           ),
-          child: const Text('SET TIME'),
+          child: Text(_awaitingConfirmation
+              ? 'CONFIRM'
+              : (_needsConfirmation ? 'CHANGE TIME' : 'SET TIME')),
         ),
       ],
     );
