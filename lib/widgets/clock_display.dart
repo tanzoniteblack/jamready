@@ -10,6 +10,7 @@ class ClockDisplay extends StatefulWidget {
   final bool enabled;
   final Function(String) onAdjust;
   final Function(int)? onSetTime;
+  final double scaleFactor;
 
   const ClockDisplay({
     super.key,
@@ -18,6 +19,7 @@ class ClockDisplay extends StatefulWidget {
     this.enabled = true,
     required this.onAdjust,
     this.onSetTime,
+    this.scaleFactor = 1.0,
   });
 
   @override
@@ -137,16 +139,18 @@ class _ClockDisplayState extends State<ClockDisplay>
       mainAxisSize: MainAxisSize.min,
       children: [
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+          padding: EdgeInsets.symmetric(
+              horizontal: 24 * widget.scaleFactor,
+              vertical: 12 * widget.scaleFactor),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(16 * widget.scaleFactor),
             color: glowColor?.withValues(alpha: 0.05),
             boxShadow: glowColor != null
                 ? [
                     BoxShadow(
                       color: glowColor.withValues(alpha: 0.15),
-                      blurRadius: 24,
-                      spreadRadius: 2,
+                      blurRadius: 24 * widget.scaleFactor,
+                      spreadRadius: 2 * widget.scaleFactor,
                     ),
                   ]
                 : null,
@@ -157,7 +161,7 @@ class _ClockDisplayState extends State<ClockDisplay>
               Text(
                 label,
                 style: AppTextStyles.clockLabel.copyWith(
-                  fontSize: 18,
+                  fontSize: 18 * widget.scaleFactor,
                   color: color,
                   height: 1.0,
                 ),
@@ -182,7 +186,7 @@ class _ClockDisplayState extends State<ClockDisplay>
                         _formatTime(widget.clock.time),
                         style: AppTextStyles.clockTime.copyWith(
                           color: color,
-                          fontSize: 72,
+                          fontSize: 72 * widget.scaleFactor,
                         ),
                       ),
                     ),
@@ -201,11 +205,13 @@ class _ClockDisplayState extends State<ClockDisplay>
               ? GestureDetector(
                   onTap: () => setState(() => _showLongPressHint = false),
                   child: Container(
-                    margin: const EdgeInsets.only(top: 8),
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    margin: EdgeInsets.only(top: 8 * widget.scaleFactor),
+                    padding: EdgeInsets.symmetric(
+                        horizontal: 12 * widget.scaleFactor,
+                        vertical: 8 * widget.scaleFactor),
                     decoration: BoxDecoration(
                       color: Colors.blue.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(8 * widget.scaleFactor),
                       border: Border.all(
                         color: Colors.blue.withValues(alpha: 0.3),
                       ),
@@ -215,15 +221,15 @@ class _ClockDisplayState extends State<ClockDisplay>
                       children: [
                         Icon(
                           Icons.touch_app,
-                          size: 16,
+                          size: 16 * widget.scaleFactor,
                           color: Colors.blue.shade300,
                         ),
-                        const SizedBox(width: 8),
+                        SizedBox(width: 8 * widget.scaleFactor),
                         Text(
                           'Tip: Long-press the time to jump to any value',
                           style: TextStyle(
                             color: Colors.blue.shade300,
-                            fontSize: 12,
+                            fontSize: 12 * widget.scaleFactor,
                           ),
                         ),
                       ],
@@ -238,14 +244,15 @@ class _ClockDisplayState extends State<ClockDisplay>
 
   Widget _buildAdjustButton(String label, VoidCallback? onPressed) {
     return SizedBox(
-      width: 36,
-      height: 36,
+      width: 36 * widget.scaleFactor,
+      height: 36 * widget.scaleFactor,
       child: OutlinedButton(
         onPressed: onPressed,
         style: OutlinedButton.styleFrom(
           padding: EdgeInsets.zero,
           side: BorderSide(
             color: onPressed != null ? Colors.white24 : Colors.white10,
+            width: 1 * widget.scaleFactor,
           ),
           shape: const CircleBorder(),
         ),
@@ -253,7 +260,7 @@ class _ClockDisplayState extends State<ClockDisplay>
           label,
           style: TextStyle(
             color: onPressed != null ? Colors.white : Colors.white24,
-            fontSize: 16,
+            fontSize: 16 * widget.scaleFactor,
           ),
         ),
       ),

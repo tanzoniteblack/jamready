@@ -10,6 +10,7 @@ class SwipeButton extends StatefulWidget {
   final Color iconColor;
   final bool enabled;
   final bool compact;
+  final double scaleFactor;
 
   const SwipeButton({
     super.key,
@@ -19,6 +20,7 @@ class SwipeButton extends StatefulWidget {
     this.iconColor = Colors.white,
     this.enabled = true,
     this.compact = false,
+    this.scaleFactor = 1.0,
   });
 
   @override
@@ -33,12 +35,12 @@ class _SwipeButtonState extends State<SwipeButton>
   Timer? _resetTimer;
   final double _confirmThreshold = 0.7;
 
-  double get _height => widget.compact ? 48.0 : 80.0;
-  double get _handleWidth => widget.compact ? 48.0 : 80.0;
-  double get _fontSize => widget.compact ? 14.0 : 24.0;
-  double get _iconSize => widget.compact ? 20.0 : 32.0;
-  double get _borderRadius => widget.compact ? 10.0 : 16.0;
-  double get _borderWidth => widget.compact ? 1.0 : 2.0;
+  double get _height => (widget.compact ? 48.0 : 80.0) * widget.scaleFactor;
+  double get _handleWidth => (widget.compact ? 48.0 : 80.0) * widget.scaleFactor;
+  double get _fontSize => (widget.compact ? 14.0 : 24.0) * widget.scaleFactor;
+  double get _iconSize => (widget.compact ? 20.0 : 32.0) * widget.scaleFactor;
+  double get _borderRadius => (widget.compact ? 10.0 : 16.0) * widget.scaleFactor;
+  double get _borderWidth => (widget.compact ? 1.0 : 2.0) * widget.scaleFactor;
 
   @override
   void dispose() {

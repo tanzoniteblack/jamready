@@ -11,6 +11,7 @@ class JamControls extends StatelessWidget {
   final String timeoutLabel;
   final Color? alertColor;
   final bool enabled;
+  final double scaleFactor;
   final VoidCallback onStartJam;
   final VoidCallback onStopJam;
   final VoidCallback onTimeout;
@@ -25,6 +26,7 @@ class JamControls extends StatelessWidget {
     required this.timeoutLabel,
     this.alertColor,
     this.enabled = true,
+    this.scaleFactor = 1.0,
     required this.onStartJam,
     required this.onStopJam,
     required this.onTimeout,
@@ -62,30 +64,31 @@ class JamControls extends StatelessWidget {
       children: [
         SizedBox(
           width: double.infinity,
-          height: 80,
+          height: 80 * scaleFactor,
           child: isPrePeriod
               ? SwipeButton(
                   label: "Slide to Start Lineup",
                   onConfirmed: onStopJam,
                   color: Colors.orange.shade800,
                   enabled: enabled,
+                  scaleFactor: scaleFactor,
                 )
               : _buildDepthButton(
                   label: label.toUpperCase(),
                   color: color,
                   enabled: enabled,
                   onPressed: onPressed,
-                  fontSize: 28,
-                  height: 80,
+                  fontSize: 28 * scaleFactor,
+                  height: 80 * scaleFactor,
                 ),
         ),
-        const SizedBox(height: 24),
+        SizedBox(height: 24 * scaleFactor),
         _buildDepthOutlinedButton(
           label: timeoutLabel.toUpperCase(),
           color: Colors.amber,
           enabled: timeoutEnabled,
           onPressed: onTimeout,
-          height: 56,
+          height: 56 * scaleFactor,
         ),
       ],
     );
@@ -105,13 +108,13 @@ class JamControls extends StatelessWidget {
     return Container(
       height: height,
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(16 * scaleFactor),
         boxShadow: enabled
             ? [
                 BoxShadow(
                   color: Colors.black.withValues(alpha: 0.25),
-                  blurRadius: 4,
-                  offset: const Offset(0, 2),
+                  blurRadius: 4 * scaleFactor,
+                  offset: Offset(0, 2 * scaleFactor),
                 ),
               ]
             : [],
@@ -120,7 +123,7 @@ class JamControls extends StatelessWidget {
         color: Colors.transparent,
         child: InkWell(
           onTap: enabled ? onPressed : null,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(16 * scaleFactor),
           child: Ink(
             decoration: BoxDecoration(
               gradient: enabled
@@ -132,7 +135,7 @@ class JamControls extends StatelessWidget {
                     )
                   : null,
               color: enabled ? null : Colors.grey.shade800,
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(16 * scaleFactor),
             ),
             child: Container(
               alignment: Alignment.center,
@@ -160,13 +163,13 @@ class JamControls extends StatelessWidget {
     return Container(
       height: height,
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(12 * scaleFactor),
         boxShadow: enabled
             ? [
                 BoxShadow(
                   color: color.withValues(alpha: 0.15),
-                  blurRadius: 4,
-                  offset: const Offset(0, 1),
+                  blurRadius: 4 * scaleFactor,
+                  offset: Offset(0, 1 * scaleFactor),
                 ),
               ]
             : [],
@@ -175,14 +178,14 @@ class JamControls extends StatelessWidget {
         color: Colors.transparent,
         child: InkWell(
           onTap: enabled ? onPressed : null,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(12 * scaleFactor),
           child: Ink(
             decoration: BoxDecoration(
               color: (enabled ? color : Colors.white12).withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(12 * scaleFactor),
               border: Border.all(
                 color: enabled ? color : Colors.white12,
-                width: 2,
+                width: 2 * scaleFactor,
               ),
             ),
             child: Container(
@@ -190,6 +193,7 @@ class JamControls extends StatelessWidget {
               child: Text(
                 label,
                 style: AppTextStyles.buttonText.copyWith(
+                  fontSize: 18 * scaleFactor,
                   color: enabled ? color : Colors.white38,
                 ),
               ),

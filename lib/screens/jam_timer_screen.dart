@@ -235,113 +235,154 @@ class _JamTimerScreenState extends State<JamTimerScreen>
           final isEnabled =
               _isLocalMode || state.connectionStatus == "Connected";
 
-          return RefreshIndicator(
-            onRefresh: () async {
-              if (!_isLocalMode) {
-                await _connectToServer(forceReconnect: true);
-              }
-            },
-            child: SingleChildScrollView(
-              physics: const AlwaysScrollableScrollPhysics(),
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  children: [
-                    // Teams
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TeamPanel(
-                            team: state.team1,
-                            isLeft: true,
-                            enabled: isEnabled,
-                            onRetainedToggle: (val) =>
-                                _engine?.setRetainedReview(1, val),
+          return LayoutBuilder(
+            builder: (context, constraints) {
+              final availableHeight = constraints.maxHeight;
+              // Determine scale factor for compact layouts
+              // Below 600px we start scaling down, minimum scale at 400px
+              final scaleFactor = availableHeight < 600
+                  ? (availableHeight / 600).clamp(0.7, 1.0)
+                  : 1.0;
+              final isCompact = availableHeight < 550;
+
+              return SingleChildScrollView(
+                physics: const ClampingScrollPhysics(),
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    minHeight: availableHeight,
+                  ),
+                  child: IntrinsicHeight(
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: 16.0,
+                        vertical: isCompact ? 8.0 : 16.0,
+                      ),
+                      child: Column(
+                        children: [
+                          // Teams - fixed at top
+                          Row(
+                            children: [
+                              Expanded(
+                                child: TeamPanel(
+                                  team: state.team1,
+                                  isLeft: true,
+                                  enabled: isEnabled,
+                                  onRetainedToggle: (val) =>
+                                      _engine?.setRetainedReview(1, val),
+                                ),
+                              ),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: TeamPanel(
+                                  team: state.team2,
+                                  isLeft: false,
+                                  enabled: isEnabled,
+                                  onRetainedToggle: (val) =>
+                                      _engine?.setRetainedReview(2, val),
+                                ),
+                              ),
+                            ],
                           ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: TeamPanel(
-                            team: state.team2,
-                            isLeft: false,
-                            enabled: isEnabled,
-                            onRetainedToggle: (val) =>
-                                _engine?.setRetainedReview(2, val),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 24),
 
-                    // Period / Intermission Clock
-                    // In local mode, show prominent period clock
-                    // In remote mode, show period clock row (unless intermission)
-                    if (_isLocalMode)
-                      _buildLocalModePeriodClock(state, isEnabled)
-                    else if (!(state.clocks['Intermission']?.running ?? false))
-                      _buildPeriodClockRow(state, isEnabled),
+                          SizedBox(height: isCompact ? 8 : 16),
 
-                    if (_isLocalMode ||
-                        !(state.clocks['Intermission']?.running ?? false))
-                      const SizedBox(height: 24),
+                          // Period / Intermission Clock
+                          if (_isLocalMode)
+                            _buildLocalModePeriodClock(
+                              state,
+                              isEnabled,
+                              scaleFactor,
+                            )
+                          else if (!(state.clocks['Intermission']?.running ??
+                              false))
+                            _buildPeriodClockRow(state, isEnabled),
 
-                    // Active Game Clock (Jam / Lineup / Timeout) or Ready indicator
-                    if (_isReadyToStart(state))
-                      _buildReadyToStartDisplay(state, isEnabled)
-                    else
-                      ClockDisplay(
-                        clock: _determineActiveClock(state),
-                        textColor: _determineAlertColor(state),
-                        enabled: isEnabled,
-                        onAdjust: (val) {
-                          final active = _determineActiveClock(state);
-                          final delta = int.tryParse(val) ?? 0;
-                          _engine?.adjustClock(active.name, delta);
-                        },
-                        // Only allow direct time setting in local mode
-                        onSetTime: _isLocalMode
-                            ? (timeMs) {
+                          if (_isLocalMode ||
+                              !(state.clocks['Intermission']?.running ?? false))
+                            SizedBox(height: isCompact ? 12 : 20),
+
+                          Spacer(),
+
+                          // Active Game Clock or Ready indicator
+                          if (_isReadyToStart(state))
+                            _buildReadyToStartDisplay(
+                              state,
+                              isEnabled,
+                              scaleFactor,
+                            )
+                          else
+                            ClockDisplay(
+                              clock: _determineActiveClock(state),
+                              textColor: _determineAlertColor(state),
+                              enabled: isEnabled,
+                              scaleFactor: scaleFactor,
+                              onAdjust: (val) {
                                 final active = _determineActiveClock(state);
-                                _engine?.setClockTime(active.name, timeMs);
-                              }
-                            : null,
+                                final delta = int.tryParse(val) ?? 0;
+                                _engine?.adjustClock(active.name, delta);
+                              },
+                              onSetTime: _isLocalMode
+                                  ? (timeMs) {
+                                      final active =
+                                          _determineActiveClock(state);
+                                      _engine?.setClockTime(active.name, timeMs);
+                                    }
+                                  : null,
+                            ),
+
+                          // Flexible spacer pushes controls toward bottom
+                          const Spacer(),
+
+                          // Timeout Type Buttons OR normal controls
+                          if (state.labelStop == "End Timeout")
+                            _buildTimeoutTypeSection(
+                              state,
+                              isEnabled,
+                              scaleFactor,
+                            )
+                          else
+                            JamControls(
+                              inJam: state.inJam,
+                              isPrePeriod: _isPrePeriod(state),
+                              isIntermission:
+                                  (state.clocks['Intermission']?.running ??
+                                          false) ||
+                                      (state.clocks['Period']?.number == 0),
+                              startLabel: state.labelStart,
+                              stopLabel: state.labelStop,
+                              timeoutLabel: state.labelTimeout,
+                              alertColor: _determineAlertColor(state),
+                              enabled: isEnabled,
+                              scaleFactor: scaleFactor,
+                              onStartJam: () => _engine?.startJam(),
+                              onStopJam: () => _engine?.stopJam(),
+                              onTimeout: () => _engine?.startTimeout(),
+                            ),
+
+                          // Undo Section at bottom (only for remote mode)
+                          if (!_isLocalMode) ...[
+                            SizedBox(height: 16 * scaleFactor),
+                            _buildUndoSection(state, isEnabled),
+                            SizedBox(height: 16 * scaleFactor)
+                          ],
+                        ],
                       ),
-
-                    const SizedBox(height: 24),
-
-                    // Timeout Type Buttons (visible during timeout) OR normal controls
-                    if (state.labelStop == "End Timeout")
-                      _buildTimeoutTypeSection(state, isEnabled)
-                    else
-                      JamControls(
-                        inJam: state.inJam,
-                        isPrePeriod: _isPrePeriod(state),
-                        isIntermission:
-                            (state.clocks['Intermission']?.running ?? false) ||
-                            (state.clocks['Period']?.number == 0),
-                        startLabel: state.labelStart,
-                        stopLabel: state.labelStop,
-                        timeoutLabel: state.labelTimeout,
-                        alertColor: _determineAlertColor(state),
-                        enabled: isEnabled,
-                        onStartJam: () => _engine?.startJam(),
-                        onStopJam: () => _engine?.stopJam(),
-                        onTimeout: () => _engine?.startTimeout(),
-                      ),
-
-                    // Undo Section (only for remote mode)
-                    if (!_isLocalMode) _buildUndoSection(state, isEnabled),
-                  ],
+                    ),
+                  ),
                 ),
-              ),
-            ),
+              );
+            },
           );
         },
       ),
     );
   }
 
-  Widget _buildLocalModePeriodClock(ScoreboardState state, bool isEnabled) {
+  Widget _buildLocalModePeriodClock(
+    ScoreboardState state,
+    bool isEnabled,
+    double scaleFactor,
+  ) {
     final bool showIntermission = state.clocks['Intermission']!.running;
     final clock = showIntermission
         ? state.clocks['Intermission']!
@@ -350,6 +391,7 @@ class _JamTimerScreenState extends State<JamTimerScreen>
     return ProminentPeriodClock(
       clock: clock,
       enabled: isEnabled,
+      scaleFactor: scaleFactor,
       onAdjust: (delta) => _engine?.adjustClock(clock.name, delta),
       onSetTime: (timeMs) => _engine?.setClockTime(clock.name, timeMs),
     );
@@ -463,7 +505,11 @@ class _JamTimerScreenState extends State<JamTimerScreen>
     return "${minutes.toString().padLeft(1, '0')}:${remainingSeconds.toString().padLeft(2, '0')}";
   }
 
-  Widget _buildTimeoutTypeSection(ScoreboardState state, bool isEnabled) {
+  Widget _buildTimeoutTypeSection(
+    ScoreboardState state,
+    bool isEnabled,
+    double scaleFactor,
+  ) {
     final owner = state.timeoutOwner;
     final isOr =
         state.officialReview == "true" || state.officialReview == "True";
@@ -491,11 +537,12 @@ class _JamTimerScreenState extends State<JamTimerScreen>
           isActive: isOfficialTO,
           color: Colors.amber,
           enabled: isEnabled,
-          height: 56,
+          height: 56 * scaleFactor,
           onTap: () => _engine?.setTimeoutOwner('O'),
+          scaleFactor: scaleFactor,
         ),
 
-        const SizedBox(height: 16),
+        SizedBox(height: 16 * scaleFactor),
 
         // Team timeout/review rows
         Row(
@@ -507,36 +554,38 @@ class _JamTimerScreenState extends State<JamTimerScreen>
                   Text(
                     state.team1.displayName,
                     style: AppTextStyles.clockLabel.copyWith(
-                      fontSize: 14,
+                      fontSize: 14 * scaleFactor,
                       color: Colors.white70,
                     ),
                     overflow: TextOverflow.ellipsis,
                   ),
-                  const SizedBox(height: 10),
+                  SizedBox(height: 10 * scaleFactor),
                   _buildTimeoutButton(
                     "TIMEOUT",
                     isActive: isTeam1TO,
                     count: state.team1.timeouts,
                     color: Colors.white,
                     enabled: isEnabled,
-                    height: 48,
+                    height: 48 * scaleFactor,
                     onTap: () => _engine?.setTimeoutOwner('1'),
+                    scaleFactor: scaleFactor,
                   ),
-                  const SizedBox(height: 8),
+                  SizedBox(height: 8 * scaleFactor),
                   _buildTimeoutButton(
                     "REVIEW",
                     isActive: isTeam1OR,
                     count: state.team1.officialReviews,
                     color: Colors.blue.shade300,
                     enabled: isEnabled,
-                    height: 48,
+                    height: 48 * scaleFactor,
                     onTap: () =>
                         _engine?.setTimeoutOwner('1', isOfficialReview: true),
+                    scaleFactor: scaleFactor,
                   ),
                 ],
               ),
             ),
-            const SizedBox(width: 12),
+            SizedBox(width: 12 * scaleFactor),
             // Team 2 column
             Expanded(
               child: Column(
@@ -544,31 +593,33 @@ class _JamTimerScreenState extends State<JamTimerScreen>
                   Text(
                     state.team2.displayName,
                     style: AppTextStyles.clockLabel.copyWith(
-                      fontSize: 14,
+                      fontSize: 14 * scaleFactor,
                       color: Colors.white70,
                     ),
                     overflow: TextOverflow.ellipsis,
                   ),
-                  const SizedBox(height: 10),
+                  SizedBox(height: 10 * scaleFactor),
                   _buildTimeoutButton(
                     "TIMEOUT",
                     isActive: isTeam2TO,
                     count: state.team2.timeouts,
                     color: Colors.white,
                     enabled: isEnabled,
-                    height: 48,
+                    height: 48 * scaleFactor,
                     onTap: () => _engine?.setTimeoutOwner('2'),
+                    scaleFactor: scaleFactor,
                   ),
-                  const SizedBox(height: 8),
+                  SizedBox(height: 8 * scaleFactor),
                   _buildTimeoutButton(
                     "REVIEW",
                     isActive: isTeam2OR,
                     count: state.team2.officialReviews,
                     color: Colors.blue.shade300,
                     enabled: isEnabled,
-                    height: 48,
+                    height: 48 * scaleFactor,
                     onTap: () =>
                         _engine?.setTimeoutOwner('2', isOfficialReview: true),
+                    scaleFactor: scaleFactor,
                   ),
                 ],
               ),
@@ -576,10 +627,10 @@ class _JamTimerScreenState extends State<JamTimerScreen>
           ],
         ),
 
-        const SizedBox(height: 20),
+        SizedBox(height: 20 * scaleFactor),
 
         // End Timeout button
-        _buildEndTimeoutButton(isEnabled),
+        _buildEndTimeoutButton(isEnabled, scaleFactor),
       ],
     );
   }
@@ -592,6 +643,7 @@ class _JamTimerScreenState extends State<JamTimerScreen>
     required bool enabled,
     required double height,
     required VoidCallback onTap,
+    double scaleFactor = 1.0,
   }) {
     final bool useDarkText =
         isActive && (color == Colors.amber || color.computeLuminance() > 0.5);
@@ -605,13 +657,13 @@ class _JamTimerScreenState extends State<JamTimerScreen>
       height: height,
       child: Container(
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(12 * scaleFactor),
           boxShadow: enabled && isActive
               ? [
                   BoxShadow(
                     color: color.withValues(alpha: 0.25),
-                    blurRadius: 4,
-                    offset: const Offset(0, 2),
+                    blurRadius: 4 * scaleFactor,
+                    offset: Offset(0, 2 * scaleFactor),
                   ),
                 ]
               : [],
@@ -620,7 +672,7 @@ class _JamTimerScreenState extends State<JamTimerScreen>
           color: Colors.transparent,
           child: InkWell(
             onTap: enabled ? onTap : null,
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(12 * scaleFactor),
             child: Ink(
               decoration: BoxDecoration(
                 gradient: isActive && enabled
@@ -632,15 +684,15 @@ class _JamTimerScreenState extends State<JamTimerScreen>
                       )
                     : null,
                 color: isActive ? null : Colors.white.withValues(alpha: 0.06),
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(12 * scaleFactor),
                 border: Border.all(
                   color: isActive ? color : Colors.white30,
-                  width: isActive ? 2 : 1,
+                  width: (isActive ? 2 : 1) * scaleFactor,
                 ),
               ),
               child: Container(
                 alignment: Alignment.center,
-                padding: const EdgeInsets.symmetric(horizontal: 8),
+                padding: EdgeInsets.symmetric(horizontal: 8 * scaleFactor),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
@@ -651,7 +703,7 @@ class _JamTimerScreenState extends State<JamTimerScreen>
                           color: enabled
                               ? (isActive ? textColor : Colors.white)
                               : Colors.white38,
-                          fontSize: 14,
+                          fontSize: 14 * scaleFactor,
                           fontWeight: isActive
                               ? FontWeight.bold
                               : FontWeight.w500,
@@ -660,11 +712,11 @@ class _JamTimerScreenState extends State<JamTimerScreen>
                       ),
                     ),
                     if (count != null) ...[
-                      const SizedBox(width: 6),
+                      SizedBox(width: 6 * scaleFactor),
                       Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 2,
+                        padding: EdgeInsets.symmetric(
+                          horizontal: 8 * scaleFactor,
+                          vertical: 2 * scaleFactor,
                         ),
                         decoration: BoxDecoration(
                           color: isActive
@@ -672,7 +724,7 @@ class _JamTimerScreenState extends State<JamTimerScreen>
                                     ? Colors.black.withValues(alpha: 0.15)
                                     : Colors.black.withValues(alpha: 0.2))
                               : Colors.white.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(10),
+                          borderRadius: BorderRadius.circular(10 * scaleFactor),
                         ),
                         child: Text(
                           "$count",
@@ -680,7 +732,7 @@ class _JamTimerScreenState extends State<JamTimerScreen>
                             color: enabled
                                 ? (isActive ? textColor : Colors.white)
                                 : Colors.white38,
-                            fontSize: 14,
+                            fontSize: 14 * scaleFactor,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
@@ -696,23 +748,23 @@ class _JamTimerScreenState extends State<JamTimerScreen>
     );
   }
 
-  Widget _buildEndTimeoutButton(bool isEnabled) {
+  Widget _buildEndTimeoutButton(bool isEnabled, double scaleFactor) {
     final color = Colors.red.shade700;
     final highlightColor = Color.lerp(color, Colors.white, 0.1)!;
     final shadowColor = Color.lerp(color, Colors.black, 0.15)!;
 
     return SizedBox(
       width: double.infinity,
-      height: 72,
+      height: 72 * scaleFactor,
       child: Container(
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(16 * scaleFactor),
           boxShadow: isEnabled
               ? [
                   BoxShadow(
                     color: Colors.black.withValues(alpha: 0.25),
-                    blurRadius: 4,
-                    offset: const Offset(0, 2),
+                    blurRadius: 4 * scaleFactor,
+                    offset: Offset(0, 2 * scaleFactor),
                   ),
                 ]
               : [],
@@ -721,7 +773,7 @@ class _JamTimerScreenState extends State<JamTimerScreen>
           color: Colors.transparent,
           child: InkWell(
             onTap: isEnabled ? () => _engine?.endTimeout() : null,
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(16 * scaleFactor),
             child: Ink(
               decoration: BoxDecoration(
                 gradient: isEnabled
@@ -733,14 +785,14 @@ class _JamTimerScreenState extends State<JamTimerScreen>
                       )
                     : null,
                 color: isEnabled ? null : Colors.grey.shade800,
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(16 * scaleFactor),
               ),
               child: Container(
                 alignment: Alignment.center,
                 child: Text(
                   "END TIMEOUT",
                   style: AppTextStyles.buttonText.copyWith(
-                    fontSize: 24,
+                    fontSize: 24 * scaleFactor,
                     color: isEnabled ? Colors.white : Colors.white38,
                   ),
                 ),
@@ -790,20 +842,27 @@ class _JamTimerScreenState extends State<JamTimerScreen>
     return false;
   }
 
-  Widget _buildReadyToStartDisplay(ScoreboardState state, bool isEnabled) {
+  Widget _buildReadyToStartDisplay(
+    ScoreboardState state,
+    bool isEnabled,
+    double scaleFactor,
+  ) {
     final periodNumber = (state.clocks['Period']?.number ?? 1);
     final color = isEnabled ? _healthyColor : Colors.white12;
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+      padding: EdgeInsets.symmetric(
+        horizontal: 24 * scaleFactor,
+        vertical: 16 * scaleFactor,
+      ),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(16 * scaleFactor),
         color: _healthyColor.withValues(alpha: 0.05),
         boxShadow: [
           BoxShadow(
             color: _healthyColor.withValues(alpha: 0.15),
-            blurRadius: 24,
-            spreadRadius: 2,
+            blurRadius: 24 * scaleFactor,
+            spreadRadius: 2 * scaleFactor,
           ),
         ],
       ),
@@ -812,19 +871,22 @@ class _JamTimerScreenState extends State<JamTimerScreen>
           Text(
             periodNumber == 0 ? "GAME" : "PERIOD $periodNumber",
             style: AppTextStyles.clockLabel.copyWith(
-              fontSize: 22,
+              fontSize: 22 * scaleFactor,
               color: color,
             ),
           ),
-          const SizedBox(height: 8),
+          SizedBox(height: 8 * scaleFactor),
           FittedBox(
             fit: BoxFit.scaleDown,
             child: Text(
               "READY",
-              style: AppTextStyles.clockTime.copyWith(color: color),
+              style: AppTextStyles.clockTime.copyWith(
+                color: color,
+                fontSize: 96 * scaleFactor,
+              ),
             ),
           ),
-          const SizedBox(height: 16),
+          SizedBox(height: 16 * scaleFactor),
         ],
       ),
     );

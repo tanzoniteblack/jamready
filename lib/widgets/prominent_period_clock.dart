@@ -8,6 +8,7 @@ import 'time_edit_dialog.dart';
 class ProminentPeriodClock extends StatefulWidget {
   final Clock clock;
   final bool enabled;
+  final double scaleFactor;
   final Function(int) onAdjust;
   final Function(int)? onSetTime;
 
@@ -15,6 +16,7 @@ class ProminentPeriodClock extends StatefulWidget {
     super.key,
     required this.clock,
     this.enabled = true,
+    this.scaleFactor = 1.0,
     required this.onAdjust,
     this.onSetTime,
   });
@@ -100,10 +102,12 @@ class _ProminentPeriodClockState extends State<ProminentPeriodClock> {
       mainAxisSize: MainAxisSize.min,
       children: [
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+          padding: EdgeInsets.symmetric(
+              horizontal: 24 * widget.scaleFactor,
+              vertical: 12 * widget.scaleFactor),
           decoration: BoxDecoration(
             color: Colors.white.withValues(alpha: 0.05),
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(16 * widget.scaleFactor),
             border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
           ),
           child: Column(
@@ -112,11 +116,11 @@ class _ProminentPeriodClockState extends State<ProminentPeriodClock> {
               Text(
                 label.toUpperCase(),
                 style: AppTextStyles.clockLabel.copyWith(
-                  fontSize: 14,
+                  fontSize: 14 * widget.scaleFactor,
                   color: contentColor.withValues(alpha: 0.7),
                 ),
               ),
-              const SizedBox(height: 4),
+              SizedBox(height: 4 * widget.scaleFactor),
               GestureDetector(
                 // Only enable long press for time editing when onSetTime is provided
                 onLongPress: widget.onSetTime != null ? _handleLongPress : null,
@@ -127,7 +131,7 @@ class _ProminentPeriodClockState extends State<ProminentPeriodClock> {
                     Text(
                       _formatTime(widget.clock.time),
                       style: AppTextStyles.clockTime.copyWith(
-                        fontSize: 48,
+                        fontSize: 48 * widget.scaleFactor,
                         color: contentColor,
                       ),
                     ),
@@ -145,11 +149,13 @@ class _ProminentPeriodClockState extends State<ProminentPeriodClock> {
               ? GestureDetector(
                   onTap: () => setState(() => _showLongPressHint = false),
                   child: Container(
-                    margin: const EdgeInsets.only(top: 8),
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    margin: EdgeInsets.only(top: 8 * widget.scaleFactor),
+                    padding: EdgeInsets.symmetric(
+                        horizontal: 12 * widget.scaleFactor,
+                        vertical: 8 * widget.scaleFactor),
                     decoration: BoxDecoration(
                       color: Colors.blue.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(8 * widget.scaleFactor),
                       border: Border.all(
                         color: Colors.blue.withValues(alpha: 0.3),
                       ),
@@ -159,15 +165,15 @@ class _ProminentPeriodClockState extends State<ProminentPeriodClock> {
                       children: [
                         Icon(
                           Icons.touch_app,
-                          size: 16,
+                          size: 16 * widget.scaleFactor,
                           color: Colors.blue.shade300,
                         ),
-                        const SizedBox(width: 8),
+                        SizedBox(width: 8 * widget.scaleFactor),
                         Text(
                           'Tip: Long-press the time to jump to any value',
                           style: TextStyle(
                             color: Colors.blue.shade300,
-                            fontSize: 12,
+                            fontSize: 12 * widget.scaleFactor,
                           ),
                         ),
                       ],
@@ -182,13 +188,14 @@ class _ProminentPeriodClockState extends State<ProminentPeriodClock> {
 
   Widget _buildAdjustButton(String label, VoidCallback? onPressed) {
     return SizedBox(
-      width: 36,
-      height: 36,
+      width: 36 * widget.scaleFactor,
+      height: 36 * widget.scaleFactor,
       child: OutlinedButton(
         onPressed: onPressed,
         style: OutlinedButton.styleFrom(
           padding: EdgeInsets.zero,
           side: BorderSide(
+            width: 1 * widget.scaleFactor,
             color: onPressed != null ? Colors.white24 : Colors.white10,
           ),
           shape: const CircleBorder(),
@@ -197,7 +204,7 @@ class _ProminentPeriodClockState extends State<ProminentPeriodClock> {
           label,
           style: TextStyle(
             color: onPressed != null ? Colors.white60 : Colors.white24,
-            fontSize: 14,
+            fontSize: 14 * widget.scaleFactor,
           ),
         ),
       ),
