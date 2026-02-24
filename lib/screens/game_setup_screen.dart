@@ -110,7 +110,7 @@ class _GameSetupScreenState extends State<GameSetupScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF121212),
+      backgroundColor: const Color(0xFF0E0F12),
       appBar: AppBar(
         title: Text("NEW GAME", style: AppTextStyles.appBarTitle),
         centerTitle: true,

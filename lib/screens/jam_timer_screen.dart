@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:roller_derby_jam_timer/styles/text_styles.dart';
+import 'package:roller_derby_jam_timer/styles/track_background.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/scoreboard_state.dart';
 import '../services/game_engine.dart';
@@ -137,262 +138,250 @@ class _JamTimerScreenState extends State<JamTimerScreen>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      appBar: AppBar(
-        title: Consumer<ScoreboardState>(
-          builder: (context, state, _) {
-            return Text(
-              "JAM TIMER",
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                color: _determineAlertColor(state),
+    return Consumer<ScoreboardState>(
+      builder: (context, state, _) {
+        final alertColor = _determineAlertColor(state);
+        final isEnabled = _isLocalMode || state.connectionStatus == "Connected";
+
+        return DynamicBackground(
+          accentColor: alertColor,
+          child: Scaffold(
+            backgroundColor: Colors.transparent,
+            appBar: AppBar(
+              title: Text(
+                "ROLLER DERBY JAM TIMER",
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: alertColor,
+                ),
               ),
-            );
-          },
-        ),
-        centerTitle: true,
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          icon: Icon(
-            _isLocalMode ? Icons.home : Icons.settings,
-            color: Colors.white70,
-          ),
-          onPressed: () => _navigateToHome(context),
-        ),
-        actions: [
-          Consumer<ScoreboardState>(
-            builder: (context, state, _) {
-              if (_isLocalMode) {
-                // Show "LOCAL" badge for offline mode
-                return Padding(
-                  padding: const EdgeInsets.only(right: 12.0),
-                  child: Center(
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.orange.withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(6),
-                        border: Border.all(color: Colors.orange, width: 1),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.phonelink_off,
-                            color: Colors.orange,
-                            size: 14,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            'LOCAL',
-                            style: TextStyle(
+              centerTitle: true,
+              backgroundColor: Colors.transparent,
+              elevation: 0,
+              leading: IconButton(
+                icon: Icon(
+                  _isLocalMode ? Icons.home : Icons.settings,
+                  color: Colors.white70,
+                ),
+                onPressed: () => _navigateToHome(context),
+              ),
+              actions: [
+                if (_isLocalMode)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 12.0),
+                    child: Center(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.orange.withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: Colors.orange, width: 1),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.phonelink_off,
                               color: Colors.orange,
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
-                              letterSpacing: 0.5,
+                              size: 14,
                             ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                );
-              }
-
-              // Remote mode - show connection status dot
-              Color statusColor;
-              if (state.connectionStatus == "Connected") {
-                statusColor = Colors.green;
-              } else if (state.connectionStatus.startsWith("Connecting")) {
-                statusColor = Colors.orange;
-              } else {
-                statusColor = Colors.red;
-              }
-              return Center(
-                child: Padding(
-                  padding: const EdgeInsets.only(right: 16.0),
-                  child: Container(
-                    width: 12,
-                    height: 12,
-                    decoration: BoxDecoration(
-                      color: statusColor,
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                ),
-              );
-            },
-          ),
-        ],
-      ),
-      body: Consumer<ScoreboardState>(
-        builder: (context, state, _) {
-          final isEnabled =
-              _isLocalMode || state.connectionStatus == "Connected";
-
-          return LayoutBuilder(
-            builder: (context, constraints) {
-              final availableHeight = constraints.maxHeight;
-              // Determine scale factor for compact layouts
-              // Below 600px: scale down (minimum 0.7 at 400px)
-              // Above 800px: scale up slightly (maximum 1.15 at 1000px)
-              final scaleFactor = availableHeight < 600
-                  ? (availableHeight / 600).clamp(0.7, 1.0)
-                  : availableHeight > 800
-                      ? (1.0 + (availableHeight - 800) / 1000 * 0.15).clamp(1.0, 1.15)
-                      : 1.0;
-              final isCompact = availableHeight < 550;
-
-              final scrollView = SingleChildScrollView(
-                physics: _isLocalMode
-                    ? const ClampingScrollPhysics()
-                    : const AlwaysScrollableScrollPhysics(),
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(
-                    minHeight: availableHeight,
-                  ),
-                  child: IntrinsicHeight(
-                    child: Padding(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: 16.0,
-                        vertical: isCompact ? 8.0 : 16.0,
-                      ),
-                      child: Column(
-                        children: [
-                          // Teams - fixed at top
-                          Row(
-                            children: [
-                              Expanded(
-                                child: TeamPanel(
-                                  team: state.team1,
-                                  isLeft: true,
-                                  enabled: isEnabled,
-                                  onRetainedToggle: (val) =>
-                                      _engine?.setRetainedReview(1, val),
-                                ),
+                            const SizedBox(width: 4),
+                            Text(
+                              'LOCAL',
+                              style: TextStyle(
+                                color: Colors.orange,
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 0.5,
                               ),
-                              const SizedBox(width: 16),
-                              Expanded(
-                                child: TeamPanel(
-                                  team: state.team2,
-                                  isLeft: false,
-                                  enabled: isEnabled,
-                                  onRetainedToggle: (val) =>
-                                      _engine?.setRetainedReview(2, val),
-                                ),
-                              ),
-                            ],
-                          ),
-
-                          SizedBox(height: isCompact ? 8 : 16),
-
-                          // Period / Intermission Clock
-                          if (_isLocalMode)
-                            _buildLocalModePeriodClock(
-                              state,
-                              isEnabled,
-                              scaleFactor,
-                            )
-                          else if (!(state.clocks['Intermission']?.running ??
-                              false))
-                            _buildPeriodClockRow(state, isEnabled),
-
-                          if (_isLocalMode ||
-                              !(state.clocks['Intermission']?.running ?? false))
-                            SizedBox(height: isCompact ? 12 : 20),
-
-                          Spacer(),
-
-                          // Active Game Clock or Ready indicator
-                          if (_isReadyToStart(state))
-                            _buildReadyToStartDisplay(
-                              state,
-                              isEnabled,
-                              scaleFactor,
-                            )
-                          else
-                            ClockDisplay(
-                              clock: _determineActiveClock(state),
-                              textColor: _determineAlertColor(state),
-                              enabled: isEnabled,
-                              scaleFactor: scaleFactor,
-                              onAdjust: (val) {
-                                final active = _determineActiveClock(state);
-                                final delta = int.tryParse(val) ?? 0;
-                                _engine?.adjustClock(active.name, delta);
-                              },
-                              onSetTime: _isLocalMode
-                                  ? (timeMs) {
-                                      final active =
-                                          _determineActiveClock(state);
-                                      _engine?.setClockTime(active.name, timeMs);
-                                    }
-                                  : null,
                             ),
-
-                          // Flexible spacer pushes controls toward bottom
-                          const Spacer(),
-
-                          // Timeout Type Buttons OR normal controls
-                          if (state.labelStop == "End Timeout")
-                            _buildTimeoutTypeSection(
-                              state,
-                              isEnabled,
-                              scaleFactor,
-                            )
-                          else
-                            JamControls(
-                              inJam: state.inJam,
-                              isPrePeriod: _isPrePeriod(state),
-                              isIntermission:
-                                  (state.clocks['Intermission']?.running ??
-                                          false) ||
-                                      (state.clocks['Period']?.number == 0),
-                              startLabel: state.labelStart,
-                              stopLabel: state.labelStop,
-                              timeoutLabel: state.labelTimeout,
-                              alertColor: _determineAlertColor(state),
-                              enabled: isEnabled,
-                              scaleFactor: scaleFactor,
-                              onStartJam: () => _engine?.startJam(),
-                              onStopJam: () => _engine?.stopJam(),
-                              onTimeout: () => _engine?.startTimeout(),
-                            ),
-
-                          // Undo Section at bottom (only for remote mode)
-                          if (!_isLocalMode) ...[
-                            SizedBox(height: 16 * scaleFactor),
-                            _buildUndoSection(state, isEnabled),
-                            // add padding from bottom of screen
-                            SizedBox(height: 16 * scaleFactor),
                           ],
-                        ],
+                        ),
+                      ),
+                    ),
+                  )
+                else
+                  Center(
+                    child: Padding(
+                      padding: const EdgeInsets.only(right: 16.0),
+                      child: Container(
+                        width: 12,
+                        height: 12,
+                        decoration: BoxDecoration(
+                          color: state.connectionStatus == "Connected"
+                              ? Colors.green
+                              : state.connectionStatus.startsWith("Connecting")
+                                  ? Colors.orange
+                                  : Colors.red,
+                          shape: BoxShape.circle,
+                        ),
                       ),
                     ),
                   ),
-                ),
-              );
+              ],
+            ),
+            body: LayoutBuilder(
+              builder: (context, constraints) {
+                final availableHeight = constraints.maxHeight;
+                final scaleFactor = availableHeight < 600
+                    ? (availableHeight / 600).clamp(0.7, 1.0)
+                    : availableHeight > 800
+                        ? (1.0 + (availableHeight - 800) / 1000 * 0.15)
+                            .clamp(1.0, 1.15)
+                        : 1.0;
+                final isCompact = availableHeight < 550;
 
-              // Wrap with RefreshIndicator for remote mode
-              if (!_isLocalMode) {
-                return RefreshIndicator(
-                  onRefresh: () async {
-                    await _connectToServer(forceReconnect: true);
-                  },
-                  child: scrollView,
+                final scrollView = SingleChildScrollView(
+                  physics: _isLocalMode
+                      ? const ClampingScrollPhysics()
+                      : const AlwaysScrollableScrollPhysics(),
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      minHeight: availableHeight,
+                    ),
+                    child: IntrinsicHeight(
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: 16.0,
+                          vertical: isCompact ? 8.0 : 16.0,
+                        ),
+                        child: Column(
+                          children: [
+                            // Teams - fixed at top
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: TeamPanel(
+                                    team: state.team1,
+                                    isLeft: true,
+                                    enabled: isEnabled,
+                                    onRetainedToggle: (val) =>
+                                        _engine?.setRetainedReview(1, val),
+                                  ),
+                                ),
+                                const SizedBox(width: 16),
+                                Expanded(
+                                  child: TeamPanel(
+                                    team: state.team2,
+                                    isLeft: false,
+                                    enabled: isEnabled,
+                                    onRetainedToggle: (val) =>
+                                        _engine?.setRetainedReview(2, val),
+                                  ),
+                                ),
+                              ],
+                            ),
+
+                            SizedBox(height: isCompact ? 8 : 16),
+
+                            // Period / Intermission Clock
+                            if (_isLocalMode)
+                              _buildLocalModePeriodClock(
+                                state,
+                                isEnabled,
+                                scaleFactor,
+                              )
+                            else if (!(state.clocks['Intermission']?.running ??
+                                false))
+                              _buildPeriodClockRow(state, isEnabled),
+
+                            if (_isLocalMode ||
+                                !(state.clocks['Intermission']?.running ??
+                                    false))
+                              SizedBox(height: isCompact ? 12 : 20),
+
+                            const Spacer(),
+
+                            // Active Game Clock or Ready indicator
+                            if (_isReadyToStart(state))
+                              _buildReadyToStartDisplay(
+                                state,
+                                isEnabled,
+                                scaleFactor,
+                                alertColor,
+                              )
+                            else
+                              ClockDisplay(
+                                clock: _determineActiveClock(state),
+                                textColor: alertColor,
+                                enabled: isEnabled,
+                                scaleFactor: scaleFactor,
+                                onAdjust: (val) {
+                                  final active = _determineActiveClock(state);
+                                  final delta = int.tryParse(val) ?? 0;
+                                  _engine?.adjustClock(active.name, delta);
+                                },
+                                onSetTime: _isLocalMode
+                                    ? (timeMs) {
+                                        final active =
+                                            _determineActiveClock(state);
+                                        _engine?.setClockTime(
+                                            active.name, timeMs);
+                                      }
+                                    : null,
+                              ),
+
+                            // Flexible spacer pushes controls toward bottom
+                            const Spacer(),
+
+                            // Timeout Type Buttons OR normal controls
+                            if (state.labelStop == "End Timeout")
+                              _buildTimeoutTypeSection(
+                                state,
+                                isEnabled,
+                                scaleFactor,
+                              )
+                            else
+                              JamControls(
+                                inJam: state.inJam,
+                                isPrePeriod: _isPrePeriod(state),
+                                isIntermission:
+                                    (state.clocks['Intermission']?.running ??
+                                            false) ||
+                                        (state.clocks['Period']?.number == 0),
+                                startLabel: state.labelStart,
+                                stopLabel: state.labelStop,
+                                timeoutLabel: state.labelTimeout,
+                                alertColor: alertColor,
+                                enabled: isEnabled,
+                                scaleFactor: scaleFactor,
+                                onStartJam: () => _engine?.startJam(),
+                                onStopJam: () => _engine?.stopJam(),
+                                onTimeout: () => _engine?.startTimeout(),
+                              ),
+
+                            // Undo Section at bottom (only for remote mode)
+                            if (!_isLocalMode) ...[
+                              SizedBox(height: 16 * scaleFactor),
+                              _buildUndoSection(state, isEnabled),
+                              SizedBox(height: 16 * scaleFactor),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
                 );
-              }
 
-              return scrollView;
-            },
-          );
-        },
-      ),
+                // Wrap with RefreshIndicator for remote mode
+                if (!_isLocalMode) {
+                  return RefreshIndicator(
+                    onRefresh: () async {
+                      await _connectToServer(forceReconnect: true);
+                    },
+                    child: scrollView,
+                  );
+                }
+
+                return scrollView;
+              },
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -488,30 +477,6 @@ class _JamTimerScreenState extends State<JamTimerScreen>
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildMiniAdjustButton(String label, VoidCallback? onPressed) {
-    return SizedBox(
-      width: 32,
-      height: 32,
-      child: OutlinedButton(
-        onPressed: onPressed,
-        style: OutlinedButton.styleFrom(
-          padding: EdgeInsets.zero,
-          side: BorderSide(
-            color: onPressed != null ? Colors.white24 : Colors.white10,
-          ),
-          shape: const CircleBorder(),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            color: onPressed != null ? Colors.white60 : Colors.white24,
-            fontSize: 14,
-          ),
-        ),
       ),
     );
   }
@@ -864,47 +829,34 @@ class _JamTimerScreenState extends State<JamTimerScreen>
     ScoreboardState state,
     bool isEnabled,
     double scaleFactor,
+    Color alertColor,
   ) {
     final periodNumber = (state.clocks['Period']?.number ?? 1);
-    final color = isEnabled ? _healthyColor : Colors.white12;
+    final color = isEnabled ? alertColor : Colors.white12;
 
     return Container(
       padding: EdgeInsets.symmetric(
         horizontal: 24 * scaleFactor,
-        vertical: 16 * scaleFactor,
-      ),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16 * scaleFactor),
-        color: _healthyColor.withValues(alpha: 0.05),
-        boxShadow: [
-          BoxShadow(
-            color: _healthyColor.withValues(alpha: 0.15),
-            blurRadius: 24 * scaleFactor,
-            spreadRadius: 2 * scaleFactor,
-          ),
-        ],
+        vertical: 12 * scaleFactor,
       ),
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
           Text(
             periodNumber == 0 ? "GAME" : "PERIOD $periodNumber",
             style: AppTextStyles.clockLabel.copyWith(
-              fontSize: 22 * scaleFactor,
+              fontSize: 18 * scaleFactor,
               color: color,
+              height: 1.0,
             ),
           ),
-          SizedBox(height: 8 * scaleFactor),
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            child: Text(
-              "READY",
-              style: AppTextStyles.clockTime.copyWith(
-                color: color,
-                fontSize: 96 * scaleFactor,
-              ),
+          Text(
+            "READY",
+            style: AppTextStyles.clockTime.copyWith(
+              color: color,
+              fontSize: 72 * scaleFactor,
             ),
           ),
-          SizedBox(height: 16 * scaleFactor),
         ],
       ),
     );

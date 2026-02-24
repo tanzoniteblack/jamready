@@ -66,7 +66,7 @@ void main() {
     await tester.pump();
 
     // Verify jam timer screen elements are present
-    expect(find.text('JAM TIMER'), findsOneWidget);
+    expect(find.text('ROLLER DERBY JAM TIMER'), findsOneWidget);
 
     // Verify settings button is present
     expect(find.byIcon(Icons.settings), findsOneWidget);
