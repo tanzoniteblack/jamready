@@ -191,12 +191,10 @@ Future<void> _waitForTimeoutMode(WidgetTester tester) async {
   );
 }
 
-Future<void> _swipeToStartLineup(WidgetTester tester) async {
-  final button = find.byType(SwipeButton);
-  print('Found swipe button: $button');
-  expect(button, findsOneWidget, reason: 'SwipeButton should be visible');
+Future<void> _swipeButton(WidgetTester tester, Finder buttonFinder) async {
+  expect(buttonFinder, findsOneWidget, reason: 'SwipeButton should be visible');
 
-  final buttonRect = tester.getRect(button);
+  final buttonRect = tester.getRect(buttonFinder);
   // Handle is 80px wide, starts at left edge
   const handleWidth = 80.0;
   final handleCenter = Offset(
@@ -205,11 +203,45 @@ Future<void> _swipeToStartLineup(WidgetTester tester) async {
   );
   final dragDistance = buttonRect.width - handleWidth;
 
-  print('Going to drag: $handleCenter to $dragDistance');
   // Use dragFrom with absolute coordinates for more reliable dragging
   await tester.dragFrom(handleCenter, Offset(dragDistance * 0.9, 0));
   // Use pump() instead of pumpAndSettle() due to continuous animations
   await tester.pump(const Duration(milliseconds: 500));
+}
+
+Future<void> _swipeToStartLineup(WidgetTester tester) async {
+  // Find the start lineup SwipeButton (labeled "Start Lineup" or similar)
+  final buttons = find.byType(SwipeButton);
+  print('Found ${buttons.evaluate().length} swipe button(s)');
+
+  // In pre-period state, there should be exactly one SwipeButton (Start Lineup)
+  // After end timeout, there might be two (Start Lineup + Undo)
+  // We want the first one for start lineup
+  final button = buttons.first;
+  await _swipeButton(tester, button);
+}
+
+Future<void> _swipeUndoButton(WidgetTester tester) async {
+  // Find the undo SwipeButton - it should contain "Undo:" in its label
+  // This should be the second SwipeButton on screen (after Start Lineup)
+  final buttons = find.byType(SwipeButton);
+  print('Found ${buttons.evaluate().length} swipe button(s) for undo');
+
+  // Wait for undo action to become available
+  await _pumpUntil(
+    tester,
+    () => _state(tester).labelUndo != 'No Action',
+  );
+
+  // In connected mode with undo available, we should have 2 buttons
+  // The undo button should be the last one (or we can find by ancestor)
+  expect(buttons, findsAtLeast(1), reason: 'Should have at least one SwipeButton');
+
+  // Get the last SwipeButton which should be the undo
+  final buttonList = buttons.evaluate().toList();
+  final undoButton = find.byWidget(buttonList.last.widget);
+
+  await _swipeButton(tester, undoButton);
 }
 
 Future<void> _tapJamControl(
@@ -379,20 +411,15 @@ void main() {
       return state.clocks['Lineup']!.running;
     }, timeout: const Duration(seconds: 20));
 
+    // Wait for undo action to be available
     await _pumpUntil(
       tester,
       () => _state(tester).labelUndo != 'No Action',
     );
-    await tester.tap(find.byType(Switch).first);
-    await tester.pump();
-    await _pumpUntil(
-      tester,
-      () => find.text(_state(tester).labelUndo.toUpperCase())
-          .evaluate()
-          .isNotEmpty,
-    );
-    await tester.tap(find.text(_state(tester).labelUndo.toUpperCase()));
-    await tester.pump();
+
+    // Swipe the undo button to restore timeout
+    await _swipeUndoButton(tester);
+
     await _pumpUntil(
       tester,
       () => _state(tester).clocks['Timeout']!.running,
@@ -422,6 +449,97 @@ void main() {
 
     expect(find.text('GAME'), findsOneWidget);
     expect(find.text('READY'), findsOneWidget);
+  });
+
+  testWidgets('Undo SwipeButton shows No Undo Available when disabled',
+      (tester) async {
+    final client = await _launchAppAndConnect(tester);
+    addTearDown(client.close);
+    addTearDown(() async {
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump();
+    });
+
+    await client.startNewGame();
+    await _ensurePrePeriod(tester);
+
+    // Verify we're in pre-game state with no undo available
+    await _pumpUntil(
+      tester,
+      () => _state(tester).labelUndo == 'No Action',
+      timeout: const Duration(seconds: 10),
+    );
+
+    // Find the undo SwipeButton - it should show "No Undo Available"
+    // In remote mode, there should be 2 SwipeButtons: Start Lineup and Undo
+    final buttons = find.byType(SwipeButton);
+    await _pumpUntil(
+      tester,
+      () => buttons.evaluate().length >= 2,
+      timeout: const Duration(seconds: 10),
+    );
+
+    // Check that the undo button text is visible
+    expect(
+      find.textContaining('NO UNDO AVAILABLE'),
+      findsOneWidget,
+      reason: 'Should show NO UNDO AVAILABLE when no action',
+    );
+  });
+
+  testWidgets('Undo SwipeButton shows action label when available',
+      (tester) async {
+    final client = await _launchAppAndConnect(tester);
+    addTearDown(client.close);
+    addTearDown(() async {
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump();
+    });
+
+    await client.startNewGame();
+    await _ensurePrePeriod(tester);
+    await _swipeToStartLineup(tester);
+
+    // Wait for lineup to start
+    await _pumpUntil(
+      tester,
+      () => _state(tester).clocks['Lineup']!.running,
+      timeout: const Duration(seconds: 20),
+    );
+
+    // Start a jam
+    await _tapJamControl(tester, _state(tester).labelStart);
+
+    // Wait for jam to start
+    await _pumpUntil(
+      tester,
+      () => _state(tester).clocks['Jam']!.running,
+      timeout: const Duration(seconds: 20),
+    );
+
+    // Stop the jam
+    await _tapJamControl(tester, _state(tester).labelStop);
+
+    // Wait for lineup to start (after jam stop)
+    await _pumpUntil(
+      tester,
+      () => _state(tester).clocks['Lineup']!.running,
+      timeout: const Duration(seconds: 20),
+    );
+
+    // Wait for undo action to become available
+    await _pumpUntil(
+      tester,
+      () => _state(tester).labelUndo != 'No Action',
+      timeout: const Duration(seconds: 10),
+    );
+
+    // Verify the undo button shows the action (should contain "UNDO:")
+    expect(
+      find.textContaining('UNDO:'),
+      findsOneWidget,
+      reason: 'Should show UNDO: label when action available',
+    );
   });
 
   testWidgets('Post-intermission shows PERIOD 2 and READY', (tester) async {

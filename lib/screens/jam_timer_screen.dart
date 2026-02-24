@@ -9,6 +9,7 @@ import '../widgets/team_panel.dart';
 import '../widgets/clock_display.dart';
 import '../widgets/jam_controls.dart';
 import '../widgets/prominent_period_clock.dart';
+import '../widgets/swipe_button.dart';
 import 'package:vibration/vibration.dart';
 import 'settings_screen.dart';
 
@@ -25,8 +26,6 @@ class JamTimerScreen extends StatefulWidget {
 class _JamTimerScreenState extends State<JamTimerScreen>
     with WidgetsBindingObserver {
   GameEngine? _engine;
-  bool _showUndo = false;
-  bool _useReplace = false;
 
   // "Healthy" color used when clock is in normal state (no alerts)
   static final Color _healthyColor = Colors.green.shade400;
@@ -105,10 +104,7 @@ class _JamTimerScreenState extends State<JamTimerScreen>
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),
-          title: const Text(
-            'End Game?',
-            style: TextStyle(color: Colors.white),
-          ),
+          title: const Text('End Game?', style: TextStyle(color: Colors.white)),
           content: const Text(
             'Leaving will end the current game. This cannot be undone.',
             style: TextStyle(color: Colors.white70),
@@ -120,9 +116,7 @@ class _JamTimerScreenState extends State<JamTimerScreen>
             ),
             TextButton(
               onPressed: () => Navigator.of(context).pop(true),
-              style: TextButton.styleFrom(
-                foregroundColor: Colors.red,
-              ),
+              style: TextButton.styleFrom(foregroundColor: Colors.red),
               child: const Text('END GAME'),
             ),
           ],
@@ -183,10 +177,7 @@ class _JamTimerScreenState extends State<JamTimerScreen>
                       decoration: BoxDecoration(
                         color: Colors.orange.withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(6),
-                        border: Border.all(
-                          color: Colors.orange,
-                          width: 1,
-                        ),
+                        border: Border.all(color: Colors.orange, width: 1),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
@@ -241,8 +232,8 @@ class _JamTimerScreenState extends State<JamTimerScreen>
       ),
       body: Consumer<ScoreboardState>(
         builder: (context, state, _) {
-          final isEnabled = _isLocalMode ||
-              state.connectionStatus == "Connected";
+          final isEnabled =
+              _isLocalMode || state.connectionStatus == "Connected";
 
           return RefreshIndicator(
             onRefresh: () async {
@@ -338,9 +329,8 @@ class _JamTimerScreenState extends State<JamTimerScreen>
                         onTimeout: () => _engine?.startTimeout(),
                       ),
 
-                    // Undo / Replace Section (only for remote mode)
-                    if (!_isLocalMode && state.labelUndo != "No Action")
-                      _buildUndoSection(state, isEnabled),
+                    // Undo Section (only for remote mode)
+                    if (!_isLocalMode) _buildUndoSection(state, isEnabled),
                   ],
                 ),
               ),
@@ -603,8 +593,8 @@ class _JamTimerScreenState extends State<JamTimerScreen>
     required double height,
     required VoidCallback onTap,
   }) {
-    final bool useDarkText = isActive &&
-        (color == Colors.amber || color.computeLuminance() > 0.5);
+    final bool useDarkText =
+        isActive && (color == Colors.amber || color.computeLuminance() > 0.5);
     final textColor = useDarkText ? Colors.black87 : Colors.white;
 
     final highlightColor = Color.lerp(color, Colors.white, 0.08)!;
@@ -662,8 +652,9 @@ class _JamTimerScreenState extends State<JamTimerScreen>
                               ? (isActive ? textColor : Colors.white)
                               : Colors.white38,
                           fontSize: 14,
-                          fontWeight:
-                              isActive ? FontWeight.bold : FontWeight.w500,
+                          fontWeight: isActive
+                              ? FontWeight.bold
+                              : FontWeight.w500,
                         ),
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -672,12 +663,14 @@ class _JamTimerScreenState extends State<JamTimerScreen>
                       const SizedBox(width: 6),
                       Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 2),
+                          horizontal: 8,
+                          vertical: 2,
+                        ),
                         decoration: BoxDecoration(
                           color: isActive
                               ? (useDarkText
-                                  ? Colors.black.withValues(alpha: 0.15)
-                                  : Colors.black.withValues(alpha: 0.2))
+                                    ? Colors.black.withValues(alpha: 0.15)
+                                    : Colors.black.withValues(alpha: 0.2))
                               : Colors.white.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(10),
                         ),
@@ -838,114 +831,20 @@ class _JamTimerScreenState extends State<JamTimerScreen>
   }
 
   Widget _buildUndoSection(ScoreboardState state, bool isEnabled) {
+    final hasUndoAction =
+        state.labelUndo != "No Action" && state.labelUndo != '---';
+
     return Padding(
-      padding: const EdgeInsets.only(top: 24),
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.03),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    "UNDO CONTROLS",
-                    style: AppTextStyles.clockLabel.copyWith(
-                      fontSize: 11,
-                      color: Colors.white38,
-                      letterSpacing: 1,
-                    ),
-                  ),
-                ),
-                SizedBox(
-                  height: 28,
-                  child: Switch(
-                    value: _showUndo,
-                    onChanged: (val) => setState(() => _showUndo = val),
-                    activeThumbColor: Colors.amber,
-                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  ),
-                ),
-              ],
-            ),
-            if (_showUndo) ...[
-              const SizedBox(height: 12),
-              if (state.labelReplaced.isNotEmpty &&
-                  state.labelReplaced != "Replaced")
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: Text(
-                    'Replace "${state.labelReplaced}" with',
-                    style: AppTextStyles.clockLabel.copyWith(
-                      fontSize: 11,
-                      color: Colors.white54,
-                      fontStyle: FontStyle.italic,
-                    ),
-                  ),
-                ),
-              Row(
-                children: [
-                  Text(
-                    "Use Replace on Undo",
-                    style: TextStyle(color: Colors.white54, fontSize: 12),
-                  ),
-                  const Spacer(),
-                  SizedBox(
-                    height: 28,
-                    child: Switch(
-                      value: _useReplace,
-                      onChanged: (val) => setState(() => _useReplace = val),
-                      activeThumbColor: Colors.orange,
-                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 10),
-              SizedBox(
-                width: double.infinity,
-                height: 44,
-                child: ElevatedButton(
-                  onPressed: isEnabled
-                      ? () {
-                          final engine = _engine as RemoteGameEngine;
-                          engine.send(
-                            "Set",
-                            _useReplace
-                                ? "ScoreBoard.CurrentGame.ClockReplace"
-                                : "ScoreBoard.CurrentGame.ClockUndo",
-                            true,
-                          );
-                        }
-                      : null,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: _useReplace
-                        ? Colors.orange.shade800
-                        : Colors.grey.shade800,
-                    disabledBackgroundColor: Colors.grey.shade900,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                  child: Text(
-                    _useReplace
-                        ? "REPLACE: ${state.labelUndo}"
-                        : state.labelUndo.toUpperCase(),
-                    style: AppTextStyles.buttonText.copyWith(
-                      fontSize: 15,
-                      color: isEnabled ? Colors.white : Colors.white38,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ],
-        ),
+      padding: const EdgeInsets.only(top: 16),
+      child: SwipeButton(
+        label: hasUndoAction ? state.labelUndo : "No Undo Available",
+        enabled: isEnabled && hasUndoAction,
+        color: Colors.grey.shade600,
+        compact: true,
+        onConfirmed: () {
+          final engine = _engine as RemoteGameEngine;
+          engine.send("Set", "ScoreBoard.CurrentGame.ClockUndo", true);
+        },
       ),
     );
   }

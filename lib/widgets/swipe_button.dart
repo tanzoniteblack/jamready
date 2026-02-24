@@ -9,6 +9,7 @@ class SwipeButton extends StatefulWidget {
   final Color color;
   final Color iconColor;
   final bool enabled;
+  final bool compact;
 
   const SwipeButton({
     super.key,
@@ -17,6 +18,7 @@ class SwipeButton extends StatefulWidget {
     this.color = const Color(0xFFEF6C00), // Orange shade 800 default
     this.iconColor = Colors.white,
     this.enabled = true,
+    this.compact = false,
   });
 
   @override
@@ -29,9 +31,14 @@ class _SwipeButtonState extends State<SwipeButton>
   bool _confirmed = false;
   bool _isTouching = false;
   Timer? _resetTimer;
-  final double _height = 80.0;
-  final double _handleWidth = 80.0;
   final double _confirmThreshold = 0.7;
+
+  double get _height => widget.compact ? 48.0 : 80.0;
+  double get _handleWidth => widget.compact ? 48.0 : 80.0;
+  double get _fontSize => widget.compact ? 14.0 : 24.0;
+  double get _iconSize => widget.compact ? 20.0 : 32.0;
+  double get _borderRadius => widget.compact ? 10.0 : 16.0;
+  double get _borderWidth => widget.compact ? 1.0 : 2.0;
 
   @override
   void dispose() {
@@ -49,8 +56,9 @@ class _SwipeButtonState extends State<SwipeButton>
 
   @override
   Widget build(BuildContext context) {
-    final backgroundColor =
-        widget.enabled ? widget.color : Colors.grey.shade800;
+    final backgroundColor = widget.compact
+        ? (widget.enabled ? widget.color.withValues(alpha: 0.7) : Colors.grey.shade800)
+        : (widget.enabled ? widget.color : Colors.grey.shade800);
     final contentColor = widget.enabled ? Colors.white : Colors.white38;
 
     return SizedBox(
@@ -70,62 +78,64 @@ class _SwipeButtonState extends State<SwipeButton>
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
                     colors: [
-                      backgroundColor.withValues(alpha: 0.15),
-                      backgroundColor.withValues(alpha: 0.25),
+                      backgroundColor.withValues(alpha: widget.compact ? 0.08 : 0.15),
+                      backgroundColor.withValues(alpha: widget.compact ? 0.12 : 0.25),
                     ],
                   ),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: backgroundColor, width: 2),
-                  boxShadow: [
-                    // Inner shadow effect (simulated with inset-like shadows)
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.3),
-                      blurRadius: 8,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
+                  borderRadius: BorderRadius.circular(_borderRadius),
+                  border: Border.all(color: backgroundColor, width: _borderWidth),
+                  boxShadow: widget.compact
+                      ? null
+                      : [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.3),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
                 ),
                 child: Container(
                   decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(14),
-                    // Inner shadow simulation
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [
-                        Colors.black.withValues(alpha: 0.15),
-                        Colors.transparent,
-                        Colors.white.withValues(alpha: 0.05),
-                      ],
-                      stops: const [0.0, 0.3, 1.0],
-                    ),
+                    borderRadius: BorderRadius.circular(_borderRadius - 2),
+                    gradient: widget.compact
+                        ? null
+                        : LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              Colors.black.withValues(alpha: 0.15),
+                              Colors.transparent,
+                              Colors.white.withValues(alpha: 0.05),
+                            ],
+                            stops: const [0.0, 0.3, 1.0],
+                          ),
                   ),
-                  padding: EdgeInsets.only(left: _handleWidth, right: 16),
+                  padding: EdgeInsets.only(left: _handleWidth, right: 12),
                   alignment: Alignment.center,
                   child: FittedBox(
                     fit: BoxFit.scaleDown,
                     child: Text(
                       widget.label.toUpperCase(),
                       style: AppTextStyles.buttonText.copyWith(
-                        fontSize: 24,
-                        color: contentColor.withValues(alpha: 0.5),
+                        fontSize: _fontSize,
+                        color: contentColor.withValues(alpha: widget.compact ? 0.4 : 0.5),
                       ),
                     ),
                   ),
                 ),
               ),
 
-              // Track glow on touch
+              // Track glow on touch (reduced for compact mode)
               if (_isTouching && widget.enabled)
                 AnimatedContainer(
                   duration: const Duration(milliseconds: 150),
                   decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(_borderRadius),
                     boxShadow: [
                       BoxShadow(
-                        color: backgroundColor.withValues(alpha: 0.3),
-                        blurRadius: 12,
-                        spreadRadius: 2,
+                        color: backgroundColor.withValues(alpha: widget.compact ? 0.15 : 0.3),
+                        blurRadius: widget.compact ? 6 : 12,
+                        spreadRadius: widget.compact ? 1 : 2,
                       ),
                     ],
                   ),
@@ -140,11 +150,11 @@ class _SwipeButtonState extends State<SwipeButton>
                     begin: Alignment.centerLeft,
                     end: Alignment.centerRight,
                     colors: [
-                      backgroundColor.withValues(alpha: 0.5),
-                      backgroundColor.withValues(alpha: 0.3 + (progress * 0.2)),
+                      backgroundColor.withValues(alpha: widget.compact ? 0.3 : 0.5),
+                      backgroundColor.withValues(alpha: (widget.compact ? 0.2 : 0.3) + (progress * 0.2)),
                     ],
                   ),
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: BorderRadius.circular(_borderRadius),
                 ),
               ),
 
@@ -155,7 +165,6 @@ class _SwipeButtonState extends State<SwipeButton>
                   onHorizontalDragStart: (details) {
                     if (!widget.enabled || _confirmed) return;
                     setState(() => _isTouching = true);
-                    // Very faint haptic on touch
                     HapticFeedback.selectionClick();
                   },
                   onHorizontalDragUpdate: (details) {
@@ -173,7 +182,6 @@ class _SwipeButtonState extends State<SwipeButton>
                     setState(() => _isTouching = false);
 
                     if (_dragValue > maxDrag * _confirmThreshold) {
-                      // Confirmed - heavier haptic
                       HapticFeedback.mediumImpact();
                       setState(() {
                         _dragValue = maxDrag;
@@ -181,14 +189,11 @@ class _SwipeButtonState extends State<SwipeButton>
                       });
                       widget.onConfirmed();
 
-                      // Auto-reset after 3 seconds if we're still showing
-                      // (server didn't respond or action failed)
                       _resetTimer?.cancel();
                       _resetTimer = Timer(const Duration(seconds: 3), () {
                         if (mounted) _resetState();
                       });
                     } else {
-                      // Snap back
                       setState(() {
                         _dragValue = 0;
                       });
@@ -205,58 +210,54 @@ class _SwipeButtonState extends State<SwipeButton>
                     width: _handleWidth,
                     height: _height,
                     decoration: BoxDecoration(
-                      // Gradient background for handle
                       gradient: LinearGradient(
                         begin: Alignment.topCenter,
                         end: Alignment.bottomCenter,
                         colors: [
-                          Color.lerp(
-                              backgroundColor, Colors.white, 0.15)!, // Highlight
+                          Color.lerp(backgroundColor, Colors.white, widget.compact ? 0.1 : 0.15)!,
                           backgroundColor,
-                          Color.lerp(
-                              backgroundColor, Colors.black, 0.1)!, // Shadow
+                          Color.lerp(backgroundColor, Colors.black, widget.compact ? 0.05 : 0.1)!,
                         ],
                         stops: const [0.0, 0.5, 1.0],
                       ),
-                      borderRadius: BorderRadius.circular(14),
+                      borderRadius: BorderRadius.circular(_borderRadius - 2),
                       boxShadow: [
-                        // Outer glow when touching
                         if (_isTouching && widget.enabled)
                           BoxShadow(
-                            color: backgroundColor.withValues(alpha: 0.6),
-                            blurRadius: 12,
-                            spreadRadius: 1,
+                            color: backgroundColor.withValues(alpha: widget.compact ? 0.3 : 0.6),
+                            blurRadius: widget.compact ? 6 : 12,
+                            spreadRadius: widget.compact ? 0 : 1,
                           ),
-                        // Standard shadow
                         if (widget.enabled)
                           BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.4),
-                            blurRadius: 6,
-                            offset: const Offset(2, 2),
+                            color: Colors.black.withValues(alpha: widget.compact ? 0.2 : 0.4),
+                            blurRadius: widget.compact ? 3 : 6,
+                            offset: Offset(widget.compact ? 1 : 2, widget.compact ? 1 : 2),
                           ),
                       ],
                     ),
                     child: Container(
-                      // Inner highlight overlay
                       decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(14),
-                        gradient: LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [
-                            Colors.white.withValues(alpha: 0.2),
-                            Colors.transparent,
-                            Colors.transparent,
-                            Colors.black.withValues(alpha: 0.1),
-                          ],
-                          stops: const [0.0, 0.3, 0.7, 1.0],
-                        ),
+                        borderRadius: BorderRadius.circular(_borderRadius - 2),
+                        gradient: widget.compact
+                            ? null
+                            : LinearGradient(
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                                colors: [
+                                  Colors.white.withValues(alpha: 0.2),
+                                  Colors.transparent,
+                                  Colors.transparent,
+                                  Colors.black.withValues(alpha: 0.1),
+                                ],
+                                stops: const [0.0, 0.3, 0.7, 1.0],
+                              ),
                       ),
                       child: Center(
                         child: Icon(
                           Icons.double_arrow_rounded,
-                          color: widget.iconColor,
-                          size: 32,
+                          color: widget.iconColor.withValues(alpha: widget.compact ? 0.7 : 1.0),
+                          size: _iconSize,
                         ),
                       ),
                     ),
