@@ -255,7 +255,7 @@ class RemoteGameEngine implements GameEngine {
   void _handleMessage(dynamic message) {
     _log.d("Received message: $message");
 
-    if (!_isConnected || _state.connectionStatus != "Connected") {
+    if (!_isConnected) {
       _isConnected = true;
       _isConnecting = false;
       _reconnectAttempts = 0;

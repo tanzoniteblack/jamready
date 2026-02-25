@@ -10,6 +10,28 @@ class ScoreboardState extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// `true` when connected to a CRG server.
+  bool get isConnected => _connectionStatus == "Connected";
+
+  /// `true` while the connection is being established or re-established.
+  bool get isConnecting =>
+      _connectionStatus.startsWith("Connecting") ||
+      _connectionStatus.startsWith("Reconnecting");
+
+  /// `true` when a timeout or official review is in progress.
+  /// Derived from the Stop label sent by the server, which is "End Timeout"
+  /// during any timeout phase regardless of CRG version.
+  bool get inTimeout => labelStop == "End Timeout";
+
+  /// `true` when an official review (rather than a regular timeout) is active.
+  bool get isOfficialReview =>
+      officialReview == "true" || officialReview == "True";
+
+  /// `true` when there is a real undo action available.
+  /// Handles both the local engine sentinel ("No Action") and the CRG
+  /// server sentinel ("---").
+  bool get hasUndoAction => labelUndo != "No Action" && labelUndo != "---";
+
   // Clocks
   Map<String, Clock> clocks = {
     'Period': Clock(name: 'Period'),

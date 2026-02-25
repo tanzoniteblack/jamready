@@ -151,7 +151,7 @@ Future<ScoreboardTestClient> _launchAppAndConnect(
 
   await _pumpUntil(
     tester,
-    () => _state(tester).connectionStatus == 'Connected',
+    () => _state(tester).isConnected,
     timeout: const Duration(seconds: 30),
   );
 
@@ -166,8 +166,7 @@ Future<void> _ensurePrePeriod(WidgetTester tester) async {
   );
 }
 
-bool _isOfficialReview(ScoreboardState state) =>
-    state.officialReview == 'true' || state.officialReview == 'True';
+bool _isOfficialReview(ScoreboardState state) => state.isOfficialReview;
 
 Future<void> _waitForTeamServerIds(WidgetTester tester) async {
   await _pumpUntil(
@@ -185,8 +184,7 @@ Future<void> _waitForTimeoutMode(WidgetTester tester) async {
     tester,
     () {
       final state = _state(tester);
-      return state.clocks['Timeout']!.running ||
-          state.labelStop == 'End Timeout';
+      return state.clocks['Timeout']!.running || state.inTimeout;
     },
     timeout: const Duration(seconds: 20),
   );
@@ -231,7 +229,7 @@ Future<void> _swipeUndoButton(WidgetTester tester) async {
   // Wait for undo action to become available
   await _pumpUntil(
     tester,
-    () => _state(tester).labelUndo != 'No Action',
+    () => _state(tester).hasUndoAction,
   );
 
   // In connected mode with undo available, we should have 2 buttons
@@ -420,7 +418,7 @@ void main() {
     // Wait for undo action to be available
     await _pumpUntil(
       tester,
-      () => _state(tester).labelUndo != 'No Action',
+      () => _state(tester).hasUndoAction,
     );
 
     // Swipe the undo button to restore timeout
@@ -470,13 +468,9 @@ void main() {
     await _ensurePrePeriod(tester);
 
     // Verify we're in pre-game state with no undo available.
-    // Local engine uses 'No Action'; CRG server uses '---'.
     await _pumpUntil(
       tester,
-      () {
-        final lbl = _state(tester).labelUndo;
-        return lbl == 'No Action' || lbl == '---';
-      },
+      () => !_state(tester).hasUndoAction,
       timeout: const Duration(seconds: 10),
     );
 
@@ -538,22 +532,16 @@ void main() {
     );
 
     // Wait for undo action to become available.
-    // Exclude both the local-engine sentinel ('No Action') and the
-    // CRG sentinel ('---') to confirm a real undo label has arrived.
     await _pumpUntil(
       tester,
-      () {
-        final lbl = _state(tester).labelUndo;
-        return lbl != 'No Action' && lbl != '---' && lbl.isNotEmpty;
-      },
+      () => _state(tester).hasUndoAction,
       timeout: const Duration(seconds: 10),
     );
 
     // Verify the undo button shows the action label from state.
     // SwipeButton renders its label in uppercase.
+    expect(_state(tester).hasUndoAction, isTrue);
     final undoLabel = _state(tester).labelUndo;
-    expect(undoLabel, isNot('No Action'));
-    expect(undoLabel, isNot('---'));
     expect(
       find.textContaining(undoLabel.toUpperCase()),
       findsAtLeast(1),

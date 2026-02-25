@@ -141,7 +141,7 @@ class _JamTimerScreenState extends State<JamTimerScreen>
     return Consumer<ScoreboardState>(
       builder: (context, state, _) {
         final alertColor = _determineAlertColor(state);
-        final isEnabled = _isLocalMode || state.connectionStatus == "Connected";
+        final isEnabled = _isLocalMode || state.isConnected;
 
         return DynamicBackground(
           accentColor: alertColor,
@@ -211,9 +211,9 @@ class _JamTimerScreenState extends State<JamTimerScreen>
                         width: 12,
                         height: 12,
                         decoration: BoxDecoration(
-                          color: state.connectionStatus == "Connected"
+                          color: state.isConnected
                               ? Colors.green
-                              : state.connectionStatus.startsWith("Connecting")
+                              : state.isConnecting
                                   ? Colors.orange
                                   : Colors.red,
                           shape: BoxShape.circle,
@@ -328,7 +328,7 @@ class _JamTimerScreenState extends State<JamTimerScreen>
                             const Spacer(),
 
                             // Timeout Type Buttons OR normal controls
-                            if (state.labelStop == "End Timeout")
+                            if (state.inTimeout)
                               _buildTimeoutTypeSection(
                                 state,
                                 isEnabled,
@@ -492,8 +492,7 @@ class _JamTimerScreenState extends State<JamTimerScreen>
     double scaleFactor,
   ) {
     final owner = state.timeoutOwner;
-    final isOr =
-        state.officialReview == "true" || state.officialReview == "True";
+    final isOr = state.isOfficialReview;
 
     // For local mode, owner is '1' or '2', for remote it's a UUID
     final bool isTeam1TO = _isLocalMode
@@ -861,8 +860,7 @@ class _JamTimerScreenState extends State<JamTimerScreen>
   }
 
   Widget _buildUndoSection(ScoreboardState state, bool isEnabled) {
-    final hasUndoAction =
-        state.labelUndo != "No Action" && state.labelUndo != '---';
+    final hasUndoAction = state.hasUndoAction;
 
     return Padding(
       padding: const EdgeInsets.only(top: 16),
