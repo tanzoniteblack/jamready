@@ -9,19 +9,13 @@ extension _JamTimerLayout on _JamTimerScreenState {
     return AppBar(
       title: Text(
         "JamReady",
-        style: TextStyle(
-          fontWeight: FontWeight.bold,
-          color: alertColor,
-        ),
+        style: TextStyle(fontWeight: FontWeight.bold, color: alertColor),
       ),
       centerTitle: true,
       backgroundColor: Colors.transparent,
       elevation: 0,
       leading: IconButton(
-        icon: Icon(
-          _isLocalMode ? Icons.home : Icons.settings,
-          color: Colors.white70,
-        ),
+        icon: Icon(Icons.home, color: Colors.white70),
         onPressed: () => _navigateToHome(context),
       ),
       actions: [
@@ -30,10 +24,7 @@ extension _JamTimerLayout on _JamTimerScreenState {
             padding: const EdgeInsets.only(right: 12.0),
             child: Center(
               child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 8,
-                  vertical: 4,
-                ),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
                   color: Colors.orange.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(6),
@@ -42,11 +33,7 @@ extension _JamTimerLayout on _JamTimerScreenState {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(
-                      Icons.phonelink_off,
-                      color: Colors.orange,
-                      size: 14,
-                    ),
+                    Icon(Icons.phonelink_off, color: Colors.orange, size: 14),
                     const SizedBox(width: 4),
                     Text(
                       'LOCAL',
@@ -73,8 +60,8 @@ extension _JamTimerLayout on _JamTimerScreenState {
                   color: state.isConnected
                       ? Colors.green
                       : state.isConnecting
-                          ? Colors.orange
-                          : Colors.red,
+                      ? Colors.orange
+                      : Colors.red,
                   shape: BoxShape.circle,
                 ),
               ),
@@ -91,9 +78,8 @@ extension _JamTimerLayout on _JamTimerScreenState {
         final scaleFactor = availableHeight < 600
             ? (availableHeight / 600).clamp(0.7, 1.0)
             : availableHeight > 800
-                ? (1.0 + (availableHeight - 800) / 1000 * 0.15)
-                    .clamp(1.0, 1.15)
-                : 1.0;
+            ? (1.0 + (availableHeight - 800) / 1000 * 0.15).clamp(1.0, 1.15)
+            : 1.0;
         final isCompact = availableHeight < 550;
 
         final scrollView = SingleChildScrollView(
@@ -101,9 +87,7 @@ extension _JamTimerLayout on _JamTimerScreenState {
               ? const ClampingScrollPhysics()
               : const AlwaysScrollableScrollPhysics(),
           child: ConstrainedBox(
-            constraints: BoxConstraints(
-              minHeight: availableHeight,
-            ),
+            constraints: BoxConstraints(minHeight: availableHeight),
             child: IntrinsicHeight(
               child: Padding(
                 padding: EdgeInsets.symmetric(
@@ -192,7 +176,7 @@ extension _JamTimerLayout on _JamTimerScreenState {
                         isPrePeriod: _isPrePeriod(state),
                         isIntermission:
                             (state.clocks['Intermission']?.running ?? false) ||
-                                (state.clocks['Period']?.number == 0),
+                            (state.clocks['Period']?.number == 0),
                         startLabel: state.labelStart,
                         stopLabel: state.labelStop,
                         timeoutLabel: state.labelTimeout,
