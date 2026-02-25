@@ -1,18 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../styles/background.dart';
 import '../styles/text_styles.dart';
 import 'game_setup_screen.dart';
 import 'jam_timer_screen.dart';
 
-class SettingsScreen extends StatefulWidget {
-  const SettingsScreen({super.key});
+class HomeScreen extends StatefulWidget {
+  const HomeScreen({super.key});
 
   @override
-  State<SettingsScreen> createState() => _SettingsScreenState();
+  State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _SettingsScreenState extends State<SettingsScreen> {
+class _HomeScreenState extends State<HomeScreen> {
   final _formKey = GlobalKey<FormState>();
   final _hostController = TextEditingController();
   final _portController = TextEditingController();
@@ -108,174 +109,212 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFF0E0F12),
-      appBar: AppBar(
-        title: Text("SETTINGS", style: AppTextStyles.appBarTitle),
-        centerTitle: true,
+    return DynamicBackground(
+      accentColor: Colors.blue.shade400,
+      child: Scaffold(
         backgroundColor: Colors.transparent,
-        elevation: 0,
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24.0),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                "SERVER CONFIGURATION",
-                style: AppTextStyles.clockLabel.copyWith(
-                  color: Colors.white70,
-                  fontSize: 14,
-                  letterSpacing: 1.5,
-                ),
-              ),
-              const SizedBox(height: 24),
-
-              // QR Code Scan Button
-              SizedBox(
-                height: 56,
-                child: OutlinedButton.icon(
-                  onPressed: _scanQRCode,
-                  icon: const Icon(Icons.qr_code_scanner, size: 24),
-                  label: Text(
-                    "SCAN QR CODE",
-                    style: AppTextStyles.buttonText.copyWith(fontSize: 16),
+        appBar: AppBar(
+          toolbarHeight: 78,
+          titleSpacing: 0,
+          title: Text("JamReady", style: AppTextStyles.appBarTitle),
+          centerTitle: false,
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          scrolledUnderElevation: 0,
+          flexibleSpace: Align(
+            alignment: Alignment.bottomCenter,
+            child: Container(
+              height: 1,
+              color: Colors.white.withValues(alpha: 0.1),
+            ),
+          ),
+        ),
+        body: SingleChildScrollView(
+          padding: const EdgeInsets.all(24.0),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  "REMOTE SCOREBOARD",
+                  style: AppTextStyles.clockLabel.copyWith(
+                    color: Colors.white70,
+                    fontSize: 14,
+                    letterSpacing: 1.5,
                   ),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.white,
-                    side: const BorderSide(color: Colors.white38, width: 2),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  "Connect to an existing CRG scoreboard session.",
+                  style: AppTextStyles.clockLabel.copyWith(
+                    color: Colors.white54,
+                    fontSize: 12,
+                  ),
+                ),
+                const SizedBox(height: 24),
+
+                // QR Code Scan Button
+                SizedBox(
+                  height: 56,
+                  child: OutlinedButton.icon(
+                    onPressed: _scanQRCode,
+                    icon: const Icon(Icons.qr_code_scanner, size: 24),
+                    label: Text(
+                      "SCAN SCOREBOARD QR",
+                      style: AppTextStyles.buttonText.copyWith(fontSize: 16),
                     ),
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 24),
-
-              // Divider with "OR" text
-              Row(
-                children: [
-                  Expanded(child: Divider(color: Colors.white24)),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: Text(
-                      "OR ENTER MANUALLY",
-                      style: AppTextStyles.clockLabel.copyWith(
-                        color: Colors.white38,
-                        fontSize: 12,
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.white,
+                      side: const BorderSide(color: Colors.white38, width: 2),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
                       ),
                     ),
                   ),
-                  Expanded(child: Divider(color: Colors.white24)),
-                ],
-              ),
-
-              const SizedBox(height: 24),
-
-              TextFormField(
-                controller: _hostController,
-                style: const TextStyle(color: Colors.white),
-                decoration: _inputDecoration(
-                  "Host / IP Address",
-                  "e.g. 192.168.1.100",
                 ),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter a host address';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _portController,
-                style: const TextStyle(color: Colors.white),
-                decoration: _inputDecoration("Port", "e.g. 8000"),
-                keyboardType: TextInputType.number,
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter a port';
-                  }
-                  if (int.tryParse(value) == null) {
-                    return 'Port must be a number';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 32),
-              SizedBox(
-                height: 56,
-                child: ElevatedButton(
-                  onPressed: _isLoading ? null : _saveSettings,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blue.shade700,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  child: _isLoading
-                      ? const CircularProgressIndicator(color: Colors.white)
-                      : Text(
-                    "CONNECT",
-                    style: AppTextStyles.buttonText.copyWith(
-                      fontSize: 18,
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 32),
-              // Divider with "OR" text
-              Row(
-                children: [
-                  Expanded(child: Divider(color: Colors.white24)),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: Text(
-                      "OR",
-                      style: AppTextStyles.clockLabel.copyWith(
-                        color: Colors.white38,
-                        fontSize: 12,
+
+                const SizedBox(height: 24),
+
+                // Divider with "OR" text
+                Row(
+                  children: [
+                    Expanded(child: Divider(color: Colors.white24)),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Text(
+                        "OR ENTER MANUALLY",
+                        style: AppTextStyles.clockLabel.copyWith(
+                          color: Colors.white38,
+                          fontSize: 12,
+                        ),
                       ),
                     ),
+                    Expanded(child: Divider(color: Colors.white24)),
+                  ],
+                ),
+
+                const SizedBox(height: 24),
+
+                TextFormField(
+                  controller: _hostController,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: _inputDecoration(
+                    "Host / IP Address",
+                    "e.g. 192.168.1.100",
                   ),
-                  Expanded(child: Divider(color: Colors.white24)),
-                ],
-              ),
-
-              const SizedBox(height: 32),
-
-              // Offline Game Button
-              SizedBox(
-                height: 56,
-                child: OutlinedButton(
-                  onPressed: () {
-                    Navigator.of(context).pushReplacement(
-                      MaterialPageRoute(
-                        builder: (context) => const GameSetupScreen(),
-                      ),
-                    );
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Please enter a host address';
+                    }
+                    return null;
                   },
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.orange,
-                    side: const BorderSide(color: Colors.orange, width: 2),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _portController,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: _inputDecoration("Port", "e.g. 8000"),
+                  keyboardType: TextInputType.number,
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Please enter a port';
+                    }
+                    if (int.tryParse(value) == null) {
+                      return 'Port must be a number';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 32),
+                SizedBox(
+                  height: 56,
+                  child: ElevatedButton(
+                    onPressed: _isLoading ? null : _saveSettings,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.blue.shade700,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                     ),
+                    child: _isLoading
+                        ? const CircularProgressIndicator(color: Colors.white)
+                        : Text(
+                            "START REMOTE SESSION",
+                            style: AppTextStyles.buttonText.copyWith(
+                              fontSize: 18,
+                            ),
+                          ),
                   ),
-                  child: Text(
-                    "START OFFLINE GAME",
-                    style: AppTextStyles.buttonText.copyWith(
-                      fontSize: 16,
-                      color: Colors.orange,
+                ),
+                const SizedBox(height: 32),
+                // Divider with "OR" text
+                Row(
+                  children: [
+                    Expanded(child: Divider(color: Colors.white24)),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Text(
+                        "OR",
+                        style: AppTextStyles.clockLabel.copyWith(
+                          color: Colors.white38,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                    Expanded(child: Divider(color: Colors.white24)),
+                  ],
+                ),
+
+                const SizedBox(height: 24),
+                Text(
+                  "LOCAL GAME",
+                  style: AppTextStyles.clockLabel.copyWith(
+                    color: Colors.orange.withValues(alpha: 0.88),
+                    fontSize: 14,
+                    letterSpacing: 1.5,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  "Run JamReady offline on this device.",
+                  style: AppTextStyles.clockLabel.copyWith(
+                    color: Colors.white54,
+                    fontSize: 12,
+                  ),
+                ),
+                const SizedBox(height: 20),
+
+                // Offline Game Button
+                SizedBox(
+                  height: 56,
+                  child: OutlinedButton(
+                    onPressed: () {
+                      Navigator.of(context).pushReplacement(
+                        MaterialPageRoute(
+                          builder: (context) => const GameSetupScreen(),
+                        ),
+                      );
+                    },
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.orange,
+                      side: const BorderSide(color: Colors.orange, width: 2),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: Text(
+                      "START LOCAL GAME",
+                      style: AppTextStyles.buttonText.copyWith(
+                        fontSize: 16,
+                        color: Colors.orange,
+                      ),
                     ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 24),
-            ],
+                const SizedBox(height: 24),
+              ],
+            ),
           ),
         ),
       ),

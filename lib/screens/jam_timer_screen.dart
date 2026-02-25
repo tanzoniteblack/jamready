@@ -13,7 +13,7 @@ import '../widgets/jam_controls.dart';
 import '../widgets/prominent_period_clock.dart';
 import '../widgets/swipe_button.dart';
 import '../widgets/team_panel.dart';
-import 'settings_screen.dart';
+import 'home_screen.dart';
 
 part 'jam_timer/jam_timer_layout.dart';
 part 'jam_timer/jam_timer_controls.dart';
@@ -143,7 +143,7 @@ class _JamTimerScreenState extends State<JamTimerScreen>
     _engine?.dispose();
     if (context.mounted) {
       Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (context) => const SettingsScreen()),
+        MaterialPageRoute(builder: (context) => const HomeScreen()),
       );
     }
   }

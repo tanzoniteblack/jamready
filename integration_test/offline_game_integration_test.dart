@@ -55,15 +55,15 @@ Future<void> _launchOfflineGame(
 
   await _pumpUntil(
     tester,
-    () => find.text('START OFFLINE GAME').evaluate().isNotEmpty,
+    () => find.text('START LOCAL GAME').evaluate().isNotEmpty,
     timeout: const Duration(seconds: 10),
   );
 
-  await tester.tap(find.text('START OFFLINE GAME'));
+  await tester.tap(find.text('START LOCAL GAME'));
 
   // Wait for GameSetupScreen to appear, then settle the transition.
-  // SettingsScreen uses pushReplacement, so both screens are in the widget
-  // tree during the animation – SettingsScreen has its own TextFormFields
+  // HomeScreen uses pushReplacement, so both screens are in the widget
+  // tree during the animation – HomeScreen has its own TextFormFields
   // (host/port) that would be found first if we don't wait for it to leave.
   await _pumpUntil(
     tester,
@@ -152,19 +152,19 @@ void main() {
       app.main();
       await tester.pump(const Duration(milliseconds: 500));
 
-      expect(find.text('START OFFLINE GAME'), findsOneWidget);
+      expect(find.text('START LOCAL GAME'), findsOneWidget);
     });
 
-    testWidgets('START OFFLINE GAME navigates to game setup', (tester) async {
+    testWidgets('START LOCAL GAME navigates to game setup', (tester) async {
       SharedPreferences.setMockInitialValues({});
       app.main();
 
       await _pumpUntil(
         tester,
-        () => find.text('START OFFLINE GAME').evaluate().isNotEmpty,
+        () => find.text('START LOCAL GAME').evaluate().isNotEmpty,
       );
 
-      await tester.tap(find.text('START OFFLINE GAME'));
+      await tester.tap(find.text('START LOCAL GAME'));
 
       await _pumpUntil(
         tester,

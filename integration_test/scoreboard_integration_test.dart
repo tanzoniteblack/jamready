@@ -123,7 +123,7 @@ Future<ScoreboardTestClient> _launchAppAndConnect(
   // Wait for settings screen to be visible
   await _pumpUntil(
     tester,
-    () => find.text('SETTINGS').evaluate().isNotEmpty,
+    () => find.text('Game Hub').evaluate().isNotEmpty,
     timeout: const Duration(seconds: 10),
   );
 

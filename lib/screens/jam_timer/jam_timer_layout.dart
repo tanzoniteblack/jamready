@@ -6,28 +6,65 @@ extension _JamTimerLayout on _JamTimerScreenState {
     ScoreboardState state,
     Color alertColor,
   ) {
+    final connectionColor = state.isConnected
+        ? Colors.green
+        : state.isConnecting
+            ? Colors.orange
+            : Colors.red;
+
     return AppBar(
-      title: Text(
-        "JamReady",
-        style: TextStyle(fontWeight: FontWeight.bold, color: alertColor),
+      toolbarHeight: 74,
+      titleSpacing: 0,
+      title: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            "JamReady",
+            style: TextStyle(
+              fontWeight: FontWeight.w800,
+              color: alertColor,
+              letterSpacing: 0.4,
+              fontSize: 24,
+            ),
+          ),
+          Text(
+            _isLocalMode
+                ? "Local Game Console"
+                : (state.isConnected ? "Connected to Scoreboard" : "Remote Mode"),
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.72),
+              fontSize: 11,
+              letterSpacing: 0.6,
+            ),
+          ),
+        ],
       ),
-      centerTitle: true,
+      centerTitle: false,
       backgroundColor: Colors.transparent,
       elevation: 0,
+      scrolledUnderElevation: 0,
+      flexibleSpace: Align(
+        alignment: Alignment.bottomCenter,
+        child: Container(
+          height: 1,
+          color: Colors.white.withValues(alpha: 0.1),
+        ),
+      ),
       leading: IconButton(
-        icon: Icon(Icons.home, color: Colors.white70),
+        icon: Icon(Icons.home_rounded, color: Colors.white70),
         onPressed: () => _navigateToHome(context),
       ),
       actions: [
         if (_isLocalMode)
           Padding(
-            padding: const EdgeInsets.only(right: 12.0),
+            padding: const EdgeInsets.only(right: 12),
             child: Center(
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
-                  color: Colors.orange.withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(6),
+                  color: Colors.orange.withValues(alpha: 0.16),
+                  borderRadius: BorderRadius.circular(999),
                   border: Border.all(color: Colors.orange, width: 1),
                 ),
                 child: Row(
@@ -39,9 +76,9 @@ extension _JamTimerLayout on _JamTimerScreenState {
                       'LOCAL',
                       style: TextStyle(
                         color: Colors.orange,
-                        fontSize: 11,
+                        fontSize: 10,
                         fontWeight: FontWeight.bold,
-                        letterSpacing: 0.5,
+                        letterSpacing: 0.8,
                       ),
                     ),
                   ],
@@ -49,24 +86,39 @@ extension _JamTimerLayout on _JamTimerScreenState {
               ),
             ),
           )
-        else
+        else ...[
           Center(
             child: Padding(
-              padding: const EdgeInsets.only(right: 16.0),
+              padding: const EdgeInsets.only(right: 6),
               child: Container(
-                width: 12,
-                height: 12,
+                width: 10,
+                height: 10,
                 decoration: BoxDecoration(
-                  color: state.isConnected
-                      ? Colors.green
-                      : state.isConnecting
-                      ? Colors.orange
-                      : Colors.red,
+                  color: connectionColor,
                   shape: BoxShape.circle,
                 ),
               ),
             ),
           ),
+          Padding(
+            padding: const EdgeInsets.only(right: 12),
+            child: Center(
+              child: Text(
+                state.isConnected
+                    ? "LIVE"
+                    : state.isConnecting
+                        ? "CONNECTING"
+                        : "OFFLINE",
+                style: TextStyle(
+                  color: connectionColor,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.9,
+                ),
+              ),
+            ),
+          ),
+        ],
       ],
     );
   }

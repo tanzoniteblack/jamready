@@ -8,7 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:jam_ready/models/scoreboard_state.dart';
 import 'package:jam_ready/models/game_config.dart';
 import 'package:jam_ready/models/ruleset.dart';
-import 'package:jam_ready/screens/settings_screen.dart';
+import 'package:jam_ready/screens/home_screen.dart';
 import 'package:jam_ready/screens/game_setup_screen.dart';
 import 'package:jam_ready/screens/jam_timer_screen.dart';
 import 'package:jam_ready/services/local_game_engine.dart';
@@ -40,14 +40,14 @@ void main() {
             ChangeNotifierProvider(create: (_) => ScoreboardState()),
           ],
           child: MaterialApp(
-            home: const SettingsScreen(),
+            home: const HomeScreen(),
           ),
         ),
       );
       await tester.pump();
 
       // Find the offline game button
-      expect(find.text('START OFFLINE GAME'), findsOneWidget);
+      expect(find.text('START LOCAL GAME'), findsOneWidget);
     });
 
     testWidgets('game setup screen shows ruleset options', (tester) async {
