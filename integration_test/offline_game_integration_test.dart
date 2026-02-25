@@ -180,7 +180,14 @@ void main() {
 
     testWidgets('team names from setup appear on the game screen', (tester) async {
       await _launchOfflineGame(tester, team1: 'Rockets', team2: 'Thunder');
-      await tester.pump(const Duration(milliseconds: 300));
+
+      // engine.initialize() is called via addPostFrameCallback, then notifies
+      // listeners, then a rebuild is needed – wait for the name to appear.
+      await _pumpUntil(
+        tester,
+        () => find.text('Rockets').evaluate().isNotEmpty,
+        timeout: const Duration(seconds: 5),
+      );
 
       expect(find.text('Rockets'), findsOneWidget);
       expect(find.text('Thunder'), findsOneWidget);

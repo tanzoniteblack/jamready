@@ -885,7 +885,12 @@ class _JamTimerScreenState extends State<JamTimerScreen>
   bool _alertsInitialized = false;
 
   void _triggerHaptic(int level) {
-    if (!_alertsInitialized) return;
+    if (!_alertsInitialized) {
+      // Absorb initial alert state without vibrating so the first real state
+      // change after initialization doesn't spuriously trigger haptics.
+      if (level > _lastAlertLevel) _lastAlertLevel = level;
+      return;
+    }
     if (_lastAlertLevel >= level) return;
 
     _lastAlertLevel = level;
