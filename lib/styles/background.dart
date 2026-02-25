@@ -84,6 +84,27 @@ class DynamicBackground extends StatelessWidget {
 
         // Layer 4: Foreground content
         Positioned.fill(child: child),
+
+        // Layer 5: Foreground edge vignette — sits above content so it
+        // closes the edges on large devices (e.g. Pro Max). Very faint
+        // (~7% black) so it doesn't affect readability.
+        Positioned.fill(
+          child: IgnorePointer(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: RadialGradient(
+                  center: Alignment.center,
+                  radius: 1.1,
+                  colors: const [
+                    Colors.transparent,
+                    Color(0x12000000), // ~7% black
+                  ],
+                  stops: const [0.55, 1.0],
+                ),
+              ),
+            ),
+          ),
+        ),
       ],
     );
   }

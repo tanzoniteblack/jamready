@@ -350,6 +350,10 @@ class _JamTimerScreenState extends State<JamTimerScreen>
                                 alertColor: alertColor,
                                 enabled: isEnabled,
                                 scaleFactor: scaleFactor,
+                                jamClockNumber:
+                                    state.clocks['Jam']?.number ?? 0,
+                                lineupClockNumber:
+                                    state.clocks['Lineup']?.number ?? 0,
                                 onStartJam: () => _engine?.startJam(),
                                 onStopJam: () => _engine?.stopJam(),
                                 onTimeout: () => _engine?.startTimeout(),

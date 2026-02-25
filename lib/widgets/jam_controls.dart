@@ -14,6 +14,8 @@ class JamControls extends StatefulWidget {
   final Color? alertColor;
   final bool enabled;
   final double scaleFactor;
+  final int jamClockNumber;
+  final int lineupClockNumber;
   final VoidCallback onStartJam;
   final VoidCallback onStopJam;
   final VoidCallback onTimeout;
@@ -32,6 +34,8 @@ class JamControls extends StatefulWidget {
     this.alertColor,
     this.enabled = true,
     this.scaleFactor = 1.0,
+    this.jamClockNumber = 0,
+    this.lineupClockNumber = 0,
     required this.onStartJam,
     required this.onStopJam,
     required this.onTimeout,
@@ -77,12 +81,25 @@ class _JamControlsState extends State<JamControls> {
   @override
   void didUpdateWidget(JamControls oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // Only show confirmation for real game transitions, not initial data load.
-    // During initial connect, enabled transitions false→true in the same update
-    // as inJam changes, so oldWidget.enabled==false guards against that case.
-    if (oldWidget.enabled &&
-        oldWidget.inJam != widget.inJam &&
-        !widget.isPrePeriod) {
+    if (oldWidget.inJam == widget.inJam || widget.isPrePeriod) return;
+
+    // Only show confirmation for real forward transitions. We detect these by
+    // requiring the relevant clock number to have incremented by exactly 1:
+    //   • jam started  → Jam.Number   went up by 1
+    //   • jam stopped  → Lineup.Number went up by 1
+    // This filters out:
+    //   • initial data load  – numbers jump from 0 to N (not +1)
+    //   • undo stop-jam      – Lineup.Number decrements back
+    //   • undo start-jam     – Jam.Number   decrements back
+    // The oldWidget.enabled guard also catches the initial-connect case where
+    // enabled transitions false→true alongside inJam changing.
+    if (!oldWidget.enabled) return;
+
+    final bool isRealTransition = widget.inJam
+        ? widget.jamClockNumber == oldWidget.jamClockNumber + 1
+        : widget.lineupClockNumber == oldWidget.lineupClockNumber + 1;
+
+    if (isRealTransition) {
       _setConfirmationState(widget.inJam);
     }
   }
@@ -157,7 +174,7 @@ class _JamControlsState extends State<JamControls> {
         SizedBox(height: 24 * widget.scaleFactor),
         _buildDepthOutlinedButton(
           label: widget.timeoutLabel.toUpperCase(),
-          color: Colors.amber.withValues(alpha: 0.7),
+          color: Colors.amber.withValues(alpha: 0.6),
           enabled: timeoutEnabled,
           onPressed: widget.onTimeout,
           height: 56 * widget.scaleFactor,

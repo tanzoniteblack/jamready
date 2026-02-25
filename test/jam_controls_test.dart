@@ -23,6 +23,8 @@ Widget _buildControls({
   String startLabel = 'Start Jam',
   String stopLabel = 'Stop Jam',
   String timeoutLabel = 'Timeout',
+  int jamClockNumber = 0,
+  int lineupClockNumber = 0,
   VoidCallback? onStartJam,
   VoidCallback? onStopJam,
   VoidCallback? onTimeout,
@@ -36,6 +38,8 @@ Widget _buildControls({
       stopLabel: stopLabel,
       timeoutLabel: timeoutLabel,
       enabled: enabled,
+      jamClockNumber: jamClockNumber,
+      lineupClockNumber: lineupClockNumber,
       onStartJam: onStartJam ?? () {},
       onStopJam: onStopJam ?? () {},
       onTimeout: onTimeout ?? () {},
@@ -114,11 +118,13 @@ void main() {
       await tester.pump(JamControls.cooldownDuration + const Duration(milliseconds: 1));
     });
 
-    testWidgets('shows JAM STARTED when inJam changes while already enabled',
+    testWidgets('shows JAM STARTED when inJam changes and jam number increments',
         (tester) async {
-      // Simulate a server-initiated transition during active gameplay
-      await tester.pumpWidget(_buildControls(inJam: false, enabled: true));
-      await tester.pumpWidget(_buildControls(inJam: true, enabled: true));
+      // Real server-initiated jam start: Jam.Number goes N → N+1
+      await tester.pumpWidget(_buildControls(
+          inJam: false, enabled: true, jamClockNumber: 6));
+      await tester.pumpWidget(_buildControls(
+          inJam: true, enabled: true, jamClockNumber: 7));
       await tester.pump();
 
       expect(find.text('JAM STARTED'), findsOneWidget);
@@ -126,12 +132,53 @@ void main() {
       await tester.pump(JamControls.cooldownDuration + const Duration(milliseconds: 1));
     });
 
+    testWidgets('shows JAM ENDED when inJam changes and lineup number increments',
+        (tester) async {
+      // Real server-initiated jam stop: Lineup.Number goes N → N+1
+      await tester.pumpWidget(_buildControls(
+          inJam: true, enabled: true, lineupClockNumber: 7));
+      await tester.pumpWidget(_buildControls(
+          inJam: false, enabled: true, lineupClockNumber: 8));
+      await tester.pump();
+
+      expect(find.text('JAM ENDED'), findsOneWidget);
+
+      await tester.pump(JamControls.cooldownDuration + const Duration(milliseconds: 1));
+    });
+
+    testWidgets('does not show JAM STARTED on initial data load (number jumps)',
+        (tester) async {
+      // Initial connect: numbers jump from default 0 to whatever the server has
+      await tester.pumpWidget(_buildControls(
+          inJam: false, enabled: true, jamClockNumber: 0));
+      await tester.pumpWidget(_buildControls(
+          inJam: true, enabled: true, jamClockNumber: 7));
+      await tester.pump();
+
+      expect(find.text('JAM STARTED'), findsNothing);
+      expect(find.text('STOP JAM'), findsOneWidget);
+    });
+
     testWidgets('does not show JAM STARTED when inJam changes simultaneously with enabled',
         (tester) async {
-      // Simulates initial server data load: enabled goes false→true at same
-      // time as inJam becomes true. Should not show confirmation.
-      await tester.pumpWidget(_buildControls(inJam: false, enabled: false));
-      await tester.pumpWidget(_buildControls(inJam: true, enabled: true));
+      // Initial connect: enabled goes false→true in same update as inJam changes
+      await tester.pumpWidget(_buildControls(
+          inJam: false, enabled: false, jamClockNumber: 0));
+      await tester.pumpWidget(_buildControls(
+          inJam: true, enabled: true, jamClockNumber: 1));
+      await tester.pump();
+
+      expect(find.text('JAM STARTED'), findsNothing);
+      expect(find.text('STOP JAM'), findsOneWidget);
+    });
+
+    testWidgets('does not show JAM STARTED on undo-stop-jam (lineup number decrements)',
+        (tester) async {
+      // Undo restores jam: Lineup.Number goes back down, inJam goes true
+      await tester.pumpWidget(_buildControls(
+          inJam: false, enabled: true, lineupClockNumber: 8));
+      await tester.pumpWidget(_buildControls(
+          inJam: true, enabled: true, lineupClockNumber: 7));
       await tester.pump();
 
       expect(find.text('JAM STARTED'), findsNothing);

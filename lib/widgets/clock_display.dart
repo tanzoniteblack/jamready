@@ -168,23 +168,35 @@ class _ClockDisplayState extends State<ClockDisplay>
                 // Only enable long press for time editing in local mode
                 onLongPress: widget.onSetTime != null ? _handleLongPress : null,
                 child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     _buildAdjustButton(
                         "-1", widget.enabled ? () => _handleAdjust("-1000") : null),
-                    AnimatedBuilder(
-                      animation: _pulseAnimation,
-                      builder: (context, child) {
-                        return Transform.scale(
-                          scale: _pulseAnimation.value,
-                          child: child,
-                        );
-                      },
-                      child: Text(
-                        _formatTime(widget.clock.time),
-                        style: AppTextStyles.clockTime.copyWith(
-                          color: color,
-                          fontSize: 72 * widget.scaleFactor,
+                    Expanded(
+                      // Height cap ensures BoxFit.contain scales to fill width,
+                      // not height. Roboto Mono "2:00" is ~2.4:1 wide, so a box
+                      // at 120*sf tall is always narrower than the text's natural
+                      // aspect ratio, making width the binding dimension on every
+                      // screen size.
+                      child: SizedBox(
+                        height: 120 * widget.scaleFactor,
+                        child: FittedBox(
+                          fit: BoxFit.contain,
+                          child: AnimatedBuilder(
+                            animation: _pulseAnimation,
+                            builder: (context, child) {
+                              return Transform.scale(
+                                scale: _pulseAnimation.value,
+                                child: child,
+                              );
+                            },
+                            child: Text(
+                              _formatTime(widget.clock.time),
+                              style: AppTextStyles.clockTime.copyWith(
+                                color: color,
+                                fontSize: 300,
+                              ),
+                            ),
+                          ),
                         ),
                       ),
                     ),
