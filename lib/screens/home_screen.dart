@@ -115,7 +115,7 @@ class _HomeScreenState extends State<HomeScreen> {
         backgroundColor: Colors.transparent,
         appBar: AppBar(
           toolbarHeight: 78,
-          titleSpacing: 0,
+          titleSpacing: 16,
           title: Text("JamReady", style: AppTextStyles.appBarTitle),
           centerTitle: false,
           backgroundColor: Colors.transparent,

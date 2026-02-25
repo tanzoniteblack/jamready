@@ -76,6 +76,10 @@ void main() {
 
       expect(state.team1.name, 'Salt');
       expect(state.team2.name, 'Pepper');
+      expect(state.team1.colorBg, 'F2F2F2');
+      expect(state.team1.colorFg, '1A1A1A');
+      expect(state.team2.colorBg, '2E2E2E');
+      expect(state.team2.colorFg, 'F5F5F5');
       expect(state.lineupDuration, 30000);
       expect(state.clocks['Jam']!.time, 60000); // RDCL: 1 min jams
       expect(state.clocks['Period']!.time, 15 * 60 * 1000); // RDCL: 15 min periods

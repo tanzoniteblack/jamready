@@ -13,31 +13,40 @@ extension _JamTimerLayout on _JamTimerScreenState {
             : Colors.red;
 
     return AppBar(
-      toolbarHeight: 74,
+      toolbarHeight: _isLocalMode ? 62 : 74,
       titleSpacing: 0,
       title: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(
-            "JamReady",
-            style: TextStyle(
-              fontWeight: FontWeight.w800,
-              color: alertColor,
-              letterSpacing: 0.4,
-              fontSize: 24,
+          ShaderMask(
+            shaderCallback: (bounds) => LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                Color.lerp(alertColor, Colors.white, 0.2)!,
+                Color.lerp(alertColor, Colors.black, 0.12)!,
+              ],
+            ).createShader(bounds),
+            child: Text(
+              "JamReady",
+              style: TextStyle(
+                fontWeight: FontWeight.w800,
+                color: Colors.white,
+                letterSpacing: 0.4,
+                fontSize: 24,
+              ),
             ),
           ),
-          Text(
-            _isLocalMode
-                ? "Local Game Console"
-                : (state.isConnected ? "Connected to Scoreboard" : "Remote Mode"),
-            style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.72),
-              fontSize: 11,
-              letterSpacing: 0.6,
+          if (!_isLocalMode)
+            Text(
+              state.isConnected ? "Connected to Scoreboard" : "Remote Mode",
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.72),
+                fontSize: 11,
+                letterSpacing: 0.6,
+              ),
             ),
-          ),
         ],
       ),
       centerTitle: false,

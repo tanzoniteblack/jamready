@@ -114,7 +114,7 @@ class _JamControlsState extends State<JamControls> {
 
     if (widget.inJam) {
       label = widget.stopLabel;
-      color = Colors.red.shade800;
+      color = Colors.red.shade700;
       action = widget.onStopJam;
       toJam = false;
     } else if (widget.isPrePeriod) {
@@ -167,17 +167,17 @@ class _JamControlsState extends State<JamControls> {
                   canTap: canTap,
                   showActive: showActive,
                   onPressed: () => _handlePress(action, toJam),
-                  fontSize: 28 * widget.scaleFactor,
+                  fontSize: 25 * widget.scaleFactor,
                   height: 80 * widget.scaleFactor,
                 ),
         ),
         SizedBox(height: 24 * widget.scaleFactor),
         _buildDepthOutlinedButton(
           label: widget.timeoutLabel.toUpperCase(),
-          color: Colors.amber.withValues(alpha: 0.6),
+          color: Colors.amber.shade700,
           enabled: timeoutEnabled,
           onPressed: widget.onTimeout,
-          height: 56 * widget.scaleFactor,
+          height: 52 * widget.scaleFactor,
         ),
       ],
     );
@@ -192,8 +192,9 @@ class _JamControlsState extends State<JamControls> {
     double fontSize = 20,
     double height = 56,
   }) {
-    final highlightColor = Color.lerp(color, Colors.white, 0.1)!;
-    final shadowColor = Color.lerp(color, Colors.black, 0.15)!;
+    final highlightColor = Color.lerp(color, Colors.white, 0.16)!;
+    final midColor = Color.lerp(color, Colors.black, 0.05)!;
+    final shadowColor = Color.lerp(color, Colors.black, 0.24)!;
 
     return Container(
       height: height,
@@ -202,9 +203,10 @@ class _JamControlsState extends State<JamControls> {
         boxShadow: showActive
             ? [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.25),
-                  blurRadius: 4 * widget.scaleFactor,
-                  offset: Offset(0, 2 * widget.scaleFactor),
+                  color: color.withValues(alpha: 0.22),
+                  blurRadius: 10 * widget.scaleFactor,
+                  spreadRadius: 0.5 * widget.scaleFactor,
+                  offset: Offset(0, 3 * widget.scaleFactor),
                 ),
               ]
             : [],
@@ -218,14 +220,20 @@ class _JamControlsState extends State<JamControls> {
             decoration: BoxDecoration(
               gradient: showActive
                   ? LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [highlightColor, color, shadowColor],
-                      stops: const [0.0, 0.5, 1.0],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [highlightColor, midColor, shadowColor],
+                      stops: const [0.0, 0.45, 1.0],
                     )
                   : null,
               color: showActive ? null : Colors.grey.shade800,
               borderRadius: BorderRadius.circular(16 * widget.scaleFactor),
+              border: Border.all(
+                color: showActive
+                    ? Colors.white.withValues(alpha: 0.14)
+                    : Colors.white12,
+                width: 1.2 * widget.scaleFactor,
+              ),
             ),
             child: Container(
               alignment: Alignment.center,
@@ -234,6 +242,7 @@ class _JamControlsState extends State<JamControls> {
                 style: AppTextStyles.buttonText.copyWith(
                   fontSize: fontSize,
                   color: showActive ? Colors.white : Colors.white38,
+                  letterSpacing: 0.35,
                 ),
               ),
             ),
@@ -250,6 +259,13 @@ class _JamControlsState extends State<JamControls> {
     required VoidCallback onPressed,
     double height = 56,
   }) {
+    final fillTop = enabled
+        ? color.withValues(alpha: 0.12)
+        : Colors.white.withValues(alpha: 0.05);
+    final fillBottom = enabled
+        ? color.withValues(alpha: 0.04)
+        : Colors.white.withValues(alpha: 0.02);
+
     return Container(
       height: height,
       decoration: BoxDecoration(
@@ -257,9 +273,9 @@ class _JamControlsState extends State<JamControls> {
         boxShadow: enabled
             ? [
                 BoxShadow(
-                  color: color.withValues(alpha: 0.15),
-                  blurRadius: 4 * widget.scaleFactor,
-                  offset: Offset(0, 1 * widget.scaleFactor),
+                  color: color.withValues(alpha: 0.12),
+                  blurRadius: 6 * widget.scaleFactor,
+                  offset: Offset(0, 1.5 * widget.scaleFactor),
                 ),
               ]
             : [],
@@ -271,11 +287,15 @@ class _JamControlsState extends State<JamControls> {
           borderRadius: BorderRadius.circular(12 * widget.scaleFactor),
           child: Ink(
             decoration: BoxDecoration(
-              color: (enabled ? color : Colors.white12).withValues(alpha: 0.08),
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [fillTop, fillBottom],
+              ),
               borderRadius: BorderRadius.circular(12 * widget.scaleFactor),
               border: Border.all(
                 color: enabled ? color : Colors.white12,
-                width: 2 * widget.scaleFactor,
+                width: 1.5 * widget.scaleFactor,
               ),
             ),
             child: Container(
@@ -283,8 +303,9 @@ class _JamControlsState extends State<JamControls> {
               child: Text(
                 label,
                 style: AppTextStyles.buttonText.copyWith(
-                  fontSize: 18 * widget.scaleFactor,
-                  color: enabled ? color : Colors.white38,
+                  fontSize: 16 * widget.scaleFactor,
+                  color: enabled ? Colors.amber.shade200 : Colors.white38,
+                  letterSpacing: 0.45,
                 ),
               ),
             ),

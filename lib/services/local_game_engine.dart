@@ -87,6 +87,11 @@ class LocalGameEngine with WidgetsBindingObserver implements GameEngine {
     _state.team1.alternateName = '';
     _state.team2.name = _config.team2Name;
     _state.team2.alternateName = '';
+    _state.team1.colorBg = '';
+    _state.team1.colorFg = '';
+    _state.team2.colorBg = '';
+    _state.team2.colorFg = '';
+    _applyDefaultLocalTeamColors();
 
     // Reset scores
     _state.team1.score = 0;
@@ -131,6 +136,24 @@ class LocalGameEngine with WidgetsBindingObserver implements GameEngine {
     _startTickTimer();
 
     _state.notify();
+  }
+
+  void _applyDefaultLocalTeamColors() {
+    void setColorsForTeam(Team team) {
+      switch (team.name.trim().toLowerCase()) {
+        case 'salt':
+          team.colorBg = 'F2F2F2';
+          team.colorFg = '1A1A1A';
+          break;
+        case 'pepper':
+          team.colorBg = '2E2E2E';
+          team.colorFg = 'F5F5F5';
+          break;
+      }
+    }
+
+    setColorsForTeam(_state.team1);
+    setColorsForTeam(_state.team2);
   }
 
   void _initializeClocks() {

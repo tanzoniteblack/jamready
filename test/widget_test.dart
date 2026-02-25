@@ -39,7 +39,7 @@ void main() {
     await tester.pump();
 
     // Verify home screen elements are present
-    expect(find.text('Game Hub'), findsOneWidget);
+    expect(find.text('JamReady'), findsOneWidget);
     expect(find.text('REMOTE SCOREBOARD'), findsOneWidget);
     expect(find.text('SCAN SCOREBOARD QR'), findsOneWidget);
     expect(find.text('START REMOTE SESSION'), findsOneWidget);
@@ -69,6 +69,6 @@ void main() {
     expect(find.text('JamReady'), findsOneWidget);
 
     // Verify home/config button is present
-    expect(find.byIcon(Icons.tune_rounded), findsOneWidget);
+    expect(find.byIcon(Icons.home_rounded), findsOneWidget);
   });
 }

@@ -59,7 +59,7 @@ class _SwipeButtonState extends State<SwipeButton>
   @override
   Widget build(BuildContext context) {
     final backgroundColor = widget.compact
-        ? (widget.enabled ? widget.color.withValues(alpha: 0.7) : Colors.grey.shade800)
+        ? (widget.enabled ? widget.color : Colors.grey.shade800)
         : (widget.enabled ? widget.color : Colors.grey.shade800);
     final contentColor = widget.enabled ? Colors.white : Colors.white38;
 
@@ -80,14 +80,20 @@ class _SwipeButtonState extends State<SwipeButton>
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
                     colors: [
-                      backgroundColor.withValues(alpha: widget.compact ? 0.08 : 0.15),
-                      backgroundColor.withValues(alpha: widget.compact ? 0.12 : 0.25),
+                      backgroundColor.withValues(alpha: widget.compact ? 0.2 : 0.15),
+                      backgroundColor.withValues(alpha: widget.compact ? 0.32 : 0.25),
                     ],
                   ),
                   borderRadius: BorderRadius.circular(_borderRadius),
                   border: Border.all(color: backgroundColor, width: _borderWidth),
                   boxShadow: widget.compact
-                      ? null
+                      ? [
+                          BoxShadow(
+                            color: backgroundColor.withValues(alpha: 0.25),
+                            blurRadius: 6,
+                            offset: const Offset(0, 1),
+                          ),
+                        ]
                       : [
                           BoxShadow(
                             color: Colors.black.withValues(alpha: 0.3),
@@ -120,7 +126,8 @@ class _SwipeButtonState extends State<SwipeButton>
                       widget.label.toUpperCase(),
                       style: AppTextStyles.buttonText.copyWith(
                         fontSize: _fontSize,
-                        color: contentColor.withValues(alpha: widget.compact ? 0.4 : 0.5),
+                        color: contentColor.withValues(alpha: widget.compact ? 0.82 : 0.5),
+                        letterSpacing: widget.compact ? 0.4 : 0.0,
                       ),
                     ),
                   ),
@@ -258,7 +265,7 @@ class _SwipeButtonState extends State<SwipeButton>
                       child: Center(
                         child: Icon(
                           Icons.double_arrow_rounded,
-                          color: widget.iconColor.withValues(alpha: widget.compact ? 0.7 : 1.0),
+                          color: widget.iconColor.withValues(alpha: widget.compact ? 0.9 : 1.0),
                           size: _iconSize,
                         ),
                       ),

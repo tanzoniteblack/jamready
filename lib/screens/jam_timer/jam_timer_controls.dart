@@ -414,7 +414,7 @@ extension _JamTimerControls on _JamTimerScreenState {
       child: SwipeButton(
         label: hasUndoAction ? state.labelUndo : "No Undo Available",
         enabled: isEnabled && hasUndoAction,
-        color: Colors.grey.shade600,
+        color: const Color(0xFF455A64),
         compact: true,
         onConfirmed: () {
           _engine?.undo();
