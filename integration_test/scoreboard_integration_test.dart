@@ -247,9 +247,10 @@ Future<void> _tapJamControl(
   WidgetTester tester,
   String label,
 ) async {
-  // JamControls cooldown is based on DateTime.now() (real time). In
-  // integration tests tester.pump(duration) advances real time on device,
-  // so pumping past the cooldown duration ensures the button is enabled.
+  // JamControls shows a confirmation state ("JAM STARTED"/"JAM ENDED") for
+  // cooldownDuration after each jam transition. The confirmation is based on
+  // DateTime.now() (real time); tester.pump(duration) advances real time on
+  // device, so pumping past it ensures the button is back to its normal label.
   await tester.pump(JamControls.cooldownDuration + const Duration(milliseconds: 200));
 
   final target = find.text(label.toUpperCase());

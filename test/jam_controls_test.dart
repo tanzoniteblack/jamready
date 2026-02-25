@@ -85,6 +85,61 @@ void main() {
   });
 
   // ---------------------------------------------------------------------------
+  // Confirmation state
+  // ---------------------------------------------------------------------------
+
+  group('confirmation state', () {
+    testWidgets('shows JAM STARTED after tapping start button', (tester) async {
+      await tester.pumpWidget(_buildControls());
+
+      await tester.tap(find.text('START JAM'));
+      await tester.pump();
+
+      expect(find.text('JAM STARTED'), findsOneWidget);
+      expect(find.text('START JAM'), findsNothing);
+
+      // Settle the Future.delayed
+      await tester.pump(JamControls.cooldownDuration + const Duration(milliseconds: 1));
+    });
+
+    testWidgets('shows JAM ENDED after tapping stop button', (tester) async {
+      await tester.pumpWidget(_buildControls(inJam: true));
+
+      await tester.tap(find.text('STOP JAM'));
+      await tester.pump();
+
+      expect(find.text('JAM ENDED'), findsOneWidget);
+      expect(find.text('STOP JAM'), findsNothing);
+
+      await tester.pump(JamControls.cooldownDuration + const Duration(milliseconds: 1));
+    });
+
+    testWidgets('shows JAM STARTED when inJam changes while already enabled',
+        (tester) async {
+      // Simulate a server-initiated transition during active gameplay
+      await tester.pumpWidget(_buildControls(inJam: false, enabled: true));
+      await tester.pumpWidget(_buildControls(inJam: true, enabled: true));
+      await tester.pump();
+
+      expect(find.text('JAM STARTED'), findsOneWidget);
+
+      await tester.pump(JamControls.cooldownDuration + const Duration(milliseconds: 1));
+    });
+
+    testWidgets('does not show JAM STARTED when inJam changes simultaneously with enabled',
+        (tester) async {
+      // Simulates initial server data load: enabled goes false→true at same
+      // time as inJam becomes true. Should not show confirmation.
+      await tester.pumpWidget(_buildControls(inJam: false, enabled: false));
+      await tester.pumpWidget(_buildControls(inJam: true, enabled: true));
+      await tester.pump();
+
+      expect(find.text('JAM STARTED'), findsNothing);
+      expect(find.text('STOP JAM'), findsOneWidget);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
   // Callbacks
   // ---------------------------------------------------------------------------
 
@@ -95,7 +150,7 @@ void main() {
           _buildControls(onStartJam: () => callCount++));
 
       await tester.tap(find.text('START JAM'));
-      // Pump past cooldown so the scheduled Future.delayed completes
+      // Pump past confirmation so the scheduled Future.delayed completes
       await tester.pump(JamControls.cooldownDuration + const Duration(milliseconds: 1));
 
       expect(callCount, 1);
@@ -125,31 +180,33 @@ void main() {
   });
 
   // ---------------------------------------------------------------------------
-  // Cooldown
+  // Cooldown / confirmation guard
   // ---------------------------------------------------------------------------
 
   group('cooldown', () {
-    testWidgets('second tap immediately after first is ignored (cooldown active)',
+    testWidgets('second tap during confirmation state is ignored',
         (tester) async {
       var callCount = 0;
       await tester.pumpWidget(
           _buildControls(onStartJam: () => callCount++));
 
-      // First tap – should fire
+      // First tap – fires callback, enters confirmation state showing 'JAM STARTED'
       await tester.tap(find.text('START JAM'));
       await tester.pump();
 
-      // Second tap immediately – cooldown prevents it
-      await tester.tap(find.text('START JAM'));
+      expect(find.text('JAM STARTED'), findsOneWidget);
+
+      // Second tap during confirmation – button is not tappable
+      await tester.tap(find.text('JAM STARTED'));
       await tester.pump();
 
       expect(callCount, 1);
 
-      // Pump past cooldown to let Future.delayed settle
+      // Pump past confirmation to let Future.delayed settle
       await tester.pump(JamControls.cooldownDuration + const Duration(milliseconds: 1));
     });
 
-    // Note: testing cooldown expiry requires real wall-clock time (the widget
+    // Note: testing confirmation expiry requires real wall-clock time (the widget
     // uses DateTime.now(), not the fake async clock), so that scenario is
     // covered by the integration tests instead.
   });
