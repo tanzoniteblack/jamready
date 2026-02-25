@@ -35,8 +35,8 @@ class DynamicBackground extends StatelessWidget {
               curve: Curves.easeInOut,
               decoration: BoxDecoration(
                 gradient: RadialGradient(
-                  center: Alignment.center,
-                  radius: 0.8, // Covers ~80% of screen from center
+                  center: Alignment(0.0, -0.25),
+                  radius: 0.85, // Covers ~80% of screen from center
                   colors: hasAccent
                       ? [
                           // Center: accent color darkened 70% toward black for subtlety

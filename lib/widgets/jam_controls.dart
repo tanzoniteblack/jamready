@@ -157,7 +157,7 @@ class _JamControlsState extends State<JamControls> {
         SizedBox(height: 24 * widget.scaleFactor),
         _buildDepthOutlinedButton(
           label: widget.timeoutLabel.toUpperCase(),
-          color: Colors.amber,
+          color: Colors.amber.withValues(alpha: 0.7),
           enabled: timeoutEnabled,
           onPressed: widget.onTimeout,
           height: 56 * widget.scaleFactor,

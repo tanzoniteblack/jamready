@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:roller_derby_jam_timer/styles/text_styles.dart';
-import 'package:roller_derby_jam_timer/styles/track_background.dart';
+import 'package:roller_derby_jam_timer/styles/background.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/scoreboard_state.dart';
 import '../services/game_engine.dart';
@@ -325,6 +325,8 @@ class _JamTimerScreenState extends State<JamTimerScreen>
                               ),
 
                             // Flexible spacer pushes controls toward bottom
+                            const Spacer(),
+                            const Spacer(),
                             const Spacer(),
 
                             // Timeout Type Buttons OR normal controls
@@ -943,6 +945,9 @@ class _JamTimerScreenState extends State<JamTimerScreen>
     if (activeClock == null || (!activeClock.running && !allowStopped)) {
       _lastAlertLevel = 0;
       _lastAlertClockName = "";
+      if (state.clocks['Intermission']?.running == true) {
+        return Colors.orange;
+      }
       return _healthyColor;
     }
 

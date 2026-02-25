@@ -128,9 +128,7 @@ class _ClockDisplayState extends State<ClockDisplay>
 
     Color? glowColor;
     if (widget.enabled && widget.clock.running) {
-      if (widget.clock.name == 'Intermission') {
-        glowColor = Colors.orange;
-      } else if (widget.clock.name == 'Timeout') {
+      if (widget.clock.name == 'Timeout') {
         glowColor = Colors.red;
       }
     }
