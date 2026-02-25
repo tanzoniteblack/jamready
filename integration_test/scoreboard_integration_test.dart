@@ -10,6 +10,7 @@ import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:roller_derby_jam_timer/main.dart' as app;
 import 'package:roller_derby_jam_timer/models/scoreboard_state.dart';
 import 'package:roller_derby_jam_timer/screens/jam_timer_screen.dart';
+import 'package:roller_derby_jam_timer/widgets/jam_controls.dart';
 import 'package:roller_derby_jam_timer/widgets/swipe_button.dart';
 
 class ScoreboardTestClient {
@@ -248,6 +249,11 @@ Future<void> _tapJamControl(
   WidgetTester tester,
   String label,
 ) async {
+  // JamControls cooldown is based on DateTime.now() (real time). In
+  // integration tests tester.pump(duration) advances real time on device,
+  // so pumping past the cooldown duration ensures the button is enabled.
+  await tester.pump(JamControls.cooldownDuration + const Duration(milliseconds: 200));
+
   final target = find.text(label.toUpperCase());
   await _pumpUntil(tester, () => target.evaluate().isNotEmpty);
   await tester.ensureVisible(target);
@@ -463,10 +469,14 @@ void main() {
     await client.startNewGame();
     await _ensurePrePeriod(tester);
 
-    // Verify we're in pre-game state with no undo available
+    // Verify we're in pre-game state with no undo available.
+    // Local engine uses 'No Action'; CRG server uses '---'.
     await _pumpUntil(
       tester,
-      () => _state(tester).labelUndo == 'No Action',
+      () {
+        final lbl = _state(tester).labelUndo;
+        return lbl == 'No Action' || lbl == '---';
+      },
       timeout: const Duration(seconds: 10),
     );
 
@@ -527,18 +537,27 @@ void main() {
       timeout: const Duration(seconds: 20),
     );
 
-    // Wait for undo action to become available
+    // Wait for undo action to become available.
+    // Exclude both the local-engine sentinel ('No Action') and the
+    // CRG sentinel ('---') to confirm a real undo label has arrived.
     await _pumpUntil(
       tester,
-      () => _state(tester).labelUndo != 'No Action',
+      () {
+        final lbl = _state(tester).labelUndo;
+        return lbl != 'No Action' && lbl != '---' && lbl.isNotEmpty;
+      },
       timeout: const Duration(seconds: 10),
     );
 
-    // Verify the undo button shows the action (should contain "UNDO:")
+    // Verify the undo button shows the action label from state.
+    // SwipeButton renders its label in uppercase.
+    final undoLabel = _state(tester).labelUndo;
+    expect(undoLabel, isNot('No Action'));
+    expect(undoLabel, isNot('---'));
     expect(
-      find.textContaining('UNDO:'),
-      findsOneWidget,
-      reason: 'Should show UNDO: label when action available',
+      find.textContaining(undoLabel.toUpperCase()),
+      findsAtLeast(1),
+      reason: 'Undo label "$undoLabel" should be visible on screen',
     );
   });
 

@@ -61,12 +61,16 @@ Future<void> _launchOfflineGame(
 
   await tester.tap(find.text('START OFFLINE GAME'));
 
-  // Wait for GameSetupScreen to fully render
+  // Wait for GameSetupScreen to appear, then settle the transition.
+  // SettingsScreen uses pushReplacement, so both screens are in the widget
+  // tree during the animation – SettingsScreen has its own TextFormFields
+  // (host/port) that would be found first if we don't wait for it to leave.
   await _pumpUntil(
     tester,
     () => find.text('START GAME').evaluate().isNotEmpty,
     timeout: const Duration(seconds: 5),
   );
+  await tester.pumpAndSettle();
 
   // Optionally override team names (defaults match GameSetupScreen placeholders)
   if (team1 != 'Salt') {
@@ -180,14 +184,9 @@ void main() {
 
     testWidgets('team names from setup appear on the game screen', (tester) async {
       await _launchOfflineGame(tester, team1: 'Rockets', team2: 'Thunder');
-
-      // engine.initialize() is called via addPostFrameCallback, then notifies
-      // listeners, then a rebuild is needed – wait for the name to appear.
-      await _pumpUntil(
-        tester,
-        () => find.text('Rockets').evaluate().isNotEmpty,
-        timeout: const Duration(seconds: 5),
-      );
+      // Pump a couple of frames for initialize() → notifyListeners() → rebuild.
+      await tester.pump();
+      await tester.pump();
 
       expect(find.text('Rockets'), findsOneWidget);
       expect(find.text('Thunder'), findsOneWidget);
