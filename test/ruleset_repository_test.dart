@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:roller_derby_jam_timer/models/ruleset.dart';
-import 'package:roller_derby_jam_timer/services/ruleset_repository.dart';
+import 'package:jam_ready/models/ruleset.dart';
+import 'package:jam_ready/services/ruleset_repository.dart';
 
 /// Creates a minimal valid custom ruleset for testing.
 Ruleset _makeCustomRuleset({

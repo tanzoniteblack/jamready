@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:roller_derby_jam_timer/models/scoreboard_state.dart';
-import 'package:roller_derby_jam_timer/widgets/team_panel.dart';
+import 'package:jam_ready/models/scoreboard_state.dart';
+import 'package:jam_ready/widgets/team_panel.dart';
 
 // ---------------------------------------------------------------------------
 // Helpers

@@ -17,12 +17,12 @@ import 'package:integration_test/integration_test.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'package:roller_derby_jam_timer/main.dart' as app;
-import 'package:roller_derby_jam_timer/models/game_config.dart';
-import 'package:roller_derby_jam_timer/models/ruleset.dart';
-import 'package:roller_derby_jam_timer/models/scoreboard_state.dart';
-import 'package:roller_derby_jam_timer/screens/jam_timer_screen.dart';
-import 'package:roller_derby_jam_timer/services/local_game_engine.dart';
+import 'package:jam_ready/main.dart' as app;
+import 'package:jam_ready/models/game_config.dart';
+import 'package:jam_ready/models/ruleset.dart';
+import 'package:jam_ready/models/scoreboard_state.dart';
+import 'package:jam_ready/screens/jam_timer_screen.dart';
+import 'package:jam_ready/services/local_game_engine.dart';
 
 // ---------------------------------------------------------------------------
 // Helpers – full-app navigation
@@ -179,7 +179,7 @@ void main() {
       await _launchOfflineGame(tester);
 
       expect(find.byType(JamTimerScreen), findsOneWidget);
-      expect(find.text('ROLLER DERBY JAM TIMER'), findsOneWidget);
+      expect(find.text('JamReady'), findsOneWidget);
     });
 
     testWidgets('team names from setup appear on the game screen', (tester) async {

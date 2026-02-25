@@ -8,7 +8,7 @@ extension _JamTimerLayout on _JamTimerScreenState {
   ) {
     return AppBar(
       title: Text(
-        "ROLLER DERBY JAM TIMER",
+        "JamReady",
         style: TextStyle(
           fontWeight: FontWeight.bold,
           color: alertColor,

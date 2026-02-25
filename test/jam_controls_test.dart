@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:roller_derby_jam_timer/widgets/jam_controls.dart';
+import 'package:jam_ready/widgets/jam_controls.dart';
 
 // ---------------------------------------------------------------------------
 // Helpers

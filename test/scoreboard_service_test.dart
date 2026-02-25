@@ -7,8 +7,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:stream_channel/stream_channel.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
-import 'package:roller_derby_jam_timer/models/scoreboard_state.dart';
-import 'package:roller_derby_jam_timer/services/remote_game_engine.dart';
+import 'package:jam_ready/models/scoreboard_state.dart';
+import 'package:jam_ready/services/remote_game_engine.dart';
 
 class FakeWebSocketSink implements WebSocketSink {
   final List<dynamic> sent = [];

@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:roller_derby_jam_timer/models/game_config.dart';
-import 'package:roller_derby_jam_timer/models/ruleset.dart';
-import 'package:roller_derby_jam_timer/models/scoreboard_state.dart';
+import 'package:jam_ready/models/game_config.dart';
+import 'package:jam_ready/models/ruleset.dart';
+import 'package:jam_ready/models/scoreboard_state.dart';
 
 void main() {
   // ─── Ruleset ────────────────────────────────────────────────────────────────

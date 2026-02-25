@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:roller_derby_jam_timer/styles/text_styles.dart';
-import 'package:roller_derby_jam_timer/styles/background.dart';
+import 'package:jam_ready/styles/text_styles.dart';
+import 'package:jam_ready/styles/background.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vibration/vibration.dart';
 

@@ -1,10 +1,10 @@
 import 'dart:typed_data';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:roller_derby_jam_timer/models/game_config.dart';
-import 'package:roller_derby_jam_timer/models/ruleset.dart';
-import 'package:roller_derby_jam_timer/models/scoreboard_state.dart';
-import 'package:roller_derby_jam_timer/services/local_game_engine.dart';
+import 'package:jam_ready/models/game_config.dart';
+import 'package:jam_ready/models/ruleset.dart';
+import 'package:jam_ready/models/scoreboard_state.dart';
+import 'package:jam_ready/services/local_game_engine.dart';
 
 // ---------------------------------------------------------------------------
 // Helpers

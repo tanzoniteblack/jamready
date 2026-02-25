@@ -5,17 +5,16 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'package:roller_derby_jam_timer/models/scoreboard_state.dart';
-import 'package:roller_derby_jam_timer/models/game_config.dart';
-import 'package:roller_derby_jam_timer/models/ruleset.dart';
-import 'package:roller_derby_jam_timer/screens/settings_screen.dart';
-import 'package:roller_derby_jam_timer/screens/game_setup_screen.dart';
-import 'package:roller_derby_jam_timer/screens/jam_timer_screen.dart';
-import 'package:roller_derby_jam_timer/services/local_game_engine.dart';
-import 'package:roller_derby_jam_timer/widgets/swipe_button.dart';
-import 'package:roller_derby_jam_timer/widgets/time_edit_dialog.dart';
-import 'package:roller_derby_jam_timer/widgets/prominent_period_clock.dart';
-import 'package:roller_derby_jam_timer/widgets/clock_display.dart';
+import 'package:jam_ready/models/scoreboard_state.dart';
+import 'package:jam_ready/models/game_config.dart';
+import 'package:jam_ready/models/ruleset.dart';
+import 'package:jam_ready/screens/settings_screen.dart';
+import 'package:jam_ready/screens/game_setup_screen.dart';
+import 'package:jam_ready/screens/jam_timer_screen.dart';
+import 'package:jam_ready/services/local_game_engine.dart';
+import 'package:jam_ready/widgets/swipe_button.dart';
+import 'package:jam_ready/widgets/time_edit_dialog.dart';
+import 'package:jam_ready/widgets/prominent_period_clock.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -166,7 +165,7 @@ void main() {
       await tester.pumpAndSettle();
 
       // Should now show jam timer screen
-      expect(find.text('ROLLER DERBY JAM TIMER'), findsOneWidget);
+      expect(find.text('JamReady'), findsOneWidget);
     });
 
     testWidgets('offline game shows team names from setup', (tester) async {

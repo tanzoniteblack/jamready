@@ -7,11 +7,11 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
-import 'package:roller_derby_jam_timer/main.dart' as app;
-import 'package:roller_derby_jam_timer/models/scoreboard_state.dart';
-import 'package:roller_derby_jam_timer/screens/jam_timer_screen.dart';
-import 'package:roller_derby_jam_timer/widgets/jam_controls.dart';
-import 'package:roller_derby_jam_timer/widgets/swipe_button.dart';
+import 'package:jam_ready/main.dart' as app;
+import 'package:jam_ready/models/scoreboard_state.dart';
+import 'package:jam_ready/screens/jam_timer_screen.dart';
+import 'package:jam_ready/widgets/jam_controls.dart';
+import 'package:jam_ready/widgets/swipe_button.dart';
 
 class ScoreboardTestClient {
   ScoreboardTestClient(this._channel);

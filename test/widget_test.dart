@@ -4,9 +4,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'package:roller_derby_jam_timer/models/scoreboard_state.dart';
-import 'package:roller_derby_jam_timer/screens/settings_screen.dart';
-import 'package:roller_derby_jam_timer/screens/jam_timer_screen.dart';
+import 'package:jam_ready/models/scoreboard_state.dart';
+import 'package:jam_ready/screens/settings_screen.dart';
+import 'package:jam_ready/screens/jam_timer_screen.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -66,7 +66,7 @@ void main() {
     await tester.pump();
 
     // Verify jam timer screen elements are present
-    expect(find.text('ROLLER DERBY JAM TIMER'), findsOneWidget);
+    expect(find.text('JamReady'), findsOneWidget);
 
     // Verify settings button is present
     expect(find.byIcon(Icons.settings), findsOneWidget);
