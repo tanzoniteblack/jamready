@@ -229,32 +229,9 @@ extension _JamTimerLayout on _JamTimerScreenState {
                     const Spacer(),
 
                     // Timeout Type Buttons OR normal controls
-                    if (state.inTimeout)
-                      _buildTimeoutTypeSection(state, isEnabled, scaleFactor)
-                    else
-                      JamControls(
-                        inJam: state.inJam,
-                        isPrePeriod: _isPrePeriod(state),
-                        isIntermission:
-                            (state.clocks['Intermission']?.running ?? false) ||
-                            (state.clocks['Period']?.number == 0),
-                        startLabel: state.labelStart,
-                        stopLabel: state.labelStop,
-                        timeoutLabel: state.labelTimeout,
-                        alertColor: alertColor,
-                        enabled: isEnabled,
-                        scaleFactor: scaleFactor,
-                        jamClockNumber: state.clocks['Jam']?.number ?? 0,
-                        lineupClockNumber: state.clocks['Lineup']?.number ?? 0,
-                        onStartJam: () => _engine?.startJam(),
-                        onStopJam: () => _engine?.stopJam(),
-                        onTimeout: () => _engine?.startTimeout(),
-                      ),
+                    _buildControlDeck(state, isEnabled, scaleFactor, alertColor),
 
-                    // Undo Section at bottom
-                    SizedBox(height: 16 * scaleFactor),
-                    _buildUndoSection(state, isEnabled),
-                    SizedBox(height: 16 * scaleFactor),
+                    SizedBox(height: 12 * scaleFactor),
                   ],
                 ),
               ),
@@ -274,6 +251,62 @@ extension _JamTimerLayout on _JamTimerScreenState {
 
         return scrollView;
       },
+    );
+  }
+
+  Widget _buildControlDeck(
+    ScoreboardState state,
+    bool isEnabled,
+    double scaleFactor,
+    Color alertColor,
+  ) {
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.fromLTRB(
+        12 * scaleFactor,
+        12 * scaleFactor,
+        12 * scaleFactor,
+        10 * scaleFactor,
+      ),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.035),
+        borderRadius: BorderRadius.circular(20 * scaleFactor),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.24),
+            blurRadius: 14 * scaleFactor,
+            offset: Offset(0, 6 * scaleFactor),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          if (state.inTimeout)
+            _buildTimeoutTypeSection(state, isEnabled, scaleFactor)
+          else
+            JamControls(
+              inJam: state.inJam,
+              isPrePeriod: _isPrePeriod(state),
+              isIntermission:
+                  (state.clocks['Intermission']?.running ?? false) ||
+                  (state.clocks['Period']?.number == 0),
+              startLabel: state.labelStart,
+              stopLabel: state.labelStop,
+              timeoutLabel: state.labelTimeout,
+              alertColor: alertColor,
+              enabled: isEnabled,
+              scaleFactor: scaleFactor,
+              jamClockNumber: state.clocks['Jam']?.number ?? 0,
+              lineupClockNumber: state.clocks['Lineup']?.number ?? 0,
+              onStartJam: () => _engine?.startJam(),
+              onStopJam: () => _engine?.stopJam(),
+              onTimeout: () => _engine?.startTimeout(),
+            ),
+          SizedBox(height: 10 * scaleFactor),
+          _buildUndoSection(state, isEnabled),
+        ],
+      ),
     );
   }
 }

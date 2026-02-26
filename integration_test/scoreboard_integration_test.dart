@@ -123,7 +123,7 @@ Future<ScoreboardTestClient> _launchAppAndConnect(
   // Wait for settings screen to be visible
   await _pumpUntil(
     tester,
-    () => find.text('Game Hub').evaluate().isNotEmpty,
+    () => find.widgetWithText(TextFormField, 'Host / IP Address').evaluate().isNotEmpty,
     timeout: const Duration(seconds: 10),
   );
 
@@ -138,7 +138,7 @@ Future<ScoreboardTestClient> _launchAppAndConnect(
   await tester.pump();
 
   // Tap the CONNECT button
-  final connectButton = find.text('CONNECT');
+  final connectButton = find.text('START REMOTE SESSION');
   await tester.tap(connectButton);
   await tester.pump(const Duration(seconds: 1));
 

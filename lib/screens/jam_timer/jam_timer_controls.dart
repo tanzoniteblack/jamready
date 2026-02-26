@@ -409,17 +409,14 @@ extension _JamTimerControls on _JamTimerScreenState {
   Widget _buildUndoSection(ScoreboardState state, bool isEnabled) {
     final hasUndoAction = state.hasUndoAction;
 
-    return Padding(
-      padding: const EdgeInsets.only(top: 16),
-      child: SwipeButton(
-        label: hasUndoAction ? state.labelUndo : "No Undo Available",
-        enabled: isEnabled && hasUndoAction,
-        color: const Color(0xFF455A64),
-        compact: true,
-        onConfirmed: () {
-          _engine?.undo();
-        },
-      ),
+    return SwipeButton(
+      label: hasUndoAction ? state.labelUndo : "No Undo Available",
+      enabled: isEnabled && hasUndoAction,
+      color: const Color(0xFF455A64),
+      compact: true,
+      onConfirmed: () {
+        _engine?.undo();
+      },
     );
   }
 }
