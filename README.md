@@ -1,17 +1,78 @@
-# roller_derby_scoreboard_flutter
+# JamReady
 
-A new Flutter project.
+JamReady is a Flutter app for managing a Roller Derby jam timer, including support for remote scoreboard sessions compatible with CRG Derby Scoreboard.
 
-## Getting Started
+## Prerequisites
 
-This project is a starting point for a Flutter application.
+- Flutter SDK (stable channel)
+- Dart SDK (installed with Flutter)
+- Xcode (for iOS/macOS targets) and/or Android Studio (for Android targets)
 
-A few resources to get you started if this is your first Flutter project:
+Verify your environment:
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+```bash
+flutter doctor
+```
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+## Setup
+
+From the project root:
+
+```bash
+flutter pub get
+```
+
+## Run The App
+
+List connected devices:
+
+```bash
+flutter devices
+```
+
+Run on the selected device:
+
+```bash
+flutter run
+```
+
+Run on a specific device:
+
+```bash
+flutter run -d <device-id>
+```
+
+## Testing
+
+Run all unit/widget tests:
+
+```bash
+flutter test
+```
+
+Run a single test file:
+
+```bash
+flutter test test/widget_test.dart
+```
+
+Run integration tests (requires a running emulator/simulator or physical device as well as CRG scoreboard running):
+
+```bash
+flutter test integration_test
+```
+
+## Static Analysis
+
+Run analyzer checks:
+
+```bash
+flutter analyze
+```
+
+## Project Structure
+
+- `lib/` app source code (screens, widgets, models, services)
+- `test/` unit and widget tests
+- `integration_test/` integration tests
+- `assets/` app assets
