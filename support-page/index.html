@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>JamReady</title>
+    <meta
+      name="description"
+      content="JamReady is a free roller derby jam timer app with local and remote scoreboard-compatible modes."
+    />
+    <link rel="icon" type="image/png" href="assets/icon/icon.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Roboto+Mono:wght@500;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="bg-glow" aria-hidden="true"></div>
+
+    <header class="site-header wrap">
+      <a class="brand" href="#top" aria-label="JamReady home">
+        <img src="assets/icon/icon.png" alt="JamReady icon" />
+        <span>JamReady</span>
+      </a>
+      <a class="support-link" href="#support">Contact</a>
+    </header>
+
+    <main id="top">
+      <section class="hero wrap">
+        <div class="hero-copy">
+          <p class="eyebrow">Roller Derby Jam Timer</p>
+          <h1>JamReady</h1>
+          <p>
+            JamReady is a free app for running roller derby jams with clear
+            timing controls, alerts, and CRG scoreboard-compatible remote sessions.
+          </p>
+        </div>
+        <div class="hero-shot">
+          <img
+            src="assets/screenshots/stop-jam.png"
+            alt="JamReady stop jam"
+            loading="eager"
+          />
+        </div>
+      </section>
+
+      <section class="highlights wrap" aria-label="Key app highlights">
+        <article>
+          <h2>What it is</h2>
+          <p>
+            A simple timer app for roller derby jams, built to be practical
+            during games and practices.
+          </p>
+        </article>
+        <article>
+          <h2>Compatibility</h2>
+          <p>
+            JamReady can be used standalone to run a bout in a fully
+            local mode or connected to a CRG Scoreboard server.
+          </p>
+        </article>
+        <article>
+          <h2>Questions?</h2>
+          <p>
+            For help, use the support email listed below.
+          </p>
+        </article>
+      </section>
+
+      <section id="screenshots" class="screens wrap">
+        <div class="section-head">
+          <h2>Screenshots</h2>
+          <p>Tap any image to enlarge.</p>
+        </div>
+        <div class="shot-grid">
+          <button class="shot" data-full="assets/screenshots/home-page.png">
+            <img src="assets/screenshots/home-page.png" alt="Home page screen" loading="lazy" />
+          </button>
+          <button class="shot" data-full="assets/screenshots/lineup-warning.png">
+            <img src="assets/screenshots/lineup-warning.png" alt="Lineup warning state" loading="lazy" />
+          </button>
+          <button class="shot" data-full="assets/screenshots/lineup-alert.png">
+            <img src="assets/screenshots/lineup-alert.png" alt="Lineup alert state" loading="lazy" />
+          </button>
+          <button class="shot" data-full="assets/screenshots/stop-jam.png">
+            <img src="assets/screenshots/stop-jam.png" alt="Stop jam control state" loading="lazy" />
+          </button>
+          <button class="shot" data-full="assets/screenshots/timeout.png">
+            <img src="assets/screenshots/timeout.png" alt="Timeout control state" loading="lazy" />
+          </button>
+          <button class="shot" data-full="assets/screenshots/custom-local.png">
+            <img src="assets/screenshots/custom-local.png" alt="Local mode setup screen" loading="lazy" />
+          </button>
+        </div>
+      </section>
+
+      <section id="faq" class="faq wrap">
+        <h2>Notes & Acknowledgements</h2>
+        <details>
+          <summary>CRG Derby Scoreboard compatibility</summary>
+          <p>
+            JamReady is an independent project, but is compatible with
+            <a href="https://github.com/rollerderby/scoreboard" target="_blank" rel="noopener noreferrer">CRG Derby Scoreboard</a>.
+            The work they've done for the community is greatly appreciated!
+          </p>
+        </details>
+        <details>
+          <summary>Community testing and support</summary>
+          <p>
+            Thanks to
+            <a href="https://www.seattlederbybrats.com" target="_blank" rel="noopener noreferrer">Seattle Derby Brats</a>
+            and
+            <a href="https://sites.google.com/rainierrollerriot.com/rainierrollerriot/" target="_blank" rel="noopener noreferrer">Rainier Roller Riot</a>,
+            both 501(c)(3) organizations, for helping test this app.
+            If you are able, please consider making a small donation to support their programs.
+          </p>
+        </details>
+        <details>
+          <summary>How to get support</summary>
+          <p>
+            Email
+            <a href="mailto:info@jamready.net">info@jamready.net</a>
+            with your device model, app version, and a short issue summary.
+          </p>
+        </details>
+      </section>
+
+      <section id="support" class="support wrap">
+        <h2>Support Email</h2>
+        <p>
+          For support questions, contact
+          <a href="mailto:info@jamready.net">info@jamready.net</a>.
+        </p>
+      </section>
+    </main>
+
+    <footer class="site-footer wrap">
+      <p>© <span id="year"></span> Ryan Smith</p>
+    </footer>
+
+    <dialog id="lightbox" class="lightbox">
+      <button class="lightbox-close" aria-label="Close image">Close</button>
+      <img src="" alt="Expanded screenshot" />
+    </dialog>
+
+    <script src="script.js"></script>
+  </body>
+</html>

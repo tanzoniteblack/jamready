@@ -1,0 +1,356 @@
+:root {
+  --bg: #0e0f12;
+  --bg-soft: #14161b;
+  --panel: #1e2229;
+  --text: #f3f5f8;
+  --muted: #b8bec8;
+  --healthy: #16a34a;
+  --warn: #e6a400;
+  --alert: #c4572a;
+  --critical: #cf3636;
+  --line: rgba(255, 255, 255, 0.12);
+  --radius: 18px;
+  --shadow: 0 14px 40px rgba(0, 0, 0, 0.45);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: "Outfit", "Segoe UI", sans-serif;
+  color: var(--text);
+  background: var(--bg);
+  min-height: 100vh;
+  line-height: 1.45;
+}
+
+.bg-glow {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 50% 12%, rgba(45, 53, 67, 0.75), transparent 48%),
+    radial-gradient(circle at 0% 100%, rgba(207, 54, 54, 0.14), transparent 40%),
+    radial-gradient(circle at 100% 80%, rgba(230, 164, 0, 0.1), transparent 35%);
+  z-index: -1;
+}
+
+.wrap {
+  width: min(1080px, calc(100vw - 2rem));
+  margin: 0 auto;
+}
+
+.site-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 0;
+  position: sticky;
+  top: 0;
+  backdrop-filter: blur(8px);
+  background: rgba(14, 15, 18, 0.72);
+  z-index: 12;
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+  text-decoration: none;
+  color: var(--text);
+  font-weight: 700;
+  letter-spacing: 0.3px;
+}
+
+.brand img {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 0.6rem;
+}
+
+.support-link {
+  color: var(--text);
+  text-decoration: none;
+  border: 1px solid var(--line);
+  padding: 0.45rem 0.8rem;
+  border-radius: 999px;
+  font-size: 0.95rem;
+}
+
+.hero {
+  display: grid;
+  grid-template-columns: 1.1fr 0.9fr;
+  gap: 1.5rem;
+  padding: 2.2rem 0 1rem;
+  align-items: center;
+}
+
+.eyebrow {
+  margin: 0;
+  text-transform: uppercase;
+  letter-spacing: 1.4px;
+  font-size: 0.8rem;
+  color: var(--healthy);
+  font-weight: 700;
+}
+
+h1 {
+  margin: 0.35rem 0 0.75rem;
+  font-size: clamp(2rem, 5vw, 3.2rem);
+  line-height: 1.05;
+}
+
+.hero-copy p {
+  margin: 0;
+  color: var(--muted);
+  max-width: 42ch;
+}
+
+.hero-actions {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 1.2rem;
+}
+
+.btn {
+  text-decoration: none;
+  border-radius: 12px;
+  padding: 0.65rem 1rem;
+  font-weight: 600;
+  border: 1px solid transparent;
+}
+
+.btn-primary {
+  color: #111;
+  background: linear-gradient(140deg, #f5c348, #d18e23);
+}
+
+.btn-ghost {
+  color: var(--text);
+  border-color: var(--line);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.hero-shot {
+  justify-self: center;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02));
+  border: 1px solid var(--line);
+  border-radius: 26px;
+  padding: 0.7rem;
+  box-shadow: var(--shadow);
+}
+
+.hero-shot img {
+  display: block;
+  width: min(100%, 330px);
+  max-height: 70vh;
+  object-fit: cover;
+  border-radius: 20px;
+}
+
+.highlights {
+  margin-top: 1rem;
+  display: grid;
+  gap: 0.85rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.highlights article {
+  border: 1px solid var(--line);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.01));
+  border-radius: var(--radius);
+  padding: 1rem;
+}
+
+.highlights h2 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.highlights p {
+  margin: 0.45rem 0 0;
+  color: var(--muted);
+}
+
+.screens,
+.faq,
+.support {
+  margin-top: 2.7rem;
+}
+
+.section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.8rem;
+}
+
+.section-head h2,
+.faq h2,
+.support h2 {
+  margin: 0;
+  font-size: 1.6rem;
+}
+
+.section-head p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.shot-grid {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.shot {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 0;
+  overflow: hidden;
+  background: var(--bg-soft);
+  cursor: pointer;
+}
+
+.shot img {
+  width: 100%;
+  aspect-ratio: 9 / 19;
+  object-fit: cover;
+  display: block;
+}
+
+.faq {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 1rem;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+details {
+  border-top: 1px solid var(--line);
+  padding: 0.8rem 0;
+}
+
+details:first-of-type {
+  border-top: 0;
+}
+
+summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+details p {
+  color: var(--muted);
+  margin: 0.55rem 0 0;
+}
+
+a {
+  color: #f7cf58;
+}
+
+.support {
+  border: 1px solid rgba(214, 148, 52, 0.5);
+  border-radius: var(--radius);
+  padding: 1rem;
+  background: linear-gradient(180deg, rgba(214, 148, 52, 0.08), rgba(214, 148, 52, 0.02));
+}
+
+.support p {
+  margin: 0.55rem 0 0;
+}
+
+.tiny {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.site-footer {
+  padding: 2.5rem 0 2rem;
+  color: var(--muted);
+}
+
+.site-footer p {
+  margin: 0;
+}
+
+.lightbox {
+  width: min(92vw, 460px);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  padding: 0.9rem;
+  background: #0a0b0f;
+}
+
+.lightbox::backdrop {
+  background: rgba(0, 0, 0, 0.8);
+}
+
+.lightbox img {
+  width: 100%;
+  border-radius: 12px;
+}
+
+.lightbox-close {
+  display: inline-block;
+  margin-bottom: 0.6rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 0.3rem 0.7rem;
+  background: #151821;
+  color: var(--text);
+  cursor: pointer;
+}
+
+@media (max-width: 900px) {
+  .hero {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
+  .hero-shot {
+    justify-self: stretch;
+    max-width: 360px;
+    width: 100%;
+    margin: 0 auto;
+  }
+
+  .highlights {
+    grid-template-columns: 1fr;
+  }
+
+  .shot-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 560px) {
+  .site-header {
+    padding: 0.7rem 0;
+  }
+
+  .support-link {
+    font-size: 0.86rem;
+  }
+
+  .shot-grid {
+    display: flex;
+    overflow-x: auto;
+    gap: 0.7rem;
+    padding-bottom: 0.4rem;
+    scroll-snap-type: x mandatory;
+  }
+
+  .shot {
+    flex: 0 0 44vw;
+    scroll-snap-align: center;
+  }
+}
