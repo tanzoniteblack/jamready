@@ -86,7 +86,7 @@ String _scoreboardHost() {
 
 int _scoreboardPort() {
   const port = String.fromEnvironment('SCOREBOARD_PORT');
-  return int.tryParse(port) ?? 8001;
+  return int.tryParse(port) ?? 8000;
 }
 
 ScoreboardState _state(WidgetTester tester) {

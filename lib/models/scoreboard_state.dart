@@ -18,13 +18,10 @@ class ScoreboardState extends ChangeNotifier {
       _connectionStatus.startsWith("Connecting") ||
       _connectionStatus.startsWith("Reconnecting");
 
-  /// `true` when a timeout or official review is in progress.
-  /// Primary signal is the timeout clock running; label/owner are fallbacks
-  /// for transient update ordering differences from remote servers.
-  bool get inTimeout =>
-      (clocks['Timeout']?.running ?? false) ||
-      timeoutOwner.isNotEmpty ||
-      labelStop == "End Timeout";
+  /// `true` when timeout phase is active.
+  /// Matches CRG official phase selection, which keys timeout state off the
+  /// timeout clock running flag.
+  bool get inTimeout => clocks['Timeout']?.running ?? false;
 
   /// `true` when an official review (rather than a regular timeout) is active.
   bool get isOfficialReview =>
