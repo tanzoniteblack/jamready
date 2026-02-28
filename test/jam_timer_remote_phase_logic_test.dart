@@ -141,4 +141,25 @@ void main() {
 
     expect(find.text('PERIOD 0'), findsNothing);
   });
+
+  testWidgets('second-lineup overlap shows lineup clock as active', (
+    tester,
+  ) async {
+    final state = ScoreboardState();
+    state.setConnectionStatus('Connected');
+    state.clocks['Lineup']!.displayName = 'Lineup';
+    state.clocks['Lineup']!.time = 20000;
+    state.clocks['Lineup']!.running = true;
+    state.clocks['Timeout']!.displayName = 'Timeout';
+    state.clocks['Timeout']!.time = 50000;
+    state.clocks['Timeout']!.running = true;
+    state.timeoutOwner = 'O';
+
+    await tester.pumpWidget(buildHarness(state));
+    await tester.pump();
+
+    expect(find.text('LINEUP'), findsOneWidget);
+    expect(find.text('0:20'), findsOneWidget);
+    expect(find.text('0:50'), findsNothing);
+  });
 }

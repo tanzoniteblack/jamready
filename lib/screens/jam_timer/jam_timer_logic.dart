@@ -2,22 +2,31 @@ part of '../jam_timer_screen.dart';
 
 extension _JamTimerLogic on _JamTimerScreenState {
   Clock _determineActiveClock(ScoreboardState state) {
+    final lineupRunning = state.clocks['Lineup']!.running;
+    final timeoutRunning = state.clocks['Timeout']!.running;
+
     // Priority 1: Jam clock while jam is in progress (even if jam clock is 0).
     if (state.clocks['Jam']!.running || state.inJam) {
       return state.clocks['Jam']!;
     }
 
-    // Priority 2: Timeout clock.
-    if (state.inTimeout || state.clocks['Timeout']!.running) {
-      return state.clocks['Timeout']!;
-    }
-
-    // Priority 3: Lineup clock.
-    if (state.clocks['Lineup']!.running) {
+    // Priority 2: CRG "SecondLineup" overlap (lineup + timeout running).
+    // In this state, lineup is the primary clock while timeout still exists.
+    if (lineupRunning && timeoutRunning) {
       return state.clocks['Lineup']!;
     }
 
-    // Priority 4: Intermission clock (except post-game final state).
+    // Priority 3: Timeout clock.
+    if (timeoutRunning) {
+      return state.clocks['Timeout']!;
+    }
+
+    // Priority 4: Lineup clock.
+    if (lineupRunning) {
+      return state.clocks['Lineup']!;
+    }
+
+    // Priority 5: Intermission clock (except post-game final state).
     if (state.clocks['Intermission']!.running && !state.noMoreJam) {
       return state.clocks['Intermission']!;
     }

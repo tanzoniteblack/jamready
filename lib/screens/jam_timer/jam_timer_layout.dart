@@ -268,6 +268,10 @@ extension _JamTimerLayout on _JamTimerScreenState {
     Color alertColor,
   ) {
     final controlsEnabled = isEnabled && !_isGameOver(state);
+    final timeoutRunning = state.clocks['Timeout']?.running ?? false;
+    final lineupRunning = state.clocks['Lineup']?.running ?? false;
+    final inOverlapTimeoutState = timeoutRunning && (state.inJam || lineupRunning);
+    final showTimeoutOnly = timeoutRunning && !inOverlapTimeoutState;
 
     return Container(
       width: double.infinity,
@@ -291,9 +295,9 @@ extension _JamTimerLayout on _JamTimerScreenState {
       ),
       child: Column(
         children: [
-          if (state.inTimeout)
+          if (showTimeoutOnly)
             _buildTimeoutTypeSection(state, controlsEnabled, scaleFactor)
-          else
+          else ...[
             JamControls(
               inJam: state.inJam,
               isPrePeriod: _isPrePeriod(state),
@@ -312,6 +316,11 @@ extension _JamTimerLayout on _JamTimerScreenState {
               onStopJam: () => _engine?.stopJam(),
               onTimeout: () => _engine?.startTimeout(),
             ),
+            if (inOverlapTimeoutState) ...[
+              SizedBox(height: 16 * scaleFactor),
+              _buildTimeoutTypeSection(state, controlsEnabled, scaleFactor),
+            ],
+          ],
           SizedBox(height: 10 * scaleFactor),
           _buildUndoSection(state, controlsEnabled),
         ],
