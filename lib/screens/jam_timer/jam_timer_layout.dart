@@ -9,8 +9,8 @@ extension _JamTimerLayout on _JamTimerScreenState {
     final connectionColor = state.isConnected
         ? Colors.green
         : state.isConnecting
-            ? Colors.orange
-            : Colors.red;
+        ? Colors.orange
+        : Colors.red;
 
     return AppBar(
       toolbarHeight: _isLocalMode ? 62 : 74,
@@ -55,10 +55,7 @@ extension _JamTimerLayout on _JamTimerScreenState {
       scrolledUnderElevation: 0,
       flexibleSpace: Align(
         alignment: Alignment.bottomCenter,
-        child: Container(
-          height: 1,
-          color: Colors.white.withValues(alpha: 0.1),
-        ),
+        child: Container(height: 1, color: Colors.white.withValues(alpha: 0.1)),
       ),
       leading: IconButton(
         icon: Icon(Icons.home_rounded, color: Colors.white70),
@@ -70,7 +67,10 @@ extension _JamTimerLayout on _JamTimerScreenState {
             padding: const EdgeInsets.only(right: 12),
             child: Center(
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 6,
+                ),
                 decoration: BoxDecoration(
                   color: Colors.orange.withValues(alpha: 0.16),
                   borderRadius: BorderRadius.circular(999),
@@ -116,8 +116,8 @@ extension _JamTimerLayout on _JamTimerScreenState {
                 state.isConnected
                     ? "LIVE"
                     : state.isConnecting
-                        ? "CONNECTING"
-                        : "OFFLINE",
+                    ? "CONNECTING"
+                    : "OFFLINE",
                 style: TextStyle(
                   color: connectionColor,
                   fontSize: 10,
@@ -197,7 +197,9 @@ extension _JamTimerLayout on _JamTimerScreenState {
                     const Spacer(),
 
                     // Active Game Clock or Ready indicator
-                    if (_isReadyToStart(state))
+                    if (_isGameOver(state))
+                      _buildGameOverDisplay(isEnabled, scaleFactor)
+                    else if (_isReadyToStart(state))
                       _buildReadyToStartDisplay(
                         state,
                         isEnabled,
@@ -229,7 +231,12 @@ extension _JamTimerLayout on _JamTimerScreenState {
                     const Spacer(),
 
                     // Timeout Type Buttons OR normal controls
-                    _buildControlDeck(state, isEnabled, scaleFactor, alertColor),
+                    _buildControlDeck(
+                      state,
+                      isEnabled,
+                      scaleFactor,
+                      alertColor,
+                    ),
 
                     SizedBox(height: 12 * scaleFactor),
                   ],
@@ -260,6 +267,8 @@ extension _JamTimerLayout on _JamTimerScreenState {
     double scaleFactor,
     Color alertColor,
   ) {
+    final controlsEnabled = isEnabled && !_isGameOver(state);
+
     return Container(
       width: double.infinity,
       padding: EdgeInsets.fromLTRB(
@@ -283,7 +292,7 @@ extension _JamTimerLayout on _JamTimerScreenState {
       child: Column(
         children: [
           if (state.inTimeout)
-            _buildTimeoutTypeSection(state, isEnabled, scaleFactor)
+            _buildTimeoutTypeSection(state, controlsEnabled, scaleFactor)
           else
             JamControls(
               inJam: state.inJam,
@@ -295,7 +304,7 @@ extension _JamTimerLayout on _JamTimerScreenState {
               stopLabel: state.labelStop,
               timeoutLabel: state.labelTimeout,
               alertColor: alertColor,
-              enabled: isEnabled,
+              enabled: controlsEnabled,
               scaleFactor: scaleFactor,
               jamClockNumber: state.clocks['Jam']?.number ?? 0,
               lineupClockNumber: state.clocks['Lineup']?.number ?? 0,
@@ -304,7 +313,7 @@ extension _JamTimerLayout on _JamTimerScreenState {
               onTimeout: () => _engine?.startTimeout(),
             ),
           SizedBox(height: 10 * scaleFactor),
-          _buildUndoSection(state, isEnabled),
+          _buildUndoSection(state, controlsEnabled),
         ],
       ),
     );

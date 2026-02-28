@@ -26,9 +26,10 @@ extension _JamTimerControls on _JamTimerScreenState {
         ? state.clocks['Intermission']!
         : state.clocks['Period']!;
 
-    final String label = clock.displayName.isNotEmpty
-        ? "${clock.displayName} ${clock.number}"
-        : "${clock.name} ${clock.number}";
+    final baseLabel = clock.displayName.isNotEmpty
+        ? clock.displayName
+        : clock.name;
+    final String label = clock.number > 0 ? "$baseLabel ${clock.number}" : baseLabel;
 
     final contentColor = isEnabled ? Colors.white70 : Colors.white24;
 
@@ -270,8 +271,9 @@ extension _JamTimerControls on _JamTimerScreenState {
                               ? (isActive ? textColor : Colors.white)
                               : Colors.white38,
                           fontSize: 14 * scaleFactor,
-                          fontWeight:
-                              isActive ? FontWeight.bold : FontWeight.w500,
+                          fontWeight: isActive
+                              ? FontWeight.bold
+                              : FontWeight.w500,
                         ),
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -399,6 +401,37 @@ extension _JamTimerControls on _JamTimerScreenState {
             style: AppTextStyles.clockTime.copyWith(
               color: color,
               fontSize: 72 * scaleFactor,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildGameOverDisplay(bool isEnabled, double scaleFactor) {
+    final color = isEnabled ? Colors.red.shade400 : Colors.white24;
+
+    return Container(
+      padding: EdgeInsets.symmetric(
+        horizontal: 24 * scaleFactor,
+        vertical: 12 * scaleFactor,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            "FINAL",
+            style: AppTextStyles.clockLabel.copyWith(
+              fontSize: 18 * scaleFactor,
+              color: color,
+              height: 1.0,
+            ),
+          ),
+          Text(
+            "GAME OVER",
+            style: AppTextStyles.clockTime.copyWith(
+              color: color,
+              fontSize: 52 * scaleFactor,
             ),
           ),
         ],

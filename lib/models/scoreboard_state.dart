@@ -19,9 +19,12 @@ class ScoreboardState extends ChangeNotifier {
       _connectionStatus.startsWith("Reconnecting");
 
   /// `true` when a timeout or official review is in progress.
-  /// Derived from the Stop label sent by the server, which is "End Timeout"
-  /// during any timeout phase regardless of CRG version.
-  bool get inTimeout => labelStop == "End Timeout";
+  /// Primary signal is the timeout clock running; label/owner are fallbacks
+  /// for transient update ordering differences from remote servers.
+  bool get inTimeout =>
+      (clocks['Timeout']?.running ?? false) ||
+      timeoutOwner.isNotEmpty ||
+      labelStop == "End Timeout";
 
   /// `true` when an official review (rather than a regular timeout) is active.
   bool get isOfficialReview =>

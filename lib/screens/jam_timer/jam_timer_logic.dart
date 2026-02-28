@@ -2,27 +2,32 @@ part of '../jam_timer_screen.dart';
 
 extension _JamTimerLogic on _JamTimerScreenState {
   Clock _determineActiveClock(ScoreboardState state) {
-    // Priority 1: Jam Clock - running OR InJam flag is true
+    // Priority 1: Jam clock while jam is in progress (even if jam clock is 0).
     if (state.clocks['Jam']!.running || state.inJam) {
       return state.clocks['Jam']!;
     }
 
-    // Priority 2: Lineup Clock - running
+    // Priority 2: Timeout clock.
+    if (state.inTimeout || state.clocks['Timeout']!.running) {
+      return state.clocks['Timeout']!;
+    }
+
+    // Priority 3: Lineup clock.
     if (state.clocks['Lineup']!.running) {
       return state.clocks['Lineup']!;
     }
 
-    // Priority 3: Timeout Clock - running
-    if (state.clocks['Timeout']!.running) {
-      return state.clocks['Timeout']!;
-    }
-
-    // Fall through to Period/Intermission
-    if (state.clocks['Intermission']!.running) {
+    // Priority 4: Intermission clock (except post-game final state).
+    if (state.clocks['Intermission']!.running && !state.noMoreJam) {
       return state.clocks['Intermission']!;
     }
 
-    // Default: show Lineup
+    // Fallback: period clock when no active primary phase.
+    if (state.clocks['Period']!.running || state.clocks['Period']!.time > 0) {
+      return state.clocks['Period']!;
+    }
+
+    // Last resort.
     return state.clocks['Lineup']!;
   }
 
@@ -37,12 +42,25 @@ extension _JamTimerLogic on _JamTimerScreenState {
     final intermission = state.clocks['Intermission'];
     final lineup = state.clocks['Lineup'];
     final period = state.clocks['Period'];
+    final jam = state.clocks['Jam'];
+    final timeout = state.clocks['Timeout'];
 
-    if (lineup == null || lineup.running) return false;
-    if (period == null || period.running) return false;
+    if (state.noMoreJam) return false;
+    if (state.inJam || state.inTimeout) return false;
+    if (jam == null || timeout == null || lineup == null || period == null) {
+      return false;
+    }
+    if (jam.running ||
+        timeout.running ||
+        lineup.running ||
+        intermission?.running == true) {
+      return false;
+    }
+
+    if (period.running) return false;
 
     // Pre-game: Period 0
-    if (period.number == 0 && !lineup.running) {
+    if (period.number == 0) {
       return true;
     }
 
@@ -58,16 +76,19 @@ extension _JamTimerLogic on _JamTimerScreenState {
   }
 
   bool _isPrePeriod(ScoreboardState state) {
+    if (!_isReadyToStart(state)) return false;
+
+    // Use slider only for true pre-period lineup starts.
     if (state.clocks['Period']?.number == 0) return true;
-    if (state.clocks['Intermission']?.running == true) return true;
-    if (_isReadyToStart(state)) return true;
+    return state.labelStart.toLowerCase().contains('lineup');
+  }
 
-    bool anyClockRunning = state.clocks.values.any((c) => c.running);
-    bool inTimeout = state.clocks['Timeout']!.running;
-
-    if (!anyClockRunning && !state.inJam && !inTimeout) {
-      return true;
+  bool _isGameOver(ScoreboardState state) {
+    if (!state.noMoreJam) return false;
+    if (state.inJam || state.clocks['Jam']?.running == true) return false;
+    if (state.inTimeout || state.clocks['Timeout']?.running == true) {
+      return false;
     }
-    return false;
+    return true;
   }
 }
