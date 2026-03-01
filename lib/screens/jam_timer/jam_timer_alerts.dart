@@ -1,6 +1,8 @@
 part of '../jam_timer_screen.dart';
 
 extension _JamTimerAlerts on _JamTimerScreenState {
+  static const List<int> _teamTimeoutHapticThresholdSeconds = [50, 55, 60];
+
   void _triggerHaptic(int level) {
     if (!_alertsInitialized) {
       // Absorb initial alert state without vibrating so the first real state
@@ -27,7 +29,62 @@ extension _JamTimerAlerts on _JamTimerScreenState {
     }
   }
 
+  bool _isTeamOwnedRegularTimeout(ScoreboardState state) {
+    if (!(state.clocks['Timeout']?.running ?? false)) return false;
+    if (state.isOfficialReview) return false;
+
+    final owner = state.timeoutOwner.trim();
+    if (owner.isEmpty || owner == "O") return false;
+
+    if (_isLocalMode) {
+      return owner == '1' || owner == '2';
+    }
+
+    return owner == state.team1.serverId || owner == state.team2.serverId;
+  }
+
+  void _handleTeamTimeoutThresholdHaptics(ScoreboardState state) {
+    final timeoutClock = state.clocks['Timeout'];
+    final ownerKey = '${state.timeoutOwner}|${state.officialReview}';
+
+    if (_lastTimeoutAlertOwnerKey != ownerKey) {
+      _timeoutThresholdsTriggered.clear();
+      _lastTimeoutAlertOwnerKey = ownerKey;
+    }
+
+    if (timeoutClock == null || !timeoutClock.running) {
+      _timeoutThresholdsTriggered.clear();
+      _lastTimeoutAlertOwnerKey = "";
+      return;
+    }
+
+    if (!_isTeamOwnedRegularTimeout(state)) {
+      return;
+    }
+
+    final currentSeconds = timeoutClock.time ~/ 1000;
+
+    if (!_alertsInitialized) {
+      for (final threshold in _teamTimeoutHapticThresholdSeconds) {
+        if (currentSeconds >= threshold) {
+          _timeoutThresholdsTriggered.add(threshold);
+        }
+      }
+      return;
+    }
+
+    for (final threshold in _teamTimeoutHapticThresholdSeconds) {
+      if (currentSeconds >= threshold &&
+          !_timeoutThresholdsTriggered.contains(threshold)) {
+        _timeoutThresholdsTriggered.add(threshold);
+        Vibration.vibrate(duration: 50);
+      }
+    }
+  }
+
   Color _determineAlertColor(ScoreboardState state) {
+    _handleTeamTimeoutThresholdHaptics(state);
+
     Clock? activeClock;
     bool isCountUp = false;
     int duration = 0;

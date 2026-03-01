@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 
@@ -61,6 +62,23 @@ class _FakeRemoteEngine implements GameEngine {
 }
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
+  const vibrationChannel = MethodChannel('vibration');
+  final List<MethodCall> vibrationCalls = <MethodCall>[];
+
+  setUpAll(() {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(vibrationChannel, (MethodCall methodCall) async {
+      vibrationCalls.add(methodCall);
+      return null;
+    });
+  });
+
+  setUp(() {
+    vibrationCalls.clear();
+  });
+
   Widget buildHarness(ScoreboardState state) {
     final engine = _FakeRemoteEngine(state);
     return MultiProvider(
@@ -161,5 +179,63 @@ void main() {
     expect(find.text('LINEUP'), findsOneWidget);
     expect(find.text('0:20'), findsOneWidget);
     expect(find.text('0:50'), findsNothing);
+  });
+
+  testWidgets('team-owned timeout vibrates at 50s, 55s, and 60s only', (
+    tester,
+  ) async {
+    final state = ScoreboardState();
+    state.setConnectionStatus('Connected');
+    state.team1.serverId = 'team-1-id';
+    state.timeoutOwner = 'team-1-id';
+    state.officialReview = 'false';
+    state.clocks['Timeout']!.running = true;
+    state.clocks['Timeout']!.time = 49000;
+
+    await tester.pumpWidget(buildHarness(state));
+    await tester.pump();
+    expect(vibrationCalls, isEmpty);
+
+    state.clocks['Timeout']!.time = 50000;
+    state.notify();
+    await tester.pump();
+
+    state.clocks['Timeout']!.time = 55000;
+    state.notify();
+    await tester.pump();
+
+    state.clocks['Timeout']!.time = 60000;
+    state.notify();
+    await tester.pump();
+
+    expect(
+      vibrationCalls.where((call) => call.method == 'vibrate').length,
+      3,
+    );
+  });
+
+  testWidgets('official and unlabeled timeouts do not trigger threshold haptics', (
+    tester,
+  ) async {
+    final state = ScoreboardState();
+    state.setConnectionStatus('Connected');
+    state.team1.serverId = 'team-1-id';
+    state.clocks['Timeout']!.running = true;
+    state.clocks['Timeout']!.time = 60000;
+
+    await tester.pumpWidget(buildHarness(state));
+    await tester.pump();
+
+    state.timeoutOwner = 'O';
+    state.officialReview = 'false';
+    state.notify();
+    await tester.pump();
+
+    state.timeoutOwner = '';
+    state.officialReview = 'false';
+    state.notify();
+    await tester.pump();
+
+    expect(vibrationCalls.where((call) => call.method == 'vibrate'), isEmpty);
   });
 }

@@ -44,6 +44,8 @@ class _JamTimerScreenState extends State<JamTimerScreen>
   String _lastAlertClockName = "";
   bool _wasInJam = false;
   bool _alertsInitialized = false;
+  final Set<int> _timeoutThresholdsTriggered = <int>{};
+  String _lastTimeoutAlertOwnerKey = "";
 
   @override
   void initState() {
