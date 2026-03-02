@@ -62,6 +62,9 @@ class _FakeRemoteEngine implements GameEngine {
 
   @override
   void undo() {}
+
+  @override
+  void endGame() {}
 }
 
 void main() {

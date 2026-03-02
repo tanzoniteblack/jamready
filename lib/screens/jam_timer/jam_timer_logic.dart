@@ -162,10 +162,13 @@ extension _JamTimerLogic on _JamTimerScreenState {
     }
 
     // When the period count is known, detect via Intermission.Number.
+    // Show unofficial score while the final intermission is still running, OR
+    // after it has ended (noMoreJam confirms we are truly post-game).
     if (state.periodCount > 0) {
       final intermissionClock = state.clocks['Intermission'];
-      return intermissionClock != null && (intermissionClock.running) &&
-          intermissionClock.number >= state.periodCount;
+      if (intermissionClock == null) return false;
+      if (intermissionClock.number < state.periodCount) return false;
+      return intermissionClock.running || state.noMoreJam;
     }
 
     // Fall back to noMoreJam when period count is not yet known.

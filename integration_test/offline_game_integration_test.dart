@@ -459,8 +459,8 @@ void main() {
       expect(state.clocks['Intermission']!.running, false);
     });
 
-    testWidgets('final period ending leads to game over', (tester) async {
-      // 1-period ruleset so any period end → game over immediately
+    testWidgets('final period ending leads to unofficial score then game over', (tester) async {
+      // 1-period ruleset so any period end → unofficial score immediately
       final ruleset = Ruleset.custom(
         id: 'test_1p',
         name: 'Test 1P',
@@ -482,12 +482,18 @@ void main() {
       engine.stopJam();
       await tester.pump();
 
-      expect(engine.phase, GamePhase.gameOver);
+      // Final period → unofficial score; operator must explicitly end the game.
+      expect(engine.phase, GamePhase.unofficialScore);
       expect(state.noMoreJam, true);
+
+      engine.endGame();
+      await tester.pump();
+
+      expect(engine.phase, GamePhase.gameOver);
       expect(state.connectionStatus, 'Game Over');
     });
 
-    testWidgets('undo reverses game over and restores jam', (tester) async {
+    testWidgets('undo reverses unofficial score and restores jam', (tester) async {
       final ruleset = Ruleset.custom(
         id: 'test_1p',
         name: 'Test 1P',
@@ -561,5 +567,8 @@ void main() {
     await tapJamControl(tester, state.labelStop);
     await validateActiveDisplay(tester, .unofficialScore);
 
+    // tap End Game and confirm the game over display
+    await tapButton(tester, find.text('END GAME'));
+    await validateActiveDisplay(tester, .gameOver);
   });
 }

@@ -62,4 +62,7 @@ abstract class GameEngine {
 
   /// Undo the last action (if supported)
   void undo();
+
+  /// End the game officially (local mode only — no-op for remote engines).
+  void endGame();
 }

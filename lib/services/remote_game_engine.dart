@@ -384,4 +384,9 @@ class RemoteGameEngine implements GameEngine {
   void undo() {
     send("Set", "ScoreBoard.CurrentGame.ClockUndo", true);
   }
+
+  @override
+  void endGame() {
+    // CRG manages overtime and game-end decisions server-side; no-op here.
+  }
 }

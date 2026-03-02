@@ -23,6 +23,9 @@ enum GamePhase {
   /// Between periods
   intermission,
 
+  /// Final period has ended; waiting for overtime or end-game decision.
+  unofficialScore,
+
   /// Game has ended
   gameOver,
 }
@@ -411,7 +414,10 @@ class LocalGameEngine with WidgetsBindingObserver implements GameEngine {
     _internalClockTimes['Jam'] = jamTime;
     _state.clocks['Jam']!.number = _currentJam;
     _state.clocks['Jam']!.running = true;
-    _state.clocks['Period']!.running = true;
+    // Overtime jams have no period clock — it already expired.
+    if (!_state.inOvertime) {
+      _state.clocks['Period']!.running = true;
+    }
 
     _state.inJam = true;
     _phase = GamePhase.jam;
@@ -445,6 +451,18 @@ class LocalGameEngine with WidgetsBindingObserver implements GameEngine {
       return;
     }
 
+    if (_phase == GamePhase.unofficialScore) {
+      // User chose overtime — start an overtime lineup.
+      _state.inOvertime = true;
+      _state.noMoreJam = false;
+      _state.clocks['Lineup']!.time = 0;
+      _internalClockTimes['Lineup'] = 0;
+      _state.clocks['Lineup']!.running = true;
+      _phase = GamePhase.lineup;
+      _state.notify();
+      return;
+    }
+
     if (_phase == GamePhase.jam) {
       _endJam();
     } else if (_phase == GamePhase.timeout) {
@@ -452,12 +470,27 @@ class LocalGameEngine with WidgetsBindingObserver implements GameEngine {
     }
   }
 
+  @override
+  void endGame() {
+    _state.clocks['Jam']!.running = false;
+    _state.clocks['Period']!.running = false;
+    _state.clocks['Lineup']!.running = false;
+    _state.clocks['Timeout']!.running = false;
+    _state.inJam = false;
+    _state.noMoreJam = true;
+    _state.officialScore = true;
+    _phase = GamePhase.gameOver;
+    _state.setConnectionStatus("Game Over");
+    _state.notify();
+  }
+
   void _endJam({bool fromExpiration = false}) {
     _state.clocks['Jam']!.running = false;
     _state.inJam = false;
 
-    // Check if period ended (period expired while jam was running)
-    if (_state.clocks['Period']!.time <= 0) {
+    // Check if period ended (period expired while jam was running).
+    // Overtime jams have no period clock, so skip this check.
+    if (!_state.inOvertime && _state.clocks['Period']!.time <= 0) {
       if (!fromExpiration) {
         // Period ended because this jam was manually stopped – save undo so
         // the operator can restore both the jam and the period.
@@ -545,10 +578,9 @@ class LocalGameEngine with WidgetsBindingObserver implements GameEngine {
     _state.inJam = false;
 
     if (_currentPeriod >= ruleset.periodCount) {
-      // Game over
-      _phase = GamePhase.gameOver;
+      // Final period ended — wait for the user to choose overtime or end game.
       _state.noMoreJam = true;
-      _state.setConnectionStatus("Game Over");
+      _phase = GamePhase.unofficialScore;
       _state.notify();
       return;
     }

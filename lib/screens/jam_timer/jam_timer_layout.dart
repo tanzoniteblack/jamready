@@ -310,7 +310,9 @@ extension _JamTimerLayout on _JamTimerScreenState {
       ),
       child: Column(
         children: [
-          if (showTimeoutOnly)
+          if (_isLocalMode && _isUnofficialScore(state))
+            _buildOvertimeDecisionSection(state, isEnabled, scaleFactor)
+          else if (showTimeoutOnly)
             _buildTimeoutTypeSection(state, controlsEnabled, scaleFactor)
           else ...[
             JamControls(

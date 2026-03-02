@@ -315,6 +315,86 @@ extension _JamTimerControls on _JamTimerScreenState {
     );
   }
 
+  Widget _buildOvertimeDecisionSection(
+    ScoreboardState state,
+    bool isEnabled,
+    double scaleFactor,
+  ) {
+    return Column(
+      children: [
+        SizedBox(
+          width: double.infinity,
+          height: 80 * scaleFactor,
+          child: SwipeButton(
+            label: "Overtime Lineup",
+            onConfirmed: () => _engine?.stopJam(),
+            color: Colors.purple.shade700,
+            enabled: isEnabled,
+            scaleFactor: scaleFactor,
+          ),
+        ),
+        SizedBox(height: 16 * scaleFactor),
+        _buildEndGameButton(isEnabled, scaleFactor),
+      ],
+    );
+  }
+
+  Widget _buildEndGameButton(bool isEnabled, double scaleFactor) {
+    final color = Colors.blueGrey.shade700;
+    final highlightColor = Color.lerp(color, Colors.white, 0.1)!;
+    final shadowColor = Color.lerp(color, Colors.black, 0.15)!;
+
+    return SizedBox(
+      width: double.infinity,
+      height: 56 * scaleFactor,
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16 * scaleFactor),
+          boxShadow: isEnabled
+              ? [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.25),
+                    blurRadius: 4 * scaleFactor,
+                    offset: Offset(0, 2 * scaleFactor),
+                  ),
+                ]
+              : [],
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: isEnabled ? () => _engine?.endGame() : null,
+            borderRadius: BorderRadius.circular(16 * scaleFactor),
+            child: Ink(
+              decoration: BoxDecoration(
+                gradient: isEnabled
+                    ? LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [highlightColor, color, shadowColor],
+                        stops: const [0.0, 0.5, 1.0],
+                      )
+                    : null,
+                color: isEnabled ? null : Colors.grey.shade800,
+                borderRadius: BorderRadius.circular(16 * scaleFactor),
+              ),
+              child: Container(
+                alignment: Alignment.center,
+                child: Text(
+                  "END GAME",
+                  style: AppTextStyles.buttonText.copyWith(
+                    fontSize: 18 * scaleFactor,
+                    color: isEnabled ? Colors.white : Colors.white38,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildEndTimeoutButton(bool isEnabled, double scaleFactor) {
     final color = Colors.red.shade700;
     final highlightColor = Color.lerp(color, Colors.white, 0.1)!;

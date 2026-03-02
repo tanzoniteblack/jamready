@@ -321,17 +321,16 @@ void main() {
   // ---------------------------------------------------------------------------
 
   group('undo unstopJam with period end → game over', () {
-    test('stopping jam when final period expires → game over with undo available', () async {
+    test('stopping jam when final period expires → unofficial score with undo available', () async {
       final (state, engine) = await _makeEngine(ruleset: _oneperiodRuleset());
       addTearDown(engine.dispose);
 
       engine.startJam();
       engine.setClockTime('Period', 0);
-      engine.stopJam(); // final period ends → game over
+      engine.stopJam(); // final period ends → unofficial score (operator must choose OT or end)
 
-      expect(engine.phase, GamePhase.gameOver);
+      expect(engine.phase, GamePhase.unofficialScore);
       expect(state.noMoreJam, true);
-      expect(state.connectionStatus, 'Game Over');
       expect(state.labelUndo, 'UNDO: Unstop Jam');
     });
 
@@ -364,17 +363,17 @@ void main() {
       expect(state.clocks['Period']!.running, false);
     });
 
-    test('after undo, stopping jam again ends game over again', () async {
+    test('after undo, stopping jam again returns to unofficial score', () async {
       final (state, engine) = await _makeEngine(ruleset: _oneperiodRuleset());
       addTearDown(engine.dispose);
 
       engine.startJam();
       engine.setClockTime('Period', 0);
-      engine.stopJam(); // → game over
+      engine.stopJam(); // → unofficial score
       engine.undo();    // → back to jam
-      engine.stopJam(); // → game over again
+      engine.stopJam(); // → unofficial score again
 
-      expect(engine.phase, GamePhase.gameOver);
+      expect(engine.phase, GamePhase.unofficialScore);
       expect(state.noMoreJam, true);
     });
   });

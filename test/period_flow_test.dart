@@ -117,7 +117,7 @@ void main() {
       expect(state.clocks['Intermission']!.number, 1);
     });
 
-    test('final period ending transitions to game over (not intermission)', () async {
+    test('final period ending transitions to unofficial score (not intermission)', () async {
       final ruleset = Ruleset.custom(
         id: 'test_1p',
         name: 'Test 1P',
@@ -136,9 +136,10 @@ void main() {
 
       _expirePeriodDuringJam(engine);
 
-      expect(engine.phase, GamePhase.gameOver);
+      // After the final jam stops the game enters "unofficial score" — the
+      // operator must explicitly choose overtime or end game.
+      expect(engine.phase, GamePhase.unofficialScore);
       expect(state.noMoreJam, true);
-      expect(state.connectionStatus, 'Game Over');
       expect(state.clocks['Intermission']!.running, false);
     });
   });
@@ -219,10 +220,14 @@ void main() {
       // Period 2
       _skipIntermission(engine);
       engine.setClockTime('Period', 0);
-      engine.stopJam(); // end period 2 → game over
+      engine.stopJam(); // end period 2 → unofficial score
 
-      expect(engine.phase, GamePhase.gameOver);
+      expect(engine.phase, GamePhase.unofficialScore);
       expect(state.noMoreJam, true);
+
+      // Operator explicitly ends the game
+      engine.endGame();
+      expect(engine.phase, GamePhase.gameOver);
     });
 
     test('game over clears all running clocks', () async {
