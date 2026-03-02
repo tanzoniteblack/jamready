@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -85,6 +88,17 @@ void main() {
       providers: [ChangeNotifierProvider.value(value: state)],
       child: MaterialApp(home: JamTimerScreen(engine: engine)),
     );
+  }
+
+  /// Loads a fixture JSON file and feeds it through the same [ScoreboardState]
+  /// parsing path that [RemoteGameEngine] uses when receiving server messages.
+  ScoreboardState stateFromFixture(String filename) {
+    final file = File('test/fixtures/$filename');
+    final Map<String, dynamic> data = jsonDecode(file.readAsStringSync());
+    final state = ScoreboardState();
+    state.updateFromMap(data);
+    state.setConnectionStatus('Connected');
+    return state;
   }
 
   testWidgets('timeout state does not fall through to READY in remote mode', (
@@ -217,20 +231,7 @@ void main() {
   testWidgets(
     'post-countdown READY state shows READY text and slide to start lineup',
     (tester) async {
-      final state = ScoreboardState();
-      state.setConnectionStatus('Connected');
-      state.clocks['Intermission']!.displayName = 'Intermission';
-      state.clocks['Intermission']!.number = 1;
-      state.clocks['Intermission']!.running = false;
-      state.clocks['Intermission']!.time = 0;
-      state.clocks['Period']!.displayName = 'Period';
-      state.clocks['Period']!.number = 1;
-      state.clocks['Period']!.running = false;
-      state.clocks['Period']!.time = 1800000;
-      state.inJam = false;
-      state.noMoreJam = false;
-      state.labelStop = 'Lineup';
-      state.labelStart = 'Start Jam';
+      final state = stateFromFixture('pre-game-no-time-to-derby.json');
 
       await tester.pumpWidget(buildHarness(state));
       await tester.pump();
@@ -245,19 +246,7 @@ void main() {
   testWidgets(
     'pre-game countdown shows TIME TO DERBY and slide to start lineup',
     (tester) async {
-      final state = ScoreboardState();
-      state.setConnectionStatus('Connected');
-      state.clocks['Intermission']!.displayName = 'Intermission';
-      state.clocks['Intermission']!.number = 0;
-      state.clocks['Intermission']!.running = true;
-      state.clocks['Intermission']!.time = 136000;
-      state.clocks['Period']!.number = 0;
-      state.clocks['Period']!.running = false;
-      state.clocks['Period']!.time = 0;
-      state.inJam = false;
-      state.noMoreJam = false;
-      state.labelStop = 'Lineup';
-      state.labelStart = 'Start Jam';
+      final state = stateFromFixture('pre-game-time-to-derby.json');
 
       await tester.pumpWidget(buildHarness(state));
       await tester.pump();
