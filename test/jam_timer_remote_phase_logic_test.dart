@@ -258,6 +258,47 @@ void main() {
     },
   );
 
+  testWidgets(
+    'between-period lineup with noMoreJam shows lineup clock not game over',
+    (tester) async {
+      final state = stateFromFixture('between-period-lineup.json');
+
+      await tester.pumpWidget(buildHarness(state));
+      await tester.pump();
+
+      expect(find.text('GAME OVER'), findsNothing);
+      expect(find.text('LINEUP'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'running jam at end of period shows jam clock and stop jam button',
+    (tester) async {
+      final state = stateFromFixture('end-of-period-1-running-jam.json');
+
+      await tester.pumpWidget(buildHarness(state));
+      await tester.pump();
+
+      expect(find.text('STOP JAM'), findsOneWidget);
+      expect(find.text('SLIDE TO START LINEUP'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'halftime intermission shows intermission clock and slide to start lineup',
+    (tester) async {
+      final state = stateFromFixture('end-of-period-1.json');
+
+      await tester.pumpWidget(buildHarness(state));
+      await tester.pump();
+
+      expect(find.text('SLIDE TO START LINEUP'), findsOneWidget);
+      expect(find.text('START JAM'), findsNothing);
+      expect(find.text('GAME OVER'), findsNothing);
+      expect(find.text('READY'), findsNothing);
+    },
+  );
+
   testWidgets('official and unlabeled timeouts do not trigger threshold haptics', (
     tester,
   ) async {

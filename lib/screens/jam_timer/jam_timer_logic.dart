@@ -97,8 +97,19 @@ extension _JamTimerLogic on _JamTimerScreenState {
     return true;
   }
 
+  /// Halftime (or between-period) intermission: Intermission is actively
+  /// running after at least one period has been played.
+  bool _isHalftimeIntermission(ScoreboardState state) {
+    final intermission = state.clocks['Intermission'];
+    if (intermission == null) return false;
+    if (!intermission.running || intermission.number == 0) return false;
+    if (state.inJam || state.noMoreJam) return false;
+    return true;
+  }
+
   bool _isPrePeriod(ScoreboardState state) {
     if (_isPreGameCountdown(state)) return true;
+    if (_isHalftimeIntermission(state)) return true;
     if (!_isReadyToStart(state)) return false;
 
     // Period hasn't started yet (pre-game).
@@ -120,6 +131,7 @@ extension _JamTimerLogic on _JamTimerScreenState {
   bool _isGameOver(ScoreboardState state) {
     if (!state.noMoreJam) return false;
     if (state.inJam || state.clocks['Jam']?.running == true) return false;
+    if (state.clocks['Lineup']?.running == true) return false;
     if (state.inTimeout || state.clocks['Timeout']?.running == true) {
       return false;
     }
