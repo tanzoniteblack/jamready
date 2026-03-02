@@ -65,6 +65,10 @@ class ScoreboardState extends ChangeNotifier {
   int lineupDuration = 30000;
   int lineupOvertimeDuration = 30000;
   bool injuryContinuationRule = false;
+  int periodCount = 0;
+
+  // Official score: set by the head NSO to confirm the score is final.
+  bool officialScore = false;
 
   void updateFromMap(Map<String, dynamic> data) {
     data.forEach((key, value) {
@@ -117,6 +121,13 @@ class ScoreboardState extends ChangeNotifier {
           break;
         case 'ScoreBoard.CurrentGame.Rule(Lineup.OvertimeDuration)':
           if (value is int) lineupOvertimeDuration = value;
+          break;
+        case 'ScoreBoard.CurrentGame.Rule(Period.Number)':
+          periodCount =
+              value is int ? value : int.tryParse(value.toString()) ?? 0;
+          break;
+        case 'ScoreBoard.CurrentGame.OfficialScore':
+          officialScore = value == true;
           break;
       }
     }

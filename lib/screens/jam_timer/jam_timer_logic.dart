@@ -54,7 +54,14 @@ extension _JamTimerLogic on _JamTimerScreenState {
     final jam = state.clocks['Jam'];
     final timeout = state.clocks['Timeout'];
 
-    if (state.noMoreJam) return false;
+    // noMoreJam only blocks ready-to-start when we're truly done with the game.
+    // When the period count is known and there are still periods to play
+    // (intermission number < total periods), noMoreJam is a transient flag
+    // set at the end of each period, not a game-over signal.
+    final isBetweenPeriods = state.periodCount > 0 &&
+        !state.officialScore &&
+        (intermission?.number ?? 0) < state.periodCount;
+    if (state.noMoreJam && !isBetweenPeriods) return false;
     if (state.inJam || state.inTimeout) return false;
     if (jam == null || timeout == null || lineup == null || period == null) {
       return false;
@@ -98,13 +105,23 @@ extension _JamTimerLogic on _JamTimerScreenState {
   }
 
   /// Halftime (or between-period) intermission: Intermission is actively
-  /// running after at least one period has been played.
+  /// running after at least one period has been played, but the game is not
+  /// yet over.
   bool _isHalftimeIntermission(ScoreboardState state) {
     final intermission = state.clocks['Intermission'];
     if (intermission == null) return false;
     if (!intermission.running || intermission.number == 0) return false;
-    if (state.inJam || state.noMoreJam) return false;
-    return true;
+    if (state.inJam || state.officialScore) return false;
+
+    // When the period count is known, use it precisely: this is halftime only
+    // when the intermission number hasn't reached the final period yet.
+    if (state.periodCount > 0) {
+      return intermission.number < state.periodCount;
+    }
+
+    // Fall back: noMoreJam marks the post-game intermission when period
+    // count isn't known yet.
+    return !state.noMoreJam;
   }
 
   bool _isPrePeriod(ScoreboardState state) {
@@ -130,13 +147,30 @@ extension _JamTimerLogic on _JamTimerScreenState {
     return state.labelStart.toLowerCase().contains('lineup');
   }
 
-  bool _isGameOver(ScoreboardState state) {
-    if (!state.noMoreJam) return false;
+  /// Post-regulation: the final-period intermission is running (or has ended)
+  /// but the score has not yet been confirmed by the NSO. This includes the
+  /// tied-game/overtime-possible case (noMoreJam=false) as well as the
+  /// definitive-end case (noMoreJam=true).
+  bool _isUnofficialScore(ScoreboardState state) {
+    if (state.officialScore) return false;
     if (state.inJam || state.clocks['Jam']?.running == true) return false;
     if (state.clocks['Lineup']?.running == true) return false;
     if (state.inTimeout || state.clocks['Timeout']?.running == true) {
       return false;
     }
-    return true;
+
+    // When the period count is known, detect via Intermission.Number.
+    if (state.periodCount > 0) {
+      return (state.clocks['Intermission']?.number ?? 0) >= state.periodCount;
+    }
+
+    // Fall back to noMoreJam when period count is not yet known.
+    return state.noMoreJam;
+  }
+
+  /// True only when the officials have confirmed the score is official.
+  /// Use [_isUnofficialScore] for the post-game-but-not-yet-confirmed state.
+  bool _isGameOver(ScoreboardState state) {
+    return state.officialScore;
   }
 }

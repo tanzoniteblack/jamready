@@ -181,6 +181,8 @@ class RemoteGameEngine implements GameEngine {
       "ScoreBoard.CurrentGame.Label(Timeout)",
       "ScoreBoard.CurrentGame.Label(Undo)",
       "ScoreBoard.CurrentGame.Label(Replaced)",
+      "ScoreBoard.CurrentGame.Rule(Period.Number)",
+      "ScoreBoard.CurrentGame.OfficialScore",
     ];
 
     _log.d("Registering paths");

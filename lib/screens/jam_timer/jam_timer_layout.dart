@@ -199,6 +199,8 @@ extension _JamTimerLayout on _JamTimerScreenState {
                     // Active Game Clock or Ready indicator
                     if (_isGameOver(state))
                       _buildGameOverDisplay(isEnabled, scaleFactor)
+                    else if (_isUnofficialScore(state))
+                      _buildUnofficialScoreDisplay(isEnabled, scaleFactor)
                     else if (_isPreGameCountdown(state))
                       _buildTimeToDerbyDisplay(
                         state,
@@ -274,8 +276,13 @@ extension _JamTimerLayout on _JamTimerScreenState {
     double scaleFactor,
     Color alertColor,
   ) {
-    final controlsEnabled =
-        isEnabled && !_isGameOver(state) && !_isHalftimeIntermission(state);
+    // Disable controls when the game is officially over, during active
+    // halftime intermission, or during unofficial score with no remaining
+    // jams (noMoreJam=false means overtime is still possible, so keep live).
+    final controlsEnabled = isEnabled &&
+        !_isGameOver(state) &&
+        !_isHalftimeIntermission(state) &&
+        !(_isUnofficialScore(state) && state.noMoreJam);
     final timeoutRunning = state.clocks['Timeout']?.running ?? false;
     final lineupRunning = state.clocks['Lineup']?.running ?? false;
     final inOverlapTimeoutState = timeoutRunning && (state.inJam || lineupRunning);

@@ -78,6 +78,8 @@ PATHS = [
     "ScoreBoard.CurrentGame.Label(Timeout)",
     "ScoreBoard.CurrentGame.Label(Undo)",
     "ScoreBoard.CurrentGame.Label(Replaced)",
+    "ScoreBoard.CurrentGame.Rule(Period.Number)",
+    "ScoreBoard.CurrentGame.OfficialScore",
 ]
 
 # How long to keep collecting after the first message arrives, in seconds.

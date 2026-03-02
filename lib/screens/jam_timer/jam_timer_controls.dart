@@ -445,6 +445,37 @@ extension _JamTimerControls on _JamTimerScreenState {
     );
   }
 
+  Widget _buildUnofficialScoreDisplay(bool isEnabled, double scaleFactor) {
+    final color = isEnabled ? Colors.amber.shade300 : Colors.white24;
+
+    return Container(
+      padding: EdgeInsets.symmetric(
+        horizontal: 24 * scaleFactor,
+        vertical: 12 * scaleFactor,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            "UNOFFICIAL",
+            style: AppTextStyles.clockLabel.copyWith(
+              fontSize: 18 * scaleFactor,
+              color: color,
+              height: 1.0,
+            ),
+          ),
+          Text(
+            "SCORE",
+            style: AppTextStyles.clockTime.copyWith(
+              color: color,
+              fontSize: 72 * scaleFactor,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildGameOverDisplay(bool isEnabled, double scaleFactor) {
     final color = isEnabled ? Colors.red.shade400 : Colors.white24;
 

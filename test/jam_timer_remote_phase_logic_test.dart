@@ -140,23 +140,28 @@ void main() {
     },
   );
 
-  testWidgets('game over shows final state instead of intermission clock', (
-    tester,
-  ) async {
-    final state = ScoreboardState();
-    state.setConnectionStatus('Connected');
-    state.noMoreJam = true;
-    state.clocks['Intermission']!.running = true;
-    state.clocks['Intermission']!.time = 300000;
-    state.clocks['Intermission']!.displayName = 'Intermission';
-    state.clocks['Intermission']!.number = 2;
+  testWidgets(
+    'unofficial score (noMoreJam fallback) shows unofficial display not intermission clock',
+    (tester) async {
+      // When periodCount is unknown, noMoreJam=true is the fallback signal
+      // for the post-game intermission → should show UNOFFICIAL SCORE.
+      final state = ScoreboardState();
+      state.setConnectionStatus('Connected');
+      state.noMoreJam = true;
+      state.clocks['Intermission']!.running = true;
+      state.clocks['Intermission']!.time = 300000;
+      state.clocks['Intermission']!.displayName = 'Intermission';
+      state.clocks['Intermission']!.number = 2;
 
-    await tester.pumpWidget(buildHarness(state));
-    await tester.pump();
+      await tester.pumpWidget(buildHarness(state));
+      await tester.pump();
 
-    expect(find.text('GAME OVER'), findsOneWidget);
-    expect(find.text('READY'), findsNothing);
-  });
+      expect(find.text('UNOFFICIAL'), findsOneWidget);
+      expect(find.text('SCORE'), findsOneWidget);
+      expect(find.text('GAME OVER'), findsNothing);
+      expect(find.text('READY'), findsNothing);
+    },
+  );
 
   testWidgets('pregame does not show "PERIOD 0" in remote header row', (
     tester,
@@ -254,6 +259,78 @@ void main() {
       expect(find.text('TIME TO DERBY'), findsOneWidget);
       expect(find.text('SLIDE TO START LINEUP'), findsOneWidget);
       expect(find.text('READY'), findsNothing);
+      expect(find.text('GAME OVER'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'unofficial score (tied game, overtime possible) shows unofficial display not intermission',
+    (tester) async {
+      final state = stateFromFixture('unofficial-score-overtime-possible.json');
+
+      await tester.pumpWidget(buildHarness(state));
+      await tester.pump();
+
+      expect(find.text('UNOFFICIAL'), findsOneWidget);
+      expect(find.text('SCORE'), findsOneWidget);
+      // Controls must be live so overtime can be triggered.
+      expect(find.text('GAME OVER'), findsNothing);
+    },
+  );
+
+  testWidgets('officialScore shows game over regardless of other state', (
+    tester,
+  ) async {
+    final state = ScoreboardState();
+    state.setConnectionStatus('Connected');
+    state.officialScore = true;
+    // No other game-over signals set — officialScore alone is sufficient.
+
+    await tester.pumpWidget(buildHarness(state));
+    await tester.pump();
+
+    expect(find.text('GAME OVER'), findsOneWidget);
+  });
+
+  testWidgets(
+    'periodCount distinguishes halftime from game over when noMoreJam is true',
+    (tester) async {
+      // 2-period game, halftime: Intermission.Number(1) < periodCount(2)
+      final state = ScoreboardState();
+      state.setConnectionStatus('Connected');
+      state.periodCount = 2;
+      state.noMoreJam = true;
+      state.clocks['Intermission']!.number = 1;
+      state.clocks['Intermission']!.running = true;
+      state.clocks['Intermission']!.time = 600000;
+
+      await tester.pumpWidget(buildHarness(state));
+      await tester.pump();
+
+      expect(find.text('GAME OVER'), findsNothing);
+      // Controls are locked during active intermission clock.
+      expect(find.text('SLIDE TO START LINEUP'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'periodCount shows unofficial score when intermission number reaches period count',
+    (tester) async {
+      // 2-period game, post-game: Intermission.Number(2) == periodCount(2)
+      // → unofficial score, not GAME OVER (that requires officialScore=true)
+      final state = ScoreboardState();
+      state.setConnectionStatus('Connected');
+      state.periodCount = 2;
+      state.noMoreJam = true;
+      state.clocks['Intermission']!.number = 2;
+      state.clocks['Intermission']!.running = false;
+      state.clocks['Intermission']!.time = 0;
+
+      await tester.pumpWidget(buildHarness(state));
+      await tester.pump();
+
+      expect(find.text('UNOFFICIAL'), findsOneWidget);
+      expect(find.text('SCORE'), findsOneWidget);
       expect(find.text('GAME OVER'), findsNothing);
     },
   );
