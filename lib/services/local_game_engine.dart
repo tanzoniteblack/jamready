@@ -292,7 +292,7 @@ class LocalGameEngine with WidgetsBindingObserver implements GameEngine {
         _endJam(fromExpiration: true);
         break;
       case 'Period':
-        _endPeriod();
+        _endPeriod(jamIsRunning: _phase == GamePhase.jam);
         break;
       case 'Intermission':
         _endIntermission();
@@ -379,7 +379,7 @@ class LocalGameEngine with WidgetsBindingObserver implements GameEngine {
 
   @override
   void startJam() {
-    if (_phase == GamePhase.preGame) {
+    if (_phase == GamePhase.preGame && _currentPeriod == 0) {
       // First jam of game - start period 1
       _startPeriod(1);
     }
@@ -425,16 +425,22 @@ class LocalGameEngine with WidgetsBindingObserver implements GameEngine {
   @override
   void stopJam() {
     if (_phase == GamePhase.preGame) {
-      // Record undo state for "unstart lineup" at period start
+      // Record undo state for "unstart lineup".
+      // periodNumber captures where we'll return to on undo — 0 for the
+      // initial pre-game, or the already-prepared period number when coming
+      // out of an intermission (where _startPeriod has already been called).
       _setUndoAction(
         _UndoType.unstartLineup,
         periodTime: _state.clocks['Period']!.time,
         periodTimeInternal: _internalClockTimes['Period'],
-        periodNumber: 0,
+        periodNumber: _currentPeriod,
       );
 
-      // "Start Lineup" - begin the period
-      _startPeriod(1);
+      // Period 0 → first swipe of the game: begin period 1 now.
+      // Any later period is already prepared by _endIntermission.
+      if (_currentPeriod == 0) {
+        _startPeriod(1);
+      }
       _startLineup();
       return;
     }
@@ -522,7 +528,17 @@ class LocalGameEngine with WidgetsBindingObserver implements GameEngine {
     _state.notify();
   }
 
-  void _endPeriod() {
+  void _endPeriod({bool jamIsRunning = false}) {
+    if (jamIsRunning) {
+      // Period expired while a jam is live. Stop the period clock but leave
+      // the jam running — WFTDA rules require the jam to continue until the
+      // next whistle. _endJam will call _endPeriod again (without this flag)
+      // once the jam is stopped.
+      _state.clocks['Period']!.running = false;
+      _state.notify();
+      return;
+    }
+
     _state.clocks['Jam']!.running = false;
     _state.clocks['Period']!.running = false;
     _state.clocks['Lineup']!.running = false;
@@ -555,9 +571,12 @@ class LocalGameEngine with WidgetsBindingObserver implements GameEngine {
     _state.clocks['Intermission']!.time = 0;
     _internalClockTimes['Intermission'] = 0;
 
-    // Start next period
+    // Prepare the next period but wait for the user to swipe to start lineup,
+    // mirroring the CRG remote flow. _startPeriod sets phase = lineup as a
+    // side effect; we override it back to preGame so the layout shows READY.
     _startPeriod(_currentPeriod + 1);
-    _startLineup();
+    _phase = GamePhase.preGame;
+    _state.notify();
   }
 
   @override

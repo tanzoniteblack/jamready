@@ -81,6 +81,20 @@ class _JamControlsState extends State<JamControls> {
   @override
   void didUpdateWidget(JamControls oldWidget) {
     super.didUpdateWidget(oldWidget);
+
+    // Clear the confirmation state when entering intermission. Controls are
+    // disabled during intermission, so the cooldown UI serves no purpose and
+    // would otherwise persist into the next period (especially in tests that
+    // fast-forward the intermission clock).
+    if (!oldWidget.isIntermission && widget.isIntermission) {
+      _confirmationTimer?.cancel();
+      setState(() {
+        _transitionTime = null;
+        _transitionedToJam = null;
+      });
+      return;
+    }
+
     if (oldWidget.inJam == widget.inJam || widget.isPrePeriod) return;
 
     // Only show confirmation for real forward transitions. We detect these by

@@ -541,5 +541,25 @@ void main() {
     // end the jam and start intermission
     await tapJamControl(tester, state.labelStop);
     await validateActiveDisplay(tester, .intermission);
+
+    // short circuit intermission
+    await _setClock(tester, engine, 'Intermission', 0);
+
+    // start up the next period lineup
+    await swipeToStartLineup(tester);
+    await validateActiveDisplay(tester, .lineup);
+    // start first jam of 2nd period
+    await tapJamControl(tester, state.labelStart);
+    await validateActiveDisplay(tester, .jam);
+
+    // fast forward period clock without effecting jam clock
+    await _setClock(tester, engine, 'Period', 0);
+    expect(state.clocks['Jam']!.running, isTrue);
+    await validateActiveDisplay(tester, .jam);
+
+    // stop jam, see ability to start overtime jam or end game
+    await tapJamControl(tester, state.labelStop);
+    await validateActiveDisplay(tester, .unofficialScore);
+
   });
 }
