@@ -209,8 +209,17 @@ void main() {
       await tester.pump();
       await tester.pump();
 
-      expect(find.text('Rockets'), findsOneWidget);
-      expect(find.text('Thunder'), findsOneWidget);
+      // Scope to JamTimerScreen to avoid matching the TextFormField from the
+      // departing GameSetupScreen that may still be in the tree mid-animation.
+      final screen = find.byType(JamTimerScreen);
+      expect(
+        find.descendant(of: screen, matching: find.text('Rockets')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: screen, matching: find.text('Thunder')),
+        findsOneWidget,
+      );
     });
   });
 
