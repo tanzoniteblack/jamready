@@ -199,6 +199,13 @@ extension _JamTimerLayout on _JamTimerScreenState {
                     // Active Game Clock or Ready indicator
                     if (_isGameOver(state))
                       _buildGameOverDisplay(isEnabled, scaleFactor)
+                    else if (_isPreGameCountdown(state))
+                      _buildTimeToDerbyDisplay(
+                        state,
+                        isEnabled,
+                        scaleFactor,
+                        alertColor,
+                      )
                     else if (_isReadyToStart(state))
                       _buildReadyToStartDisplay(
                         state,

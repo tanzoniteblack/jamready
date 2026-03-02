@@ -84,11 +84,36 @@ extension _JamTimerLogic on _JamTimerScreenState {
     return false;
   }
 
+  /// Pre-game countdown: Intermission is running before the first period.
+  /// The server sets Intermission.Number = 0 for the pre-game countdown and
+  /// Period.Number = 0 until the first period starts.
+  bool _isPreGameCountdown(ScoreboardState state) {
+    final intermission = state.clocks['Intermission'];
+    final period = state.clocks['Period'];
+    if (intermission == null || period == null) return false;
+    if (intermission.number != 0 || !intermission.running) return false;
+    if (period.number != 0) return false;
+    if (state.inJam || state.noMoreJam) return false;
+    return true;
+  }
+
   bool _isPrePeriod(ScoreboardState state) {
+    if (_isPreGameCountdown(state)) return true;
     if (!_isReadyToStart(state)) return false;
 
-    // Use slider only for true pre-period lineup starts.
+    // Period hasn't started yet (pre-game).
     if (state.clocks['Period']?.number == 0) return true;
+
+    // Post-intermission: the countdown or halftime break just ended.
+    // _isReadyToStart uses this same condition to recognise this state.
+    final intermission = state.clocks['Intermission'];
+    if (intermission != null &&
+        !intermission.running &&
+        intermission.time == 0 &&
+        intermission.number > 0) {
+      return true;
+    }
+
     return state.labelStart.toLowerCase().contains('lineup');
   }
 

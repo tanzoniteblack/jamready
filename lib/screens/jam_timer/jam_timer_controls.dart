@@ -371,6 +371,43 @@ extension _JamTimerControls on _JamTimerScreenState {
     );
   }
 
+  Widget _buildTimeToDerbyDisplay(
+    ScoreboardState state,
+    bool isEnabled,
+    double scaleFactor,
+    Color alertColor,
+  ) {
+    final clock = state.clocks['Intermission']!;
+    final color = isEnabled ? alertColor : Colors.white12;
+
+    return Container(
+      padding: EdgeInsets.symmetric(
+        horizontal: 24 * scaleFactor,
+        vertical: 12 * scaleFactor,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            "TIME TO DERBY",
+            style: AppTextStyles.clockLabel.copyWith(
+              fontSize: 18 * scaleFactor,
+              color: color,
+              height: 1.0,
+            ),
+          ),
+          Text(
+            _formatTime(clock.time),
+            style: AppTextStyles.clockTime.copyWith(
+              color: color,
+              fontSize: 72 * scaleFactor,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildReadyToStartDisplay(
     ScoreboardState state,
     bool isEnabled,

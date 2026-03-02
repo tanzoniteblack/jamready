@@ -214,6 +214,61 @@ void main() {
     );
   });
 
+  testWidgets(
+    'post-countdown READY state shows READY text and slide to start lineup',
+    (tester) async {
+      final state = ScoreboardState();
+      state.setConnectionStatus('Connected');
+      state.clocks['Intermission']!.displayName = 'Intermission';
+      state.clocks['Intermission']!.number = 1;
+      state.clocks['Intermission']!.running = false;
+      state.clocks['Intermission']!.time = 0;
+      state.clocks['Period']!.displayName = 'Period';
+      state.clocks['Period']!.number = 1;
+      state.clocks['Period']!.running = false;
+      state.clocks['Period']!.time = 1800000;
+      state.inJam = false;
+      state.noMoreJam = false;
+      state.labelStop = 'Lineup';
+      state.labelStart = 'Start Jam';
+
+      await tester.pumpWidget(buildHarness(state));
+      await tester.pump();
+
+      expect(find.text('READY'), findsOneWidget);
+      expect(find.text('SLIDE TO START LINEUP'), findsOneWidget);
+      expect(find.text('TIME TO DERBY'), findsNothing);
+      expect(find.text('GAME OVER'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'pre-game countdown shows TIME TO DERBY and slide to start lineup',
+    (tester) async {
+      final state = ScoreboardState();
+      state.setConnectionStatus('Connected');
+      state.clocks['Intermission']!.displayName = 'Intermission';
+      state.clocks['Intermission']!.number = 0;
+      state.clocks['Intermission']!.running = true;
+      state.clocks['Intermission']!.time = 136000;
+      state.clocks['Period']!.number = 0;
+      state.clocks['Period']!.running = false;
+      state.clocks['Period']!.time = 0;
+      state.inJam = false;
+      state.noMoreJam = false;
+      state.labelStop = 'Lineup';
+      state.labelStart = 'Start Jam';
+
+      await tester.pumpWidget(buildHarness(state));
+      await tester.pump();
+
+      expect(find.text('TIME TO DERBY'), findsOneWidget);
+      expect(find.text('SLIDE TO START LINEUP'), findsOneWidget);
+      expect(find.text('READY'), findsNothing);
+      expect(find.text('GAME OVER'), findsNothing);
+    },
+  );
+
   testWidgets('official and unlabeled timeouts do not trigger threshold haptics', (
     tester,
   ) async {
