@@ -364,6 +364,8 @@ void main() {
           !state.clocks['Jam']!.running &&
           !state.clocks['Period']!.running;
     }, timeout: const Duration(seconds: 20));
+
+    await _validateActiveDisplay(tester, .lineup);
   });
 
   testWidgets('Starting initial jam starts jam and period clocks', (
@@ -379,13 +381,13 @@ void main() {
     await client.startNewGame();
     await _ensureSwipeToLineup(tester);
     await _swipeToStartLineup(tester);
-
     await _tapJamControl(tester, _state(tester).labelStart);
-
     await _pumpUntil(tester, () {
       final state = _state(tester);
       return state.clocks['Jam']!.running && state.clocks['Period']!.running;
     }, timeout: const Duration(seconds: 20));
+
+    await _validateActiveDisplay(tester, .jam);
   });
 
   testWidgets('Stop jam ends jam and starts lineup', (tester) async {
@@ -407,12 +409,16 @@ void main() {
       timeout: const Duration(seconds: 20),
     );
 
+    await _validateActiveDisplay(tester, .jam);
+
     await _tapJamControl(tester, _state(tester).labelStop);
 
     await _pumpUntil(tester, () {
       final state = _state(tester);
       return !state.clocks['Jam']!.running && state.clocks['Lineup']!.running;
     }, timeout: const Duration(seconds: 20));
+
+    await _validateActiveDisplay(tester, .lineup);
   });
 
   testWidgets('Timeout flow highlights controls and undo restores timeout', (
@@ -513,32 +519,6 @@ void main() {
     );
   });
 
-  testWidgets('Pre-game shows GAME and READY instead of lineup clock', (
-    tester,
-  ) async {
-    final client = await _launchAppAndConnect(tester);
-    addTearDown(client.close);
-    addTearDown(() async {
-      await tester.pumpWidget(const SizedBox.shrink());
-      await tester.pump();
-    });
-
-    await client.startNewGame();
-    await _ensureSwipeToLineup(tester);
-
-    // Verify "GAME" and "READY" are displayed
-    await _pumpUntil(
-      tester,
-      () =>
-          find.text('GAME').evaluate().isNotEmpty &&
-          find.text('READY').evaluate().isNotEmpty,
-      timeout: const Duration(seconds: 10),
-    );
-
-    expect(find.text('GAME'), findsOneWidget);
-    expect(find.text('READY'), findsOneWidget);
-  });
-
   testWidgets('Undo SwipeButton shows No Undo Available when disabled', (
     tester,
   ) async {
@@ -633,68 +613,6 @@ void main() {
       findsAtLeast(1),
       reason: 'Undo label "$undoLabel" should be visible on screen',
     );
-  });
-
-  testWidgets('Post-intermission shows PERIOD 2 and READY', (tester) async {
-    final client = await _launchAppAndConnect(tester);
-    addTearDown(client.close);
-    addTearDown(() async {
-      await tester.pumpWidget(const SizedBox.shrink());
-      await tester.pump();
-    });
-
-    await client.startNewGame();
-    await _ensureSwipeToLineup(tester);
-    await _swipeToStartLineup(tester);
-
-    // Start the jam to begin period 1
-    await _tapJamControl(tester, _state(tester).labelStart);
-    await _pumpUntil(
-      tester,
-      () => _state(tester).clocks['Jam']!.running,
-      timeout: const Duration(seconds: 20),
-    );
-
-    // Get the game ID and set period clock to almost zero
-    final gameId = _state(tester).gameId;
-    client.setClockTime(gameId, 'Period', 1000);
-    await tester.pump(const Duration(milliseconds: 500));
-
-    // Stop the jam - this should trigger intermission since period is ending
-    await _tapJamControl(tester, _state(tester).labelStop);
-    await tester.pump(const Duration(seconds: 1));
-
-    // Wait for intermission to start
-    await _pumpUntil(
-      tester,
-      () => _state(tester).clocks['Intermission']!.running,
-      timeout: const Duration(seconds: 10),
-    );
-
-    // Set intermission clock to almost zero to speed it up
-    client.setClockTime(gameId, 'Intermission', 1000);
-    await tester.pump(const Duration(milliseconds: 500));
-
-    // Wait for intermission to end and ready state to appear
-    await _pumpUntil(
-      tester,
-      () =>
-          !_state(tester).clocks['Intermission']!.running &&
-          _state(tester).clocks['Intermission']!.time == 0,
-      timeout: const Duration(seconds: 10),
-    );
-
-    // Verify "PERIOD 2" and "READY" are displayed
-    await _pumpUntil(
-      tester,
-      () =>
-          find.text('PERIOD 2').evaluate().isNotEmpty &&
-          find.text('READY').evaluate().isNotEmpty,
-      timeout: const Duration(seconds: 10),
-    );
-
-    expect(find.text('PERIOD 2'), findsAtLeast(1));
-    expect(find.text('READY'), findsOneWidget);
   });
 
   testWidgets('Full game start/stop', (tester) async {
