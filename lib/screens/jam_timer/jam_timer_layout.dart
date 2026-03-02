@@ -274,7 +274,8 @@ extension _JamTimerLayout on _JamTimerScreenState {
     double scaleFactor,
     Color alertColor,
   ) {
-    final controlsEnabled = isEnabled && !_isGameOver(state);
+    final controlsEnabled =
+        isEnabled && !_isGameOver(state) && !_isHalftimeIntermission(state);
     final timeoutRunning = state.clocks['Timeout']?.running ?? false;
     final lineupRunning = state.clocks['Lineup']?.running ?? false;
     final inOverlapTimeoutState = timeoutRunning && (state.inJam || lineupRunning);

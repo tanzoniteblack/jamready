@@ -285,15 +285,17 @@ void main() {
   );
 
   testWidgets(
-    'halftime intermission shows intermission clock and slide to start lineup',
+    'halftime intermission locks out controls until clock ends',
     (tester) async {
       final state = stateFromFixture('end-of-period-1.json');
 
       await tester.pumpWidget(buildHarness(state));
       await tester.pump();
 
-      expect(find.text('SLIDE TO START LINEUP'), findsOneWidget);
-      expect(find.text('START JAM'), findsNothing);
+      // Slider must not appear while intermission is still running.
+      expect(find.text('SLIDE TO START LINEUP'), findsNothing);
+      // Start button is rendered but disabled (controls locked out).
+      expect(find.text('START JAM'), findsOneWidget);
       expect(find.text('GAME OVER'), findsNothing);
       expect(find.text('READY'), findsNothing);
     },

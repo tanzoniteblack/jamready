@@ -109,7 +109,9 @@ extension _JamTimerLogic on _JamTimerScreenState {
 
   bool _isPrePeriod(ScoreboardState state) {
     if (_isPreGameCountdown(state)) return true;
-    if (_isHalftimeIntermission(state)) return true;
+    // Note: _isHalftimeIntermission is intentionally NOT checked here.
+    // While the intermission clock is still running the controls are locked
+    // out entirely; the slider only appears once the clock has finished.
     if (!_isReadyToStart(state)) return false;
 
     // Period hasn't started yet (pre-game).
