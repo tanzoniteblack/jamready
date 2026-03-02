@@ -44,7 +44,9 @@ extension _JamTimerLogic on _JamTimerScreenState {
     int seconds = (milliseconds / 1000).ceil();
     int minutes = (seconds / 60).floor();
     int remainingSeconds = (seconds % 60);
-    return "${minutes.toString().padLeft(1, '0')}:${remainingSeconds.toString().padLeft(2, '0')}";
+    return "${minutes.toString().padLeft(1, '0')}:${remainingSeconds
+        .toString()
+        .padLeft(2, '0')}";
   }
 
   bool _isReadyToStart(ScoreboardState state) {
@@ -161,7 +163,9 @@ extension _JamTimerLogic on _JamTimerScreenState {
 
     // When the period count is known, detect via Intermission.Number.
     if (state.periodCount > 0) {
-      return (state.clocks['Intermission']?.number ?? 0) >= state.periodCount;
+      final intermissionClock = state.clocks['Intermission'];
+      return intermissionClock != null && (intermissionClock.running) &&
+          intermissionClock.number >= state.periodCount;
     }
 
     // Fall back to noMoreJam when period count is not yet known.

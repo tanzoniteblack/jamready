@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
+import 'package:jam_ready/widgets/clock_display.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
@@ -24,18 +25,22 @@ class ScoreboardTestClient {
     return ScoreboardTestClient(channel);
   }
 
-  Future<void> startNewGame() async {
-    _channel.sink.add(jsonEncode({
-      'action': 'Register',
-      'paths': ['ScoreBoard.CurrentGame.Game'],
-    }));
+  Future<void> startNewGame({Duration? timeToDerby}) async {
+    _channel.sink.add(
+      jsonEncode({
+        'action': 'Register',
+        'paths': ['ScoreBoard.CurrentGame.Game'],
+      }),
+    );
     final message = {
       'action': 'StartNewGame',
       'data': {
         'Team1': '',
         'Team2': '',
         'Ruleset': 'WFTDARuleset',
-        'IntermissionClock': null,
+        'IntermissionClock': timeToDerby != null
+            ? '${timeToDerby.inMilliseconds}'
+            : null,
         'Advance': false,
         'Points1': 0,
         'Points2': 0,
@@ -56,12 +61,25 @@ class ScoreboardTestClient {
 
   /// Sets a clock time on the server
   void setClockTime(String gameId, String clockName, int timeMs) {
-    _channel.sink.add(jsonEncode({
-      'action': 'Set',
-      'key': 'ScoreBoard.Game($gameId).Clock($clockName).Time',
-      'value': timeMs.toString(),
-      'flag': '',
-    }));
+    _channel.sink.add(
+      jsonEncode({
+        'action': 'Set',
+        'key': 'ScoreBoard.Game($gameId).Clock($clockName).Time',
+        'value': timeMs.toString(),
+        'flag': '',
+      }),
+    );
+  }
+
+  void setOfficialScore(String gameId) {
+    _channel.sink.add(
+      jsonEncode({
+        "action": "Set",
+        "key": "ScoreBoard.Game($gameId).OfficialScore",
+        "value": true,
+        "flag": "",
+      }),
+    );
   }
 
   Future<void> close() async {
@@ -108,9 +126,7 @@ Future<void> _pumpUntil(
   throw TestFailure('Timed out waiting for condition.');
 }
 
-Future<ScoreboardTestClient> _launchAppAndConnect(
-  WidgetTester tester,
-) async {
+Future<ScoreboardTestClient> _launchAppAndConnect(WidgetTester tester) async {
   final host = _scoreboardHost();
   final port = _scoreboardPort();
 
@@ -123,7 +139,10 @@ Future<ScoreboardTestClient> _launchAppAndConnect(
   // Wait for settings screen to be visible
   await _pumpUntil(
     tester,
-    () => find.widgetWithText(TextFormField, 'Host / IP Address').evaluate().isNotEmpty,
+    () => find
+        .widgetWithText(TextFormField, 'Host / IP Address')
+        .evaluate()
+        .isNotEmpty,
     timeout: const Duration(seconds: 10),
   );
 
@@ -158,10 +177,81 @@ Future<ScoreboardTestClient> _launchAppAndConnect(
   return ScoreboardTestClient.connect(_scoreboardWsUri(host, port));
 }
 
-Future<void> _ensurePrePeriod(WidgetTester tester) async {
+enum ActiveDisplay {
+  timeToDerby,
+  ready,
+  jam,
+  lineup,
+  timeout,
+  period,
+  intermission,
+  unofficialScore,
+  gameOver,
+  unknown,
+}
+
+ActiveDisplay _activeDisplay(WidgetTester tester) {
+  // Special non-clock displays have unique top-level text — check these first.
+  if (find.text('GAME OVER').evaluate().isNotEmpty) {
+    return ActiveDisplay.gameOver;
+  }
+  if (find.text('UNOFFICIAL').evaluate().isNotEmpty) {
+    return ActiveDisplay.unofficialScore;
+  }
+  if (find.text('TIME TO DERBY').evaluate().isNotEmpty) {
+    return ActiveDisplay.timeToDerby;
+  }
+  if (find.text('READY').evaluate().isNotEmpty) return ActiveDisplay.ready;
+
+  // For clock displays, scope the label search to ClockDisplay to avoid false
+  // positives from button text ("TIMEOUT", "JAM" etc. appear in controls too).
+  bool clockLabel(String label) => find
+      .descendant(
+        of: find.byType(ClockDisplay),
+        matching: find.textContaining(label),
+      )
+      .evaluate()
+      .isNotEmpty;
+
+  if (clockLabel('JAM')) return ActiveDisplay.jam;
+  if (clockLabel('LINEUP')) return ActiveDisplay.lineup;
+  if (clockLabel('TIMEOUT')) return ActiveDisplay.timeout;
+  if (clockLabel('INTERMISSION')) return ActiveDisplay.intermission;
+  if (clockLabel('PERIOD')) return ActiveDisplay.period;
+
+  return ActiveDisplay.unknown;
+}
+
+Future<void> _validateActiveDisplay(
+  WidgetTester tester,
+  ActiveDisplay expectedDisplay, {
+  Duration? timeout,
+}) async {
+  try {
+    await _pumpUntil(
+      tester,
+      () => _activeDisplay(tester) == expectedDisplay,
+      timeout: timeout ?? const Duration(seconds: 4),
+    );
+  } catch (e) {
+    final actualActiveDisplay = _activeDisplay(tester);
+    print(
+      "Actual active display: $actualActiveDisplay, expected: $expectedDisplay}",
+    );
+    rethrow;
+  }
+}
+
+Future<void> _ensureSwipeToLineup(WidgetTester tester) async {
   await _pumpUntil(
     tester,
-    () => find.byType(SwipeButton).evaluate().isNotEmpty,
+    () => find
+        .ancestor(
+          of: find.text('SLIDE TO START LINEUP'),
+          matching: find.byType(SwipeButton),
+        )
+        .evaluate()
+        .isNotEmpty,
     timeout: const Duration(seconds: 15),
   );
 }
@@ -169,25 +259,17 @@ Future<void> _ensurePrePeriod(WidgetTester tester) async {
 bool _isOfficialReview(ScoreboardState state) => state.isOfficialReview;
 
 Future<void> _waitForTeamServerIds(WidgetTester tester) async {
-  await _pumpUntil(
-    tester,
-    () {
-      final state = _state(tester);
-      return state.team1.serverId.isNotEmpty &&
-          state.team2.serverId.isNotEmpty;
-    },
-  );
+  await _pumpUntil(tester, () {
+    final state = _state(tester);
+    return state.team1.serverId.isNotEmpty && state.team2.serverId.isNotEmpty;
+  });
 }
 
 Future<void> _waitForTimeoutMode(WidgetTester tester) async {
-  await _pumpUntil(
-    tester,
-    () {
-      final state = _state(tester);
-      return state.clocks['Timeout']!.running || state.inTimeout;
-    },
-    timeout: const Duration(seconds: 20),
-  );
+  await _pumpUntil(tester, () {
+    final state = _state(tester);
+    return state.clocks['Timeout']!.running || state.inTimeout;
+  }, timeout: const Duration(seconds: 20));
 }
 
 Future<void> _swipeButton(WidgetTester tester, Finder buttonFinder) async {
@@ -209,14 +291,13 @@ Future<void> _swipeButton(WidgetTester tester, Finder buttonFinder) async {
 }
 
 Future<void> _swipeToStartLineup(WidgetTester tester) async {
-  // Find the start lineup SwipeButton (labeled "Start Lineup" or similar)
-  final buttons = find.byType(SwipeButton);
-  print('Found ${buttons.evaluate().length} swipe button(s)');
-
-  // In pre-period state, there should be exactly one SwipeButton (Start Lineup)
-  // After end timeout, there might be two (Start Lineup + Undo)
-  // We want the first one for start lineup
-  final button = buttons.first;
+  // Find the start lineup SwipeButton
+  final button = find
+      .ancestor(
+        of: find.text('SLIDE TO START LINEUP'),
+        matching: find.byType(SwipeButton),
+      )
+      .first;
   await _swipeButton(tester, button);
 }
 
@@ -227,14 +308,15 @@ Future<void> _swipeUndoButton(WidgetTester tester) async {
   print('Found ${buttons.evaluate().length} swipe button(s) for undo');
 
   // Wait for undo action to become available
-  await _pumpUntil(
-    tester,
-    () => _state(tester).hasUndoAction,
-  );
+  await _pumpUntil(tester, () => _state(tester).hasUndoAction);
 
   // In connected mode with undo available, we should have 2 buttons
   // The undo button should be the last one (or we can find by ancestor)
-  expect(buttons, findsAtLeast(1), reason: 'Should have at least one SwipeButton');
+  expect(
+    buttons,
+    findsAtLeast(1),
+    reason: 'Should have at least one SwipeButton',
+  );
 
   // Get the last SwipeButton which should be the undo
   final buttonList = buttons.evaluate().toList();
@@ -243,15 +325,14 @@ Future<void> _swipeUndoButton(WidgetTester tester) async {
   await _swipeButton(tester, undoButton);
 }
 
-Future<void> _tapJamControl(
-  WidgetTester tester,
-  String label,
-) async {
+Future<void> _tapJamControl(WidgetTester tester, String label) async {
   // JamControls shows a confirmation state ("JAM STARTED"/"JAM ENDED") for
   // cooldownDuration after each jam transition. The confirmation is based on
   // DateTime.now() (real time); tester.pump(duration) advances real time on
   // device, so pumping past it ensures the button is back to its normal label.
-  await tester.pump(JamControls.cooldownDuration + const Duration(milliseconds: 200));
+  await tester.pump(
+    JamControls.cooldownDuration + const Duration(milliseconds: 200),
+  );
 
   final target = find.text(label.toUpperCase());
   await _pumpUntil(tester, () => target.evaluate().isNotEmpty);
@@ -273,7 +354,7 @@ void main() {
     });
 
     await client.startNewGame();
-    await _ensurePrePeriod(tester);
+    await _ensureSwipeToLineup(tester);
 
     await _swipeToStartLineup(tester);
 
@@ -285,8 +366,9 @@ void main() {
     }, timeout: const Duration(seconds: 20));
   });
 
-  testWidgets('Starting initial jam starts jam and period clocks',
-      (tester) async {
+  testWidgets('Starting initial jam starts jam and period clocks', (
+    tester,
+  ) async {
     final client = await _launchAppAndConnect(tester);
     addTearDown(client.close);
     addTearDown(() async {
@@ -295,7 +377,7 @@ void main() {
     });
 
     await client.startNewGame();
-    await _ensurePrePeriod(tester);
+    await _ensureSwipeToLineup(tester);
     await _swipeToStartLineup(tester);
 
     await _tapJamControl(tester, _state(tester).labelStart);
@@ -315,7 +397,7 @@ void main() {
     });
 
     await client.startNewGame();
-    await _ensurePrePeriod(tester);
+    await _ensureSwipeToLineup(tester);
     await _swipeToStartLineup(tester);
     await _tapJamControl(tester, _state(tester).labelStart);
 
@@ -333,8 +415,9 @@ void main() {
     }, timeout: const Duration(seconds: 20));
   });
 
-  testWidgets('Timeout flow highlights controls and undo restores timeout',
-      (tester) async {
+  testWidgets('Timeout flow highlights controls and undo restores timeout', (
+    tester,
+  ) async {
     final client = await _launchAppAndConnect(tester);
     addTearDown(client.close);
     addTearDown(() async {
@@ -343,7 +426,7 @@ void main() {
     });
 
     await client.startNewGame();
-    await _ensurePrePeriod(tester);
+    await _ensureSwipeToLineup(tester);
     await _swipeToStartLineup(tester);
     await _waitForTeamServerIds(tester);
 
@@ -359,11 +442,15 @@ void main() {
     // The new menu uses custom InkWell buttons with uppercase text
     final timeoutButtons = find.widgetWithText(InkWell, 'TIMEOUT');
     final reviewButtons = find.widgetWithText(InkWell, 'REVIEW');
-    final officialTimeoutButton = find.widgetWithText(InkWell, 'OFFICIAL TIMEOUT');
+    final officialTimeoutButton = find.widgetWithText(
+      InkWell,
+      'OFFICIAL TIMEOUT',
+    );
 
     await _pumpUntil(
       tester,
-      () => timeoutButtons.evaluate().length >= 2 &&
+      () =>
+          timeoutButtons.evaluate().length >= 2 &&
           reviewButtons.evaluate().length >= 2 &&
           officialTimeoutButton.evaluate().isNotEmpty,
     );
@@ -386,10 +473,7 @@ void main() {
 
     await tester.tap(officialTimeoutButton);
     await tester.pump();
-    await _pumpUntil(
-      tester,
-      () => _state(tester).timeoutOwner == 'O',
-    );
+    await _pumpUntil(tester, () => _state(tester).timeoutOwner == 'O');
 
     await tester.tap(reviewButtons.first);
     await tester.pump();
@@ -417,10 +501,7 @@ void main() {
     }, timeout: const Duration(seconds: 20));
 
     // Wait for undo action to be available
-    await _pumpUntil(
-      tester,
-      () => _state(tester).hasUndoAction,
-    );
+    await _pumpUntil(tester, () => _state(tester).hasUndoAction);
 
     // Swipe the undo button to restore timeout
     await _swipeUndoButton(tester);
@@ -432,8 +513,9 @@ void main() {
     );
   });
 
-  testWidgets('Pre-game shows GAME and READY instead of lineup clock',
-      (tester) async {
+  testWidgets('Pre-game shows GAME and READY instead of lineup clock', (
+    tester,
+  ) async {
     final client = await _launchAppAndConnect(tester);
     addTearDown(client.close);
     addTearDown(() async {
@@ -442,12 +524,13 @@ void main() {
     });
 
     await client.startNewGame();
-    await _ensurePrePeriod(tester);
+    await _ensureSwipeToLineup(tester);
 
     // Verify "GAME" and "READY" are displayed
     await _pumpUntil(
       tester,
-      () => find.text('GAME').evaluate().isNotEmpty &&
+      () =>
+          find.text('GAME').evaluate().isNotEmpty &&
           find.text('READY').evaluate().isNotEmpty,
       timeout: const Duration(seconds: 10),
     );
@@ -456,8 +539,9 @@ void main() {
     expect(find.text('READY'), findsOneWidget);
   });
 
-  testWidgets('Undo SwipeButton shows No Undo Available when disabled',
-      (tester) async {
+  testWidgets('Undo SwipeButton shows No Undo Available when disabled', (
+    tester,
+  ) async {
     final client = await _launchAppAndConnect(tester);
     addTearDown(client.close);
     addTearDown(() async {
@@ -466,7 +550,7 @@ void main() {
     });
 
     await client.startNewGame();
-    await _ensurePrePeriod(tester);
+    await _ensureSwipeToLineup(tester);
 
     // Verify we're in pre-game state with no undo available.
     await _pumpUntil(
@@ -492,8 +576,9 @@ void main() {
     );
   });
 
-  testWidgets('Undo SwipeButton shows action label when available',
-      (tester) async {
+  testWidgets('Undo SwipeButton shows action label when available', (
+    tester,
+  ) async {
     final client = await _launchAppAndConnect(tester);
     addTearDown(client.close);
     addTearDown(() async {
@@ -502,7 +587,7 @@ void main() {
     });
 
     await client.startNewGame();
-    await _ensurePrePeriod(tester);
+    await _ensureSwipeToLineup(tester);
     await _swipeToStartLineup(tester);
 
     // Wait for lineup to start
@@ -559,7 +644,7 @@ void main() {
     });
 
     await client.startNewGame();
-    await _ensurePrePeriod(tester);
+    await _ensureSwipeToLineup(tester);
     await _swipeToStartLineup(tester);
 
     // Start the jam to begin period 1
@@ -593,7 +678,8 @@ void main() {
     // Wait for intermission to end and ready state to appear
     await _pumpUntil(
       tester,
-      () => !_state(tester).clocks['Intermission']!.running &&
+      () =>
+          !_state(tester).clocks['Intermission']!.running &&
           _state(tester).clocks['Intermission']!.time == 0,
       timeout: const Duration(seconds: 10),
     );
@@ -601,12 +687,78 @@ void main() {
     // Verify "PERIOD 2" and "READY" are displayed
     await _pumpUntil(
       tester,
-      () => find.text('PERIOD 2').evaluate().isNotEmpty &&
+      () =>
+          find.text('PERIOD 2').evaluate().isNotEmpty &&
           find.text('READY').evaluate().isNotEmpty,
       timeout: const Duration(seconds: 10),
     );
 
     expect(find.text('PERIOD 2'), findsAtLeast(1));
     expect(find.text('READY'), findsOneWidget);
+  });
+
+  testWidgets('Full game start/stop', (tester) async {
+    final client = await _launchAppAndConnect(tester);
+    addTearDown(client.close);
+    addTearDown(() async {
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump();
+    });
+
+    await client.startNewGame(timeToDerby: Duration(seconds: 4));
+    // time to derby is up
+    await _validateActiveDisplay(tester, .timeToDerby);
+    // then ready
+    await _validateActiveDisplay(tester, .ready, timeout: Duration(seconds: 4));
+
+    final gameId = _state(tester).gameId;
+
+    // start initial line up
+    await _swipeToStartLineup(tester);
+    // validate line up clock is running
+    await _validateActiveDisplay(tester, .lineup);
+
+    // start the jam
+    await _tapJamControl(tester, _state(tester).labelStart);
+    await _validateActiveDisplay(tester, .jam);
+
+    // fast forward period clock
+    client.setClockTime(gameId, 'Period', 0);
+    // jam should still be running
+    await _validateActiveDisplay(tester, .jam);
+
+    // end jam
+    await _tapJamControl(tester, _state(tester).labelStop);
+    // intermission clock should be up
+    await _validateActiveDisplay(tester, .intermission);
+
+    // fast forward intermission clock
+    client.setClockTime(gameId, 'Intermission', 0);
+    // ready should be back up
+    await _validateActiveDisplay(tester, .ready);
+
+    // cool down for server catch up
+    sleep(Duration(seconds: 3));
+    // start period line up
+    await _swipeToStartLineup(tester);
+
+    // line up is running again
+    await _validateActiveDisplay(tester, .lineup);
+
+    // start jam
+    await _tapJamControl(tester, _state(tester).labelStart);
+    await _validateActiveDisplay(tester, .jam);
+
+    // fast forward period clock
+    client.setClockTime(gameId, 'Period', 0);
+    // jam should still be running
+    await _validateActiveDisplay(tester, .jam);
+    await _tapJamControl(tester, _state(tester).labelStop);
+
+    // game over, but no official score
+    await _validateActiveDisplay(tester, .unofficialScore);
+    // set official score to true
+    client.setOfficialScore(gameId);
+    await _validateActiveDisplay(tester, .gameOver);
   });
 }
