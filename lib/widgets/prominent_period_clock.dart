@@ -80,7 +80,8 @@ class _ProminentPeriodClockState extends State<ProminentPeriodClock> {
 
     final newTimeMs = await TimeEditDialog.show(
       context,
-      title: 'Set ${widget.clock.displayName.isNotEmpty ? widget.clock.displayName : widget.clock.name} Time',
+      title:
+          'Set ${widget.clock.displayName.isNotEmpty ? widget.clock.displayName : widget.clock.name} Time',
       currentTimeMs: widget.clock.time,
       getCurrentTimeMs: () => widget.clock.time,
     );
@@ -92,9 +93,12 @@ class _ProminentPeriodClockState extends State<ProminentPeriodClock> {
 
   @override
   Widget build(BuildContext context) {
+    final widgetClockDisplayNumber = widget.clock.number == 0
+        ? 'LENGTH'
+        : widget.clock.number;
     final label = widget.clock.displayName.isNotEmpty
-        ? "${widget.clock.displayName} ${widget.clock.number}"
-        : "${widget.clock.name} ${widget.clock.number}";
+        ? "${widget.clock.displayName} $widgetClockDisplayNumber"
+        : "${widget.clock.name} $widgetClockDisplayNumber";
 
     final contentColor = widget.enabled ? Colors.white : Colors.white38;
 
@@ -103,8 +107,9 @@ class _ProminentPeriodClockState extends State<ProminentPeriodClock> {
       children: [
         Container(
           padding: EdgeInsets.symmetric(
-              horizontal: 24 * widget.scaleFactor,
-              vertical: 12 * widget.scaleFactor),
+            horizontal: 24 * widget.scaleFactor,
+            vertical: 12 * widget.scaleFactor,
+          ),
           decoration: BoxDecoration(
             color: Colors.white.withValues(alpha: 0.05),
             borderRadius: BorderRadius.circular(16 * widget.scaleFactor),
@@ -127,7 +132,10 @@ class _ProminentPeriodClockState extends State<ProminentPeriodClock> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    _buildAdjustButton("-1", widget.enabled ? () => _handleAdjust(-1000) : null),
+                    _buildAdjustButton(
+                      "-1",
+                      widget.enabled ? () => _handleAdjust(-1000) : null,
+                    ),
                     Text(
                       _formatTime(widget.clock.time),
                       style: AppTextStyles.clockTime.copyWith(
@@ -135,7 +143,10 @@ class _ProminentPeriodClockState extends State<ProminentPeriodClock> {
                         color: contentColor,
                       ),
                     ),
-                    _buildAdjustButton("+1", widget.enabled ? () => _handleAdjust(1000) : null),
+                    _buildAdjustButton(
+                      "+1",
+                      widget.enabled ? () => _handleAdjust(1000) : null,
+                    ),
                   ],
                 ),
               ),
@@ -151,11 +162,14 @@ class _ProminentPeriodClockState extends State<ProminentPeriodClock> {
                   child: Container(
                     margin: EdgeInsets.only(top: 8 * widget.scaleFactor),
                     padding: EdgeInsets.symmetric(
-                        horizontal: 12 * widget.scaleFactor,
-                        vertical: 8 * widget.scaleFactor),
+                      horizontal: 12 * widget.scaleFactor,
+                      vertical: 8 * widget.scaleFactor,
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.blue.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(8 * widget.scaleFactor),
+                      borderRadius: BorderRadius.circular(
+                        8 * widget.scaleFactor,
+                      ),
                       border: Border.all(
                         color: Colors.blue.withValues(alpha: 0.3),
                       ),
