@@ -24,23 +24,42 @@ import 'package:jam_ready/models/scoreboard_state.dart';
 import 'package:jam_ready/screens/jam_timer_screen.dart';
 import 'package:jam_ready/services/local_game_engine.dart';
 
+import 'utilities/common_helpers.dart';
+
 // ---------------------------------------------------------------------------
 // Helpers – full-app navigation
 // ---------------------------------------------------------------------------
 
-/// Waits up to [timeout] for [condition] to return true.
-Future<void> _pumpUntil(
+/// Sets [clockName] to [timeMs] and pumps one frame so the state update
+/// propagates to the widget tree. Use this when you want to reposition a
+/// clock without waiting for it to expire (e.g. "set period to 1 second").
+Future<void> _setClock(
   WidgetTester tester,
-  bool Function() condition, {
-  Duration timeout = const Duration(seconds: 15),
-  Duration step = const Duration(milliseconds: 100),
+  LocalGameEngine engine,
+  String clockName,
+  int timeMs,
+) async {
+  engine.setClockTime(clockName, timeMs);
+  await tester.pump(const Duration(milliseconds: 50));
+}
+
+/// Sets [clockName] to [toMs] and then pumps until the clock is no longer
+/// running (i.e. it has expired and the engine has processed the expiration).
+/// Use this to fast-forward a clock through its endpoint, e.g. to trigger
+/// period end or intermission end without waiting the full duration.
+Future<void> _drainClock(
+  WidgetTester tester,
+  LocalGameEngine engine,
+  String clockName, {
+  int toMs = 500,
+  Duration timeout = const Duration(seconds: 5),
 }) async {
-  final deadline = DateTime.now().add(timeout);
-  while (DateTime.now().isBefore(deadline)) {
-    await tester.pump(step);
-    if (condition()) return;
-  }
-  throw TestFailure('_pumpUntil: timed out waiting for condition');
+  engine.setClockTime(clockName, toMs);
+  await pumpUntil(
+    tester,
+    () => !engine.state.clocks[clockName]!.running,
+    timeout: timeout,
+  );
 }
 
 /// Launches the full app and drives the UI through to the game screen.
@@ -53,7 +72,7 @@ Future<void> _launchOfflineGame(
   SharedPreferences.setMockInitialValues({});
   app.main();
 
-  await _pumpUntil(
+  await pumpUntil(
     tester,
     () => find.text('START LOCAL GAME').evaluate().isNotEmpty,
     timeout: const Duration(seconds: 10),
@@ -65,7 +84,7 @@ Future<void> _launchOfflineGame(
   // HomeScreen uses pushReplacement, so both screens are in the widget
   // tree during the animation – HomeScreen has its own TextFormFields
   // (host/port) that would be found first if we don't wait for it to leave.
-  await _pumpUntil(
+  await pumpUntil(
     tester,
     () => find.text('START GAME').evaluate().isNotEmpty,
     timeout: const Duration(seconds: 5),
@@ -84,7 +103,7 @@ Future<void> _launchOfflineGame(
 
   await tester.tap(find.text('START GAME'));
 
-  await _pumpUntil(
+  await pumpUntil(
     tester,
     () => find.byType(JamTimerScreen).evaluate().isNotEmpty,
     timeout: const Duration(seconds: 5),
@@ -136,10 +155,10 @@ void main() {
     // Mock the wakelock channel – harmless on real device, required in simulator.
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMessageHandler(
-      'dev.flutter.pigeon.wakelock_plus_platform_interface.WakelockPlusApi.toggle',
-      (ByteData? message) async =>
-          const StandardMessageCodec().encodeMessage(<Object?>[null]),
-    );
+          'dev.flutter.pigeon.wakelock_plus_platform_interface.WakelockPlusApi.toggle',
+          (ByteData? message) async =>
+              const StandardMessageCodec().encodeMessage(<Object?>[null]),
+        );
   });
 
   // ---------------------------------------------------------------------------
@@ -159,14 +178,14 @@ void main() {
       SharedPreferences.setMockInitialValues({});
       app.main();
 
-      await _pumpUntil(
+      await pumpUntil(
         tester,
         () => find.text('START LOCAL GAME').evaluate().isNotEmpty,
       );
 
       await tester.tap(find.text('START LOCAL GAME'));
 
-      await _pumpUntil(
+      await pumpUntil(
         tester,
         () => find.text('START GAME').evaluate().isNotEmpty,
       );
@@ -182,7 +201,9 @@ void main() {
       expect(find.text('JamReady'), findsOneWidget);
     });
 
-    testWidgets('team names from setup appear on the game screen', (tester) async {
+    testWidgets('team names from setup appear on the game screen', (
+      tester,
+    ) async {
       await _launchOfflineGame(tester, team1: 'Rockets', team2: 'Thunder');
       // Pump a couple of frames for initialize() → notifyListeners() → rebuild.
       await tester.pump();
@@ -224,7 +245,11 @@ void main() {
     });
 
     testWidgets('team names appear on the game screen', (tester) async {
-      final (_, engine) = await _setupGame(tester, team1: 'Rockets', team2: 'Thunder');
+      final (_, engine) = await _setupGame(
+        tester,
+        team1: 'Rockets',
+        team2: 'Thunder',
+      );
       addTearDown(engine.dispose);
       await tester.pump();
 
@@ -238,7 +263,9 @@ void main() {
   // ---------------------------------------------------------------------------
 
   group('starting a jam', () {
-    testWidgets('startJam transitions from preGame to jam phase', (tester) async {
+    testWidgets('startJam transitions from preGame to jam phase', (
+      tester,
+    ) async {
       final (state, engine) = await _setupGame(tester);
       addTearDown(engine.dispose);
 
@@ -263,8 +290,13 @@ void main() {
       expect(state.clocks['Jam']!.number, 2);
     });
 
-    testWidgets('jam clock resets to full duration on each new jam', (tester) async {
-      final (state, engine) = await _setupGame(tester, ruleset: Ruleset.wftda());
+    testWidgets('jam clock resets to full duration on each new jam', (
+      tester,
+    ) async {
+      final (state, engine) = await _setupGame(
+        tester,
+        ruleset: Ruleset.wftda(),
+      );
       addTearDown(engine.dispose);
 
       engine.startJam();
@@ -324,7 +356,9 @@ void main() {
   // ---------------------------------------------------------------------------
 
   group('timeout', () {
-    testWidgets('timeout pauses period clock and starts timeout clock', (tester) async {
+    testWidgets('timeout pauses period clock and starts timeout clock', (
+      tester,
+    ) async {
       final (state, engine) = await _setupGame(tester);
       addTearDown(engine.dispose);
 
@@ -394,7 +428,9 @@ void main() {
   // ---------------------------------------------------------------------------
 
   group('period transitions', () {
-    testWidgets('period expiring during a jam leads to intermission', (tester) async {
+    testWidgets('period expiring during a jam leads to intermission', (
+      tester,
+    ) async {
       final (state, engine) = await _setupGame(tester);
       addTearDown(engine.dispose);
 
@@ -407,7 +443,9 @@ void main() {
       expect(state.clocks['Intermission']!.running, true);
     });
 
-    testWidgets('undo after period-ending jam reverses intermission', (tester) async {
+    testWidgets('undo after period-ending jam reverses intermission', (
+      tester,
+    ) async {
       final (state, engine) = await _setupGame(tester);
       addTearDown(engine.dispose);
 
@@ -476,5 +514,32 @@ void main() {
       expect(state.noMoreJam, false);
       expect(state.connectionStatus, 'Offline Game');
     });
+  });
+
+  testWidgets('full game run through via UI', (tester) async {
+    // TODO: Start local game via menu options
+    final (state, engine) = await _setupGame(tester);
+
+    addTearDown(engine.dispose);
+
+    // game starts in ready state
+    await validateActiveDisplay(tester, .ready);
+    // start initial lineup
+    await swipeToStartLineup(tester);
+    await validateActiveDisplay(tester, .lineup);
+
+    // start a jam
+    await tapJamControl(tester, state.labelStart);
+    await validateActiveDisplay(tester, .jam);
+    expect(state.clocks['Jam']!.running, isTrue);
+
+    // fast forward period clock without effecting jam clock
+    await _setClock(tester, engine, 'Period', 0);
+    expect(state.clocks['Jam']!.running, isTrue);
+    await validateActiveDisplay(tester, .jam);
+
+    // end the jam and start intermission
+    await tapJamControl(tester, state.labelStop);
+    await validateActiveDisplay(tester, .intermission);
   });
 }
