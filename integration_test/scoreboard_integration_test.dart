@@ -71,6 +71,20 @@ class ScoreboardTestClient {
     );
   }
 
+  void disableOfficialScoreRule(String gameId) {
+    // v2025.9+ enforces a timing gate (INHIBIT_FINAL_SCORE) before OfficialScore
+    // can be set. Disable the rule so tests don't have to wait 30s after final
+    // jam end.
+    _channel.sink.add(
+      jsonEncode({
+        "action": "Set",
+        "key": "ScoreBoard.Game($gameId).Rule(Score.EnforceTimeToOr)",
+        "value": "false",
+        "flag": "",
+      }),
+    );
+  }
+
   void setOfficialScore(String gameId) {
     _channel.sink.add(
       jsonEncode({
@@ -99,7 +113,7 @@ Uri _scoreboardWsUri(String host, int port) {
 
 String _scoreboardHost() {
   const host = String.fromEnvironment('SCOREBOARD_HOST');
-  return host.isNotEmpty ? host : '192.168.0.111'; //'ryan.local';
+  return host.isNotEmpty ? host : '192.168.0.115'; //'ryan.local';
 }
 
 int _scoreboardPort() {
@@ -500,6 +514,7 @@ void main() {
     await validateActiveDisplay(tester, .ready, timeout: Duration(seconds: 4));
 
     final gameId = scoreboardState(tester).gameId;
+    client.disableOfficialScoreRule(gameId);
 
     // start initial line up
     await swipeToStartLineup(tester);
