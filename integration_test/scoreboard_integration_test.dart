@@ -123,6 +123,22 @@ int _scoreboardPort() {
   return int.tryParse(port) ?? 8000;
 }
 
+String _scoreboardVersion() {
+  const version = String.fromEnvironment('SCOREBOARD_VERSION');
+  return version; // empty string means unknown / not provided
+}
+
+/// Returns true if the scoreboard version is at least [major].[minor].
+/// An unknown version (empty string) is treated as compatible.
+bool _versionAtLeast(String version, int major, int minor) {
+  if (version.isEmpty) return true;
+  final stripped = version.startsWith('v') ? version.substring(1) : version;
+  final parts = stripped.split('.');
+  final ma = int.tryParse(parts.isNotEmpty ? parts[0] : '') ?? 0;
+  final mi = int.tryParse(parts.length > 1 ? parts[1] : '') ?? 0;
+  return ma > major || (ma == major && mi >= minor);
+}
+
 Future<ScoreboardTestClient> _launchAppAndConnect(WidgetTester tester) async {
   final host = _scoreboardHost();
   final port = _scoreboardPort();
@@ -615,7 +631,10 @@ void main() {
     await _finishGame(tester, client, gameId);
   });
 
-  testWidgets('Overtime transition on tied game', (tester) async {
+  testWidgets(
+    'Overtime transition on tied game',
+    skip: !_versionAtLeast(_scoreboardVersion(), 2025, 4),
+    (tester) async {
     final client = await _launchAppAndConnect(tester);
     addTearDown(client.close);
     addTearDown(() async {
