@@ -24,7 +24,10 @@ class ScoreboardTestClient {
     return ScoreboardTestClient(channel);
   }
 
-  Future<void> startNewGame({Duration? timeToDerby}) async {
+  Future<void> startNewGame({
+    Duration? timeToDerby,
+    String ruleset = 'WFTDARuleset',
+  }) async {
     _channel.sink.add(
       jsonEncode({
         'action': 'Register',
@@ -36,7 +39,7 @@ class ScoreboardTestClient {
       'data': {
         'Team1': '',
         'Team2': '',
-        'Ruleset': 'WFTDARuleset',
+        'Ruleset': ruleset,
         'IntermissionClock': timeToDerby != null
             ? '${timeToDerby.inMilliseconds}'
             : null,
@@ -223,6 +226,74 @@ Future<void> _swipeUndoButton(WidgetTester tester) async {
   final undoButton = find.byWidget(buttonList.last.widget);
 
   await swipeButton(tester, undoButton);
+}
+
+/// Starts a new game, waits through the pre-game countdown, and returns the
+/// game ID. Disables the EnforceTimeToOr rule so [setOfficialScore] is not
+/// blocked by the 30s timing gate introduced in v2025.9.
+Future<String> _startGame(
+  WidgetTester tester,
+  ScoreboardTestClient client, {
+  String ruleset = 'WFTDARuleset',
+}) async {
+  await client.startNewGame(
+    timeToDerby: const Duration(seconds: 4),
+    ruleset: ruleset,
+  );
+  await validateActiveDisplay(tester, ActiveDisplay.timeToDerby);
+  await validateActiveDisplay(
+    tester,
+    ActiveDisplay.ready,
+    timeout: const Duration(seconds: 4),
+  );
+  final gameId = scoreboardState(tester).gameId;
+  client.disableOfficialScoreRule(gameId);
+  return gameId;
+}
+
+/// Runs one period: swipe to lineup → start jam → fast-forward period clock
+/// → stop jam.
+Future<void> _runPeriod(
+  WidgetTester tester,
+  ScoreboardTestClient client,
+  String gameId,
+) async {
+  await swipeToStartLineup(tester);
+  await validateActiveDisplay(tester, ActiveDisplay.lineup);
+
+  await tapJamControl(tester, scoreboardState(tester).labelStart);
+  await validateActiveDisplay(tester, ActiveDisplay.jam);
+
+  client.setClockTime(gameId, 'Period', 0);
+  await validateActiveDisplay(tester, ActiveDisplay.jam);
+
+  await tapJamControl(tester, scoreboardState(tester).labelStop);
+}
+
+/// Advances through an intermission: validates the intermission display,
+/// fast-forwards the intermission clock, then waits for the ready display.
+Future<void> _runIntermission(
+  WidgetTester tester,
+  ScoreboardTestClient client,
+  String gameId,
+) async {
+  await validateActiveDisplay(tester, ActiveDisplay.intermission);
+  client.setClockTime(gameId, 'Intermission', 0);
+  await validateActiveDisplay(tester, ActiveDisplay.ready);
+  // Brief pause for server to process the period transition.
+  sleep(const Duration(seconds: 3));
+}
+
+/// Validates the unofficial score display, sets the official score, then
+/// waits for the game over display.
+Future<void> _finishGame(
+  WidgetTester tester,
+  ScoreboardTestClient client,
+  String gameId,
+) async {
+  await validateActiveDisplay(tester, ActiveDisplay.unofficialScore);
+  client.setOfficialScore(gameId);
+  await validateActiveDisplay(tester, ActiveDisplay.gameOver);
 }
 
 void main() {
@@ -506,61 +577,41 @@ void main() {
       await tester.pump();
     });
 
-    await client.startNewGame(timeToDerby: Duration(seconds: 4));
-    // time to derby is up
-    await validateActiveDisplay(tester, .timeToDerby);
-    // then ready
-    await validateActiveDisplay(tester, .ready, timeout: Duration(seconds: 4));
+    final gameId = await _startGame(tester, client);
 
-    final gameId = scoreboardState(tester).gameId;
-    client.disableOfficialScoreRule(gameId);
+    // Period 1
+    await _runPeriod(tester, client, gameId);
+    await _runIntermission(tester, client, gameId);
 
-    // start initial line up
-    await swipeToStartLineup(tester);
-    // validate line up clock is running
-    await validateActiveDisplay(tester, .lineup);
+    // Period 2 (final)
+    await _runPeriod(tester, client, gameId);
+    await _finishGame(tester, client, gameId);
+  });
 
-    // start the jam
-    await tapJamControl(tester, scoreboardState(tester).labelStart);
-    await validateActiveDisplay(tester, .jam);
+  testWidgets('Full game start/stop - RDCL', (tester) async {
+    final client = await _launchAppAndConnect(tester);
+    addTearDown(client.close);
+    addTearDown(() async {
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump();
+    });
 
-    // fast forward period clock
-    client.setClockTime(gameId, 'Period', 0);
-    // jam should still be running
-    await validateActiveDisplay(tester, .jam);
+    final gameId = await _startGame(tester, client, ruleset: 'RDCLRuleset');
 
-    // end jam
-    await tapJamControl(tester, scoreboardState(tester).labelStop);
-    // intermission clock should be up
-    await validateActiveDisplay(tester, .intermission);
+    // Period 1
+    await _runPeriod(tester, client, gameId);
+    await _runIntermission(tester, client, gameId); // 5 min
 
-    // fast forward intermission clock
-    client.setClockTime(gameId, 'Intermission', 0);
-    // ready should be back up
-    await validateActiveDisplay(tester, .ready);
+    // Period 2
+    await _runPeriod(tester, client, gameId);
+    await _runIntermission(tester, client, gameId); // 15 min
 
-    // cool down for server catch up
-    sleep(Duration(seconds: 3));
-    // start period line up
-    await swipeToStartLineup(tester);
+    // Period 3
+    await _runPeriod(tester, client, gameId);
+    await _runIntermission(tester, client, gameId); // 5 min
 
-    // line up is running again
-    await validateActiveDisplay(tester, .lineup);
-
-    // start jam
-    await tapJamControl(tester, scoreboardState(tester).labelStart);
-    await validateActiveDisplay(tester, .jam);
-
-    // fast forward period clock
-    client.setClockTime(gameId, 'Period', 0);
-    // jam should still be running
-    await validateActiveDisplay(tester, .jam);
-    await tapJamControl(tester, scoreboardState(tester).labelStop);
-
-    // game over, but no official score
-    await validateActiveDisplay(tester, .unofficialScore);
-    // set official score to true
-    client.setOfficialScore(gameId);
-    await validateActiveDisplay(tester, .gameOver);
+    // Period 4 (final)
+    await _runPeriod(tester, client, gameId);
+    await _finishGame(tester, client, gameId);
   });
 }
