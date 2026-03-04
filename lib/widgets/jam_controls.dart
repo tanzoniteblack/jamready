@@ -52,7 +52,8 @@ class _JamControlsState extends State<JamControls> {
 
   bool get _inConfirmation {
     if (_transitionTime == null) return false;
-    return DateTime.now().difference(_transitionTime!) < JamControls.cooldownDuration;
+    return DateTime.now().difference(_transitionTime!) <
+        JamControls.cooldownDuration;
   }
 
   void _setConfirmationState(bool jamStarted) {

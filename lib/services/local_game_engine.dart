@@ -121,6 +121,7 @@ class LocalGameEngine with WidgetsBindingObserver implements GameEngine {
     // Set rules
     _state.lineupDuration = ruleset.lineupDurationMs;
     _state.lineupOvertimeDuration = ruleset.lineupOvertimeDurationMs;
+    _state.periodCount = ruleset.periodCount;
 
     // Game state flags
     _state.inJam = false;
@@ -518,7 +519,18 @@ class LocalGameEngine with WidgetsBindingObserver implements GameEngine {
     } else {
       _clearUndo();
     }
-    _startLineup();
+
+    if (_state.inOvertime) {
+      // After an overtime jam, return to unofficial score so the operator can
+      // decide to run another overtime jam or end the game.
+      // Reset noMoreJam=true: stopJam() cleared it when entering overtime, but
+      // _isUnofficialScore needs it true to detect this state correctly.
+      _state.noMoreJam = true;
+      _phase = GamePhase.unofficialScore;
+      _state.notify();
+    } else {
+      _startLineup();
+    }
   }
 
   void _startLineup() {
@@ -579,6 +591,9 @@ class LocalGameEngine with WidgetsBindingObserver implements GameEngine {
 
     if (_currentPeriod >= ruleset.periodCount) {
       // Final period ended — wait for the user to choose overtime or end game.
+      // Set intermission.number = periodCount so _isUnofficialScore's
+      // period-count path recognises this state correctly.
+      _state.clocks['Intermission']!.number = _currentPeriod;
       _state.noMoreJam = true;
       _phase = GamePhase.unofficialScore;
       _state.notify();

@@ -14,6 +14,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
+import 'package:jam_ready/widgets/swipe_button.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -142,6 +143,117 @@ Future<(ScoreboardState, LocalGameEngine)> _setupGame(
 
   await tester.pumpAndSettle();
   return (state, engine);
+}
+
+// ---------------------------------------------------------------------------
+// Parameterised test helpers
+// ---------------------------------------------------------------------------
+
+/// Runs a single non-final period via UI: starts lineup, starts a jam,
+/// fast-forwards period clock, stops jam, validates intermission display,
+/// and drains the intermission clock.
+Future<void> _runNonFinalPeriod(
+  WidgetTester tester,
+  LocalGameEngine engine,
+  ScoreboardState state,
+) async {
+  // start jam line up and then jam
+  await swipeToStartLineup(tester);
+  await tapJamControl(tester, state.labelStart);
+  await _setClock(tester, engine, 'Period', 0);
+  // stop the jam
+  await tapJamControl(tester, state.labelStop);
+  await validateActiveDisplay(tester, ActiveDisplay.intermission);
+  // end intermission
+  await _setClock(tester, engine, 'Intermission', 0);
+}
+
+/// Runs a single period in the full-game flow, with intermediate display
+/// validations. If [isFinal] is true, validates unofficial score instead of
+/// intermission (and does not drain the intermission clock).
+Future<void> _runFullGamePeriod(
+  WidgetTester tester,
+  LocalGameEngine engine,
+  ScoreboardState state, {
+  bool isFinal = false,
+}) async {
+  await swipeToStartLineup(tester);
+  await validateActiveDisplay(tester, ActiveDisplay.lineup);
+  await tapJamControl(tester, state.labelStart);
+  await validateActiveDisplay(tester, ActiveDisplay.jam);
+  await _setClock(tester, engine, 'Period', 0);
+  expect(state.clocks['Jam']!.running, isTrue);
+  await validateActiveDisplay(tester, ActiveDisplay.jam);
+  await tapJamControl(tester, state.labelStop);
+  if (isFinal) {
+    await validateActiveDisplay(tester, ActiveDisplay.unofficialScore);
+  } else {
+    await validateActiveDisplay(tester, ActiveDisplay.intermission);
+    await _setClock(tester, engine, 'Intermission', 0);
+  }
+}
+
+Future<void> _testOvertimeFlow(WidgetTester tester, Ruleset ruleset) async {
+  final (state, engine) = await _setupGame(tester, ruleset: ruleset);
+  addTearDown(engine.dispose);
+
+  await validateActiveDisplay(tester, ActiveDisplay.ready);
+  for (int p = 1; p < ruleset.periodCount; p++) {
+    await _runNonFinalPeriod(tester, engine, state);
+  }
+
+  // --- Final period ---
+  await swipeToStartLineup(tester);
+  await tapJamControl(tester, state.labelStart);
+  await _setClock(tester, engine, 'Period', 0);
+  await tapJamControl(tester, state.labelStop);
+  await validateActiveDisplay(tester, ActiveDisplay.unofficialScore);
+
+  // Both the overtime SwipeButton and the END GAME button must be visible.
+  final overtimeButton = find.ancestor(
+    of: find.textContaining('OVERTIME LINEUP'),
+    matching: find.byType(SwipeButton),
+  );
+  expect(overtimeButton, findsOneWidget);
+  expect(find.text('END GAME'), findsOneWidget);
+
+  // Swipe to start the overtime lineup.
+  await swipeButton(tester, overtimeButton);
+  await validateActiveDisplay(tester, ActiveDisplay.lineup);
+
+  expect(state.inOvertime, isTrue);
+  expect(state.clocks['Period']!.running, isFalse);
+  // Alert system should use the overtime lineup duration, not the regular one.
+  expect(state.lineupOvertimeDuration, ruleset.lineupOvertimeDurationMs);
+
+  // --- Run Overtime jam ---
+  await tapJamControl(tester, state.labelStart);
+  await validateActiveDisplay(tester, ActiveDisplay.jam);
+  // Period clock must NOT restart during an overtime jam.
+  expect(state.clocks['Period']!.running, isFalse);
+  expect(state.clocks['Period']!.time, 0);
+  await tapJamControl(tester, state.labelStop);
+
+  // after overtime jam, back to the official score page
+  await validateActiveDisplay(tester, ActiveDisplay.unofficialScore);
+
+  // End the game
+  await tapButton(tester, find.text('END GAME'));
+  await validateActiveDisplay(tester, ActiveDisplay.gameOver);
+}
+
+Future<void> _testFullGameFlow(WidgetTester tester, Ruleset ruleset) async {
+  final (state, engine) = await _setupGame(tester, ruleset: ruleset);
+  addTearDown(engine.dispose);
+
+  await validateActiveDisplay(tester, ActiveDisplay.ready);
+  for (int p = 1; p < ruleset.periodCount; p++) {
+    await _runFullGamePeriod(tester, engine, state);
+  }
+  await _runFullGamePeriod(tester, engine, state, isFinal: true);
+
+  await tapButton(tester, find.text('END GAME'));
+  await validateActiveDisplay(tester, ActiveDisplay.gameOver);
 }
 
 // ---------------------------------------------------------------------------
@@ -468,7 +580,9 @@ void main() {
       expect(state.clocks['Intermission']!.running, false);
     });
 
-    testWidgets('final period ending leads to unofficial score then game over', (tester) async {
+    testWidgets('final period ending leads to unofficial score then game over', (
+      tester,
+    ) async {
       // 1-period ruleset so any period end → unofficial score immediately
       final ruleset = Ruleset.custom(
         id: 'test_1p',
@@ -502,7 +616,9 @@ void main() {
       expect(state.connectionStatus, 'Game Over');
     });
 
-    testWidgets('undo reverses unofficial score and restores jam', (tester) async {
+    testWidgets('undo reverses unofficial score and restores jam', (
+      tester,
+    ) async {
       final ruleset = Ruleset.custom(
         id: 'test_1p',
         name: 'Test 1P',
@@ -531,53 +647,21 @@ void main() {
     });
   });
 
-  testWidgets('full game run through via UI', (tester) async {
-    // TODO: Start local game via menu options
-    final (state, engine) = await _setupGame(tester);
+  group('full game flows', () {
+    group('overtime', () {
+      testWidgets('overtime lineup and jam flow - WFTDA', (tester) async {
+        await _testOvertimeFlow(tester, Ruleset.wftda());
+      });
+      testWidgets('overtime lineup and jam flow - RDCL', (tester) async {
+        await _testOvertimeFlow(tester, Ruleset.rdcl());
+      });
+    });
 
-    addTearDown(engine.dispose);
-
-    // game starts in ready state
-    await validateActiveDisplay(tester, .ready);
-    // start initial lineup
-    await swipeToStartLineup(tester);
-    await validateActiveDisplay(tester, .lineup);
-
-    // start a jam
-    await tapJamControl(tester, state.labelStart);
-    await validateActiveDisplay(tester, .jam);
-    expect(state.clocks['Jam']!.running, isTrue);
-
-    // fast forward period clock without effecting jam clock
-    await _setClock(tester, engine, 'Period', 0);
-    expect(state.clocks['Jam']!.running, isTrue);
-    await validateActiveDisplay(tester, .jam);
-
-    // end the jam and start intermission
-    await tapJamControl(tester, state.labelStop);
-    await validateActiveDisplay(tester, .intermission);
-
-    // short circuit intermission
-    await _setClock(tester, engine, 'Intermission', 0);
-
-    // start up the next period lineup
-    await swipeToStartLineup(tester);
-    await validateActiveDisplay(tester, .lineup);
-    // start first jam of 2nd period
-    await tapJamControl(tester, state.labelStart);
-    await validateActiveDisplay(tester, .jam);
-
-    // fast forward period clock without effecting jam clock
-    await _setClock(tester, engine, 'Period', 0);
-    expect(state.clocks['Jam']!.running, isTrue);
-    await validateActiveDisplay(tester, .jam);
-
-    // stop jam, see ability to start overtime jam or end game
-    await tapJamControl(tester, state.labelStop);
-    await validateActiveDisplay(tester, .unofficialScore);
-
-    // tap End Game and confirm the game over display
-    await tapButton(tester, find.text('END GAME'));
-    await validateActiveDisplay(tester, .gameOver);
+    testWidgets('full game run through via UI - WFTDA', (tester) async {
+      await _testFullGameFlow(tester, Ruleset.wftda());
+    });
+    testWidgets('full game run through via UI - RDCL', (tester) async {
+      await _testFullGameFlow(tester, Ruleset.rdcl());
+    });
   });
 }

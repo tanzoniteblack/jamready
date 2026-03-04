@@ -2,7 +2,7 @@
 
 # Run unit and widget tests only (fast, no device required)
 unit:
-	flutter test
+	flutter test --dart-define=JAM_CONTROLS_COOLDOWN_MS=0
 
 # Run integration tests (requires a connected device or running simulator)
 integration:
