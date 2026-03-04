@@ -46,24 +46,18 @@ class JamControls extends StatefulWidget {
 }
 
 class _JamControlsState extends State<JamControls> {
-  DateTime? _transitionTime;
+  bool _inConfirmation = false;
   bool? _transitionedToJam;
   Timer? _confirmationTimer;
-
-  bool get _inConfirmation {
-    if (_transitionTime == null) return false;
-    return DateTime.now().difference(_transitionTime!) <
-        JamControls.cooldownDuration;
-  }
 
   void _setConfirmationState(bool jamStarted) {
     _confirmationTimer?.cancel();
     setState(() {
-      _transitionTime = DateTime.now();
+      _inConfirmation = true;
       _transitionedToJam = jamStarted;
     });
     _confirmationTimer = Timer(JamControls.cooldownDuration, () {
-      if (mounted) setState(() {});
+      if (mounted) setState(() { _inConfirmation = false; });
     });
   }
 
@@ -90,7 +84,7 @@ class _JamControlsState extends State<JamControls> {
     if (!oldWidget.isIntermission && widget.isIntermission) {
       _confirmationTimer?.cancel();
       setState(() {
-        _transitionTime = null;
+        _inConfirmation = false;
         _transitionedToJam = null;
       });
       return;
