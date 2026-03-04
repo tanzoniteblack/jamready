@@ -101,7 +101,9 @@ extension _JamTimerAlerts on _JamTimerScreenState {
     } else if (state.clocks['Lineup']?.running == true) {
       activeClock = state.clocks['Lineup'];
       isCountUp = true;
-      duration = state.lineupDuration;
+      duration = state.inOvertime
+          ? state.lineupOvertimeDuration
+          : state.lineupDuration;
     }
 
     if (_wasInJam && !state.inJam && state.clocks['Lineup']?.running == true) {

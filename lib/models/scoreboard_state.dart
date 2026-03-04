@@ -117,20 +117,38 @@ class ScoreboardState extends ChangeNotifier {
           injuryContinuationRule = value == true;
           break;
         case 'ScoreBoard.CurrentGame.Rule(Lineup.Duration)':
-          if (value is int) lineupDuration = value;
+          lineupDuration = _parseTimeRuleMs(value) ?? lineupDuration;
           break;
         case 'ScoreBoard.CurrentGame.Rule(Lineup.OvertimeDuration)':
-          if (value is int) lineupOvertimeDuration = value;
+          lineupOvertimeDuration = _parseTimeRuleMs(value) ?? lineupOvertimeDuration;
           break;
         case 'ScoreBoard.CurrentGame.Rule(Period.Number)':
-          periodCount =
-              value is int ? value : int.tryParse(value.toString()) ?? 0;
+          periodCount = value is int
+              ? value
+              : int.tryParse(value.toString()) ?? 0;
           break;
         case 'ScoreBoard.CurrentGame.OfficialScore':
           officialScore = value == true;
           break;
       }
     }
+  }
+
+  /// Parses a CRG time rule value to milliseconds.
+  /// Handles int (already ms) and "M:SS" string format (e.g. "1:00" → 60000).
+  int? _parseTimeRuleMs(dynamic value) {
+    if (value is int) return value;
+    if (value is String) {
+      final parts = value.split(':');
+      if (parts.length == 2) {
+        final minutes = int.tryParse(parts[0]);
+        final seconds = int.tryParse(parts[1]);
+        if (minutes != null && seconds != null) {
+          return (minutes * 60 + seconds) * 1000;
+        }
+      }
+    }
+    return null;
   }
 
   void _updateClock(String path, dynamic value) {

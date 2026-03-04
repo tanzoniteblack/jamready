@@ -29,7 +29,9 @@ extension _JamTimerControls on _JamTimerScreenState {
     final baseLabel = clock.displayName.isNotEmpty
         ? clock.displayName
         : clock.name;
-    final String label = clock.number > 0 ? "$baseLabel ${clock.number}" : baseLabel;
+    final String label = clock.number > 0
+        ? "$baseLabel ${clock.number}"
+        : baseLabel;
 
     final contentColor = isEnabled ? Colors.white70 : Colors.white24;
 
@@ -334,7 +336,9 @@ extension _JamTimerControls on _JamTimerScreenState {
           ),
         ),
         SizedBox(height: 16 * scaleFactor),
-        _buildEndGameButton(isEnabled, scaleFactor),
+        _isLocalMode
+            ? _buildEndGameButton(isEnabled, scaleFactor)
+            : SizedBox(height: 56 * scaleFactor),
       ],
     );
   }

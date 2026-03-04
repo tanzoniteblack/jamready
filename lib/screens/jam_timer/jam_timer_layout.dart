@@ -310,7 +310,9 @@ extension _JamTimerLayout on _JamTimerScreenState {
       ),
       child: Column(
         children: [
-          if (_isLocalMode && _isUnofficialScore(state))
+          if (_isUnofficialScore(state) &&
+              (_isLocalMode ||
+                  state.labelStop.toLowerCase().contains('overtime')))
             _buildOvertimeDecisionSection(state, isEnabled, scaleFactor)
           else if (showTimeoutOnly)
             _buildTimeoutTypeSection(state, controlsEnabled, scaleFactor)
