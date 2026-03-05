@@ -507,6 +507,58 @@ void main() {
 
       expect(state.team1.timeouts, initial - 1);
     });
+
+    testWidgets(
+      'switching from team 1 timeout to team 2 restores team 1 count',
+      (tester) async {
+        final (state, engine) = await _setupGame(tester);
+        addTearDown(engine.dispose);
+
+        final t1Initial = state.team1.timeouts;
+        final t2Initial = state.team2.timeouts;
+        engine.startJam();
+        engine.setTimeoutOwner('1');
+        engine.setTimeoutOwner('2');
+        await tester.pump();
+
+        expect(state.team1.timeouts, t1Initial);
+        expect(state.team2.timeouts, t2Initial - 1);
+      },
+    );
+
+    testWidgets(
+      'switching from team timeout to official timeout restores team count',
+      (tester) async {
+        final (state, engine) = await _setupGame(tester);
+        addTearDown(engine.dispose);
+
+        final initial = state.team1.timeouts;
+        engine.startJam();
+        engine.setTimeoutOwner('1');
+        engine.setTimeoutOwner('O');
+        await tester.pump();
+
+        expect(state.team1.timeouts, initial);
+      },
+    );
+
+    testWidgets(
+      'switching from team timeout to official review restores timeout count',
+      (tester) async {
+        final (state, engine) = await _setupGame(tester);
+        addTearDown(engine.dispose);
+
+        final initialTO = state.team1.timeouts;
+        final initialOR = state.team1.officialReviews;
+        engine.startJam();
+        engine.setTimeoutOwner('1'); // team 1 timeout
+        engine.setTimeoutOwner('1', isOfficialReview: true); // switch to OR
+        await tester.pump();
+
+        expect(state.team1.timeouts, initialTO); // timeout count restored
+        expect(state.team1.officialReviews, initialOR - 1); // review count decremented
+      },
+    );
   });
 
   // ---------------------------------------------------------------------------

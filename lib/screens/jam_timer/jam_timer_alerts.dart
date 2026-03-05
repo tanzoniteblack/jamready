@@ -73,11 +73,23 @@ extension _JamTimerAlerts on _JamTimerScreenState {
       return;
     }
 
-    for (final threshold in _teamTimeoutHapticThresholdSeconds) {
+    for (int i = 0; i < _teamTimeoutHapticThresholdSeconds.length; i++) {
+      final threshold = _teamTimeoutHapticThresholdSeconds[i];
       if (currentSeconds >= threshold &&
           !_timeoutThresholdsTriggered.contains(threshold)) {
         _timeoutThresholdsTriggered.add(threshold);
-        Vibration.vibrate(duration: 50);
+        // Match the incrementing intensity used for lineup/jam alerts (levels 1–3).
+        switch (i + 1) {
+          case 1:
+            Vibration.vibrate(duration: 400);
+          case 2:
+            Vibration.vibrate(
+              pattern: [0, 200, 100, 200],
+              intensities: [0, 255, 0, 255],
+            );
+          case _:
+            Vibration.vibrate(duration: 1000, amplitude: 255);
+        }
       }
     }
   }

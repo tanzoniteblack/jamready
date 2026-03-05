@@ -660,9 +660,31 @@ class LocalGameEngine with WidgetsBindingObserver implements GameEngine {
 
   @override
   void setTimeoutOwner(String owner, {bool isOfficialReview = false}) {
+    // Capture previous owner before potentially starting a new timeout.
+    // If we're already in a timeout, we'll need to restore their resource.
+    final prevOwner = _state.timeoutOwner;
+    final prevIsOr = _state.isOfficialReview;
+
     if (_phase != GamePhase.timeout) {
       // Start timeout first
       startTimeout();
+    }
+
+    // Restore resources for the previous team owner (if any) before applying
+    // the new assignment. This handles re-assignment mid-timeout, e.g.:
+    //   assign team 1 TO → switch to official TO → team 1's count comes back.
+    if (prevOwner == '1') {
+      if (prevIsOr) {
+        _state.team1.officialReviews++;
+      } else {
+        _state.team1.timeouts++;
+      }
+    } else if (prevOwner == '2') {
+      if (prevIsOr) {
+        _state.team2.officialReviews++;
+      } else {
+        _state.team2.timeouts++;
+      }
     }
 
     // Decrement resources
