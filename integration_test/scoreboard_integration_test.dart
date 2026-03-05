@@ -585,6 +585,79 @@ void main() {
     );
   });
 
+  testWidgets('Undo after startJam returns to lineup', (tester) async {
+    final client = await _launchAppAndConnect(tester);
+    addTearDown(client.close);
+    addTearDown(() async {
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump();
+    });
+
+    await client.startNewGame();
+    await _ensureSwipeToLineup(tester);
+    await swipeToStartLineup(tester);
+
+    await pumpUntil(
+      tester,
+      () => scoreboardState(tester).clocks['Lineup']!.running,
+      timeout: const Duration(seconds: 20),
+    );
+
+    // Start jam — this is the action we want to undo
+    await tapJamControl(tester, scoreboardState(tester).labelStart);
+    await pumpUntil(
+      tester,
+      () => scoreboardState(tester).clocks['Jam']!.running,
+      timeout: const Duration(seconds: 20),
+    );
+
+    // Undo (unstart jam) → should return to lineup
+    await _swipeUndoButton(tester);
+
+    await pumpUntil(tester, () {
+      final state = scoreboardState(tester);
+      return state.clocks['Lineup']!.running && !state.clocks['Jam']!.running;
+    }, timeout: const Duration(seconds: 20));
+
+    await validateActiveDisplay(tester, ActiveDisplay.lineup);
+  });
+
+  testWidgets('Official review assignment decrements review count in UI', (
+    tester,
+  ) async {
+    final client = await _launchAppAndConnect(tester);
+    addTearDown(client.close);
+    addTearDown(() async {
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump();
+    });
+
+    await client.startNewGame();
+    await _ensureSwipeToLineup(tester);
+    await swipeToStartLineup(tester);
+    await _waitForTeamServerIds(tester);
+
+    // Verify initial OR count for WFTDA (1 per team per period)
+    expect(scoreboardState(tester).team1.officialReviews, 1);
+
+    await tapJamControl(tester, scoreboardState(tester).labelTimeout);
+    await _waitForTimeoutMode(tester);
+
+    final reviewButtons = find.widgetWithText(InkWell, 'REVIEW');
+    await pumpUntil(tester, () => reviewButtons.evaluate().length >= 2);
+
+    await tester.tap(reviewButtons.first); // assign team 1 official review
+    await tester.pump();
+    await pumpUntil(tester, () {
+      final state = scoreboardState(tester);
+      return state.timeoutOwner == state.team1.serverId &&
+          _isOfficialReview(state);
+    });
+
+    // Team 1 review count must have decremented from 1 → 0
+    expect(scoreboardState(tester).team1.officialReviews, 0);
+  });
+
   testWidgets('Full game start/stop', (tester) async {
     final client = await _launchAppAndConnect(tester);
     addTearDown(client.close);

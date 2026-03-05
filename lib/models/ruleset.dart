@@ -9,7 +9,7 @@ class Ruleset {
   final bool jamsResetPerPeriod;
   final int lineupDurationMs;
   final int lineupOvertimeDurationMs;
-  final int timeoutsPerGame;
+  final int timeoutsPerPeriod;
   final int reviewsPerPeriod;
   final List<int> intermissionDurationsMs;
 
@@ -23,7 +23,7 @@ class Ruleset {
     required this.jamsResetPerPeriod,
     required this.lineupDurationMs,
     required this.lineupOvertimeDurationMs,
-    required this.timeoutsPerGame,
+    required this.timeoutsPerPeriod,
     required this.reviewsPerPeriod,
     required this.intermissionDurationsMs,
   });
@@ -39,7 +39,7 @@ class Ruleset {
         jamsResetPerPeriod: true,
         lineupDurationMs: 30 * 1000, // 30 seconds
         lineupOvertimeDurationMs: 60 * 1000, // 1 minute
-        timeoutsPerGame: 3,
+        timeoutsPerPeriod: 3,
         reviewsPerPeriod: 1,
         intermissionDurationsMs: [15 * 60 * 1000], // 15 min intermission
       );
@@ -55,7 +55,7 @@ class Ruleset {
         jamsResetPerPeriod: false,
         lineupDurationMs: 30 * 1000, // 30 seconds
         lineupOvertimeDurationMs: 60 * 1000, // 1 minute
-        timeoutsPerGame: 3,
+        timeoutsPerPeriod: 3,
         reviewsPerPeriod: 1,
         intermissionDurationsMs: [
           5 * 60 * 1000, // 5 min after period 1
@@ -74,7 +74,7 @@ class Ruleset {
     required bool jamsResetPerPeriod,
     required int lineupDurationMs,
     required int lineupOvertimeDurationMs,
-    required int timeoutsPerGame,
+    required int timeoutsPerPeriod,
     required int reviewsPerPeriod,
     required List<int> intermissionDurationsMs,
   }) =>
@@ -88,7 +88,7 @@ class Ruleset {
         jamsResetPerPeriod: jamsResetPerPeriod,
         lineupDurationMs: lineupDurationMs,
         lineupOvertimeDurationMs: lineupOvertimeDurationMs,
-        timeoutsPerGame: timeoutsPerGame,
+        timeoutsPerPeriod: timeoutsPerPeriod,
         reviewsPerPeriod: reviewsPerPeriod,
         intermissionDurationsMs: intermissionDurationsMs,
       );
@@ -117,7 +117,7 @@ class Ruleset {
         'jamsResetPerPeriod': jamsResetPerPeriod,
         'lineupDurationMs': lineupDurationMs,
         'lineupOvertimeDurationMs': lineupOvertimeDurationMs,
-        'timeoutsPerGame': timeoutsPerGame,
+        'timeoutsPerPeriod': timeoutsPerPeriod,
         'reviewsPerPeriod': reviewsPerPeriod,
         'intermissionDurationsMs': intermissionDurationsMs,
       };
@@ -133,7 +133,7 @@ class Ruleset {
         jamsResetPerPeriod: json['jamsResetPerPeriod'] as bool,
         lineupDurationMs: json['lineupDurationMs'] as int,
         lineupOvertimeDurationMs: json['lineupOvertimeDurationMs'] as int,
-        timeoutsPerGame: json['timeoutsPerGame'] as int,
+        timeoutsPerPeriod: (json['timeoutsPerPeriod'] ?? json['timeoutsPerGame'] ?? 3) as int,
         reviewsPerPeriod: json['reviewsPerPeriod'] as int,
         intermissionDurationsMs:
             (json['intermissionDurationsMs'] as List).cast<int>(),
@@ -149,7 +149,7 @@ class Ruleset {
     bool? jamsResetPerPeriod,
     int? lineupDurationMs,
     int? lineupOvertimeDurationMs,
-    int? timeoutsPerGame,
+    int? timeoutsPerPeriod,
     int? reviewsPerPeriod,
     List<int>? intermissionDurationsMs,
   }) =>
@@ -164,7 +164,7 @@ class Ruleset {
         lineupDurationMs: lineupDurationMs ?? this.lineupDurationMs,
         lineupOvertimeDurationMs:
             lineupOvertimeDurationMs ?? this.lineupOvertimeDurationMs,
-        timeoutsPerGame: timeoutsPerGame ?? this.timeoutsPerGame,
+        timeoutsPerPeriod: timeoutsPerPeriod ?? this.timeoutsPerPeriod,
         reviewsPerPeriod: reviewsPerPeriod ?? this.reviewsPerPeriod,
         intermissionDurationsMs:
             intermissionDurationsMs ?? this.intermissionDurationsMs,

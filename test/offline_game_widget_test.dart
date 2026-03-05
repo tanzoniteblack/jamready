@@ -464,6 +464,75 @@ void main() {
   });
 
   // ---------------------------------------------------------------------------
+  // Undo: unstart jam
+  // ---------------------------------------------------------------------------
+
+  group('undo: unstart jam', () {
+    testWidgets('labelUndo is UNDO: Unstart Jam after startJam', (
+      tester,
+    ) async {
+      final (state, engine) = await _setupGame(tester);
+      addTearDown(engine.dispose);
+
+      engine.startJam();
+      await tester.pump();
+
+      expect(state.labelUndo, 'UNDO: Unstart Jam');
+    });
+
+    testWidgets('undo after startJam returns to lineup', (tester) async {
+      final (state, engine) = await _setupGame(tester);
+      addTearDown(engine.dispose);
+
+      engine.startJam();
+      await tester.pump();
+      expect(engine.phase, GamePhase.jam);
+
+      engine.undo();
+      await tester.pump();
+
+      expect(engine.phase, GamePhase.lineup);
+      expect(state.inJam, isFalse);
+      expect(state.clocks['Jam']!.running, isFalse);
+      expect(state.clocks['Lineup']!.running, isTrue);
+      expect(state.clocks['Jam']!.number, 0);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Undo: unstart lineup
+  // ---------------------------------------------------------------------------
+
+  group('undo: unstart lineup', () {
+    testWidgets('labelUndo is UNDO: Unstart Lineup after lineup start', (
+      tester,
+    ) async {
+      final (state, engine) = await _setupGame(tester);
+      addTearDown(engine.dispose);
+
+      engine.stopJam(); // preGame → lineup
+      await tester.pump();
+
+      expect(state.labelUndo, 'UNDO: Unstart Lineup');
+    });
+
+    testWidgets('undo after lineup start returns to preGame', (tester) async {
+      final (state, engine) = await _setupGame(tester);
+      addTearDown(engine.dispose);
+
+      engine.stopJam(); // preGame → lineup
+      await tester.pump();
+      expect(engine.phase, GamePhase.lineup);
+
+      engine.undo();
+      await tester.pump();
+
+      expect(engine.phase, GamePhase.preGame);
+      expect(state.clocks['Lineup']!.running, isFalse);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
   // Timeout flow
   // ---------------------------------------------------------------------------
 
@@ -559,6 +628,234 @@ void main() {
         expect(state.team1.officialReviews, initialOR - 1); // review count decremented
       },
     );
+
+    testWidgets('timeout from lineup does not require a prior jam', (
+      tester,
+    ) async {
+      final (state, engine) = await _setupGame(tester);
+      addTearDown(engine.dispose);
+
+      engine.stopJam(); // preGame → lineup (no jam ever ran)
+      await tester.pump();
+      expect(engine.phase, GamePhase.lineup);
+
+      engine.startTimeout();
+      await tester.pump();
+
+      expect(engine.phase, GamePhase.timeout);
+      expect(state.clocks['Timeout']!.running, isTrue);
+      expect(state.clocks['Lineup']!.running, isFalse);
+    });
+
+    testWidgets(
+      'startTimeout when already in timeout resets clock and owner',
+      (tester) async {
+        final (state, engine) = await _setupGame(tester);
+        addTearDown(engine.dispose);
+
+        engine.startTimeout();
+        engine.setTimeoutOwner('1'); // assign team 1, decrement their count
+        engine.adjustClock('Timeout', 30000); // advance clock 30s
+        await tester.pump();
+        expect(state.clocks['Timeout']!.time, greaterThan(0));
+
+        engine.startTimeout(); // re-timeout resets clock and owner to O
+        await tester.pump();
+
+        expect(engine.phase, GamePhase.timeout);
+        expect(state.clocks['Timeout']!.time, 0);
+        expect(state.timeoutOwner, 'O');
+      },
+    );
+
+    testWidgets(
+      'undo while in team timeout restores the team timeout count',
+      (tester) async {
+        final (state, engine) = await _setupGame(tester);
+        addTearDown(engine.dispose);
+
+        final initial = state.team1.timeouts;
+        engine.startJam();
+        engine.setTimeoutOwner('1'); // stops jam, assigns T1 timeout
+        await tester.pump();
+        expect(state.team1.timeouts, initial - 1);
+        expect(engine.phase, GamePhase.timeout);
+
+        engine.undo(); // unstopJam: should restore jam AND T1 count
+        await tester.pump();
+
+        expect(engine.phase, GamePhase.jam);
+        expect(state.team1.timeouts, initial);
+        expect(state.timeoutOwner, '');
+        expect(state.clocks['Timeout']!.running, isFalse);
+      },
+    );
+
+    testWidgets(
+      'undo while in team official review restores the review count',
+      (tester) async {
+        final ruleset = Ruleset.wftda();
+        final (state, engine) = await _setupGame(tester, ruleset: ruleset);
+        addTearDown(engine.dispose);
+
+        engine.startJam();
+        engine.setTimeoutOwner('1', isOfficialReview: true);
+        await tester.pump();
+        expect(state.team1.officialReviews, ruleset.reviewsPerPeriod - 1);
+
+        engine.undo();
+        await tester.pump();
+
+        expect(engine.phase, GamePhase.jam);
+        expect(state.team1.officialReviews, ruleset.reviewsPerPeriod);
+        expect(state.isOfficialReview, isFalse);
+        expect(state.clocks['Timeout']!.running, isFalse);
+      },
+    );
+
+    testWidgets(
+      'undo after mid-timeout reassignment restores the final assigned team count',
+      (tester) async {
+        final (state, engine) = await _setupGame(tester);
+        addTearDown(engine.dispose);
+
+        final t1Initial = state.team1.timeouts;
+        final t2Initial = state.team2.timeouts;
+        engine.startJam();
+        engine.setTimeoutOwner('1'); // T1 assigned (count --)
+        engine.setTimeoutOwner('2'); // T2 assigned, T1 restored (T1++, T2--)
+        await tester.pump();
+        expect(state.team1.timeouts, t1Initial);
+        expect(state.team2.timeouts, t2Initial - 1);
+
+        engine.undo(); // should restore T2 count and reinstate jam
+        await tester.pump();
+
+        expect(engine.phase, GamePhase.jam);
+        expect(state.team1.timeouts, t1Initial);
+        expect(state.team2.timeouts, t2Initial);
+        expect(state.clocks['Timeout']!.running, isFalse);
+      },
+    );
+  });
+
+  // ---------------------------------------------------------------------------
+  // Official reviews
+  // ---------------------------------------------------------------------------
+
+  group('official reviews', () {
+    testWidgets('team 1 official review decrements review count', (
+      tester,
+    ) async {
+      final ruleset = Ruleset.wftda();
+      final (state, engine) = await _setupGame(tester, ruleset: ruleset);
+      addTearDown(engine.dispose);
+
+      engine.setTimeoutOwner('1', isOfficialReview: true);
+      await tester.pump();
+
+      expect(state.team1.officialReviews, ruleset.reviewsPerPeriod - 1);
+    });
+
+    testWidgets('team 2 official review decrements review count', (
+      tester,
+    ) async {
+      final ruleset = Ruleset.wftda();
+      final (state, engine) = await _setupGame(tester, ruleset: ruleset);
+      addTearDown(engine.dispose);
+
+      engine.setTimeoutOwner('2', isOfficialReview: true);
+      await tester.pump();
+
+      expect(state.team2.officialReviews, ruleset.reviewsPerPeriod - 1);
+    });
+
+    testWidgets(
+      'switching from team 1 OR to official timeout restores review count',
+      (tester) async {
+        final ruleset = Ruleset.wftda();
+        final (state, engine) = await _setupGame(tester, ruleset: ruleset);
+        addTearDown(engine.dispose);
+
+        engine.setTimeoutOwner('1', isOfficialReview: true);
+        engine.setTimeoutOwner('O');
+        await tester.pump();
+
+        expect(state.team1.officialReviews, ruleset.reviewsPerPeriod);
+      },
+    );
+
+    testWidgets(
+      'switching from team 1 OR to team 2 OR restores team 1 and decrements team 2',
+      (tester) async {
+        final ruleset = Ruleset.wftda();
+        final (state, engine) = await _setupGame(tester, ruleset: ruleset);
+        addTearDown(engine.dispose);
+
+        engine.setTimeoutOwner('1', isOfficialReview: true);
+        engine.setTimeoutOwner('2', isOfficialReview: true);
+        await tester.pump();
+
+        expect(state.team1.officialReviews, ruleset.reviewsPerPeriod);
+        expect(state.team2.officialReviews, ruleset.reviewsPerPeriod - 1);
+      },
+    );
+
+    testWidgets(
+      'switching from team 1 OR to team 1 timeout restores review and decrements timeout',
+      (tester) async {
+        final ruleset = Ruleset.wftda();
+        final (state, engine) = await _setupGame(tester, ruleset: ruleset);
+        addTearDown(engine.dispose);
+
+        final initialTO = state.team1.timeouts;
+        engine.setTimeoutOwner('1', isOfficialReview: true); // OR: review --
+        engine.setTimeoutOwner('1'); // switch to TO: review restored, timeout --
+        await tester.pump();
+
+        expect(state.team1.officialReviews, ruleset.reviewsPerPeriod);
+        expect(state.team1.timeouts, initialTO - 1);
+      },
+    );
+  });
+
+  // ---------------------------------------------------------------------------
+  // Retained official review
+  // ---------------------------------------------------------------------------
+
+  group('retained official review', () {
+    testWidgets('retaining review restores the review count', (tester) async {
+      final ruleset = Ruleset.wftda();
+      final (state, engine) = await _setupGame(tester, ruleset: ruleset);
+      addTearDown(engine.dispose);
+
+      engine.setTimeoutOwner('1', isOfficialReview: true);
+      await tester.pump();
+      expect(state.team1.officialReviews, ruleset.reviewsPerPeriod - 1);
+
+      engine.setRetainedReview(1, true);
+      await tester.pump();
+
+      expect(state.team1.retainedOfficialReview, isTrue);
+      expect(state.team1.officialReviews, ruleset.reviewsPerPeriod);
+    });
+
+    testWidgets('not retaining review leaves count decremented', (
+      tester,
+    ) async {
+      final ruleset = Ruleset.wftda();
+      final (state, engine) = await _setupGame(tester, ruleset: ruleset);
+      addTearDown(engine.dispose);
+
+      engine.setTimeoutOwner('1', isOfficialReview: true);
+      await tester.pump();
+
+      engine.setRetainedReview(1, false);
+      await tester.pump();
+
+      expect(state.team1.retainedOfficialReview, isFalse);
+      expect(state.team1.officialReviews, ruleset.reviewsPerPeriod - 1);
+    });
   });
 
   // ---------------------------------------------------------------------------
@@ -584,6 +881,18 @@ void main() {
       await tester.pump();
 
       expect(state.team2.score, 0);
+    });
+
+    testWidgets('adjustClock clamps to zero with a large negative delta', (
+      tester,
+    ) async {
+      final (state, engine) = await _setupGame(tester);
+      addTearDown(engine.dispose);
+
+      engine.adjustClock('Period', -99999999);
+      await tester.pump();
+
+      expect(state.clocks['Period']!.time, 0);
     });
   });
 
@@ -636,7 +945,7 @@ void main() {
         jamsResetPerPeriod: false,
         lineupDurationMs: 30 * 1000,
         lineupOvertimeDurationMs: 60 * 1000,
-        timeoutsPerGame: 3,
+        timeoutsPerPeriod: 3,
         reviewsPerPeriod: 1,
         intermissionDurationsMs: [],
       );
@@ -671,7 +980,7 @@ void main() {
         jamsResetPerPeriod: false,
         lineupDurationMs: 30 * 1000,
         lineupOvertimeDurationMs: 60 * 1000,
-        timeoutsPerGame: 3,
+        timeoutsPerPeriod: 3,
         reviewsPerPeriod: 1,
         intermissionDurationsMs: [],
       );
@@ -687,6 +996,121 @@ void main() {
       expect(engine.phase, GamePhase.jam);
       expect(state.noMoreJam, false);
       expect(state.connectionStatus, 'Offline Game');
+    });
+
+    testWidgets('period 2 clock resets to full ruleset duration', (
+      tester,
+    ) async {
+      final ruleset = Ruleset.wftda();
+      final (state, engine) = await _setupGame(tester, ruleset: ruleset);
+      addTearDown(engine.dispose);
+
+      // Run period 1 through to intermission
+      engine.stopJam(); // preGame → lineup
+      engine.startJam(); // lineup → jam (period clock starts)
+      engine.setClockTime('Period', 0);
+      await tester.pump(const Duration(milliseconds: 50)); // period expires
+      engine.stopJam(); // jam → period ends → intermission
+      await tester.pump(const Duration(milliseconds: 50));
+
+      // End intermission → period 2 starts
+      engine.setClockTime('Intermission', 0);
+      await tester.pump(const Duration(milliseconds: 50));
+
+      expect(engine.phase, GamePhase.preGame);
+      expect(state.clocks['Period']!.number, 2);
+      expect(state.clocks['Period']!.time, ruleset.periodDurationMs);
+    });
+
+    testWidgets('timeouts and reviews reset at start of period 2', (
+      tester,
+    ) async {
+      final ruleset = Ruleset.wftda();
+      final (state, engine) = await _setupGame(tester, ruleset: ruleset);
+      addTearDown(engine.dispose);
+
+      // Burn team 1's timeout and review in period 1
+      engine.setTimeoutOwner('1'); // starts timeout, decrements T1 timeouts
+      engine.endTimeout();
+      await tester.pump();
+      expect(state.team1.timeouts, ruleset.timeoutsPerPeriod - 1);
+
+      engine.setTimeoutOwner('1', isOfficialReview: true);
+      engine.endTimeout();
+      await tester.pump();
+      expect(state.team1.officialReviews, ruleset.reviewsPerPeriod - 1);
+
+      // Run period 1 to completion
+      engine.startJam(); // from lineup (endTimeout leaves us there)
+      engine.setClockTime('Period', 0);
+      await tester.pump(const Duration(milliseconds: 50)); // period expires
+      engine.stopJam();
+      await tester.pump(const Duration(milliseconds: 50));
+
+      // End intermission → period 2
+      engine.setClockTime('Intermission', 0);
+      await tester.pump(const Duration(milliseconds: 50));
+
+      expect(state.team1.timeouts, ruleset.timeoutsPerPeriod);
+      expect(state.team2.timeouts, ruleset.timeoutsPerPeriod);
+      expect(state.team1.officialReviews, ruleset.reviewsPerPeriod);
+      expect(state.team2.officialReviews, ruleset.reviewsPerPeriod);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Idempotency
+  // ---------------------------------------------------------------------------
+
+  group('idempotency', () {
+    testWidgets('startJam when jam is already running is a no-op', (
+      tester,
+    ) async {
+      final (state, engine) = await _setupGame(tester);
+      addTearDown(engine.dispose);
+
+      engine.startJam();
+      await tester.pump();
+      expect(engine.phase, GamePhase.jam);
+      expect(state.clocks['Jam']!.number, 1);
+
+      engine.startJam(); // second call should be ignored
+      await tester.pump();
+
+      expect(engine.phase, GamePhase.jam);
+      expect(state.clocks['Jam']!.number, 1);
+    });
+
+    testWidgets('startJam from timeout is a no-op', (tester) async {
+      final (state, engine) = await _setupGame(tester);
+      addTearDown(engine.dispose);
+
+      engine.startTimeout();
+      await tester.pump();
+      expect(engine.phase, GamePhase.timeout);
+
+      engine.startJam();
+      await tester.pump();
+
+      expect(engine.phase, GamePhase.timeout);
+      expect(state.inJam, isFalse);
+    });
+
+    testWidgets('stopJam from lineup is a no-op', (tester) async {
+      final (state, engine) = await _setupGame(tester);
+      addTearDown(engine.dispose);
+
+      engine.stopJam(); // preGame → lineup
+      await tester.pump();
+      expect(engine.phase, GamePhase.lineup);
+      final lineupLabel = state.labelUndo;
+
+      engine.stopJam(); // second call from lineup: no-op
+      await tester.pump();
+
+      expect(engine.phase, GamePhase.lineup);
+      expect(state.clocks['Lineup']!.running, isTrue);
+      expect(state.labelUndo, lineupLabel); // undo state unchanged
     });
   });
 

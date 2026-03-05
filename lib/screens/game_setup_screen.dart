@@ -302,7 +302,7 @@ class _GameSetupScreenState extends State<GameSetupScreen> {
           color: Colors.white.withValues(alpha: 0.1),
         ),
         _buildSummaryChip(
-          "${ruleset.timeoutsPerGame}",
+          "${ruleset.timeoutsPerPeriod}",
           "timeouts",
           false,
         ),

@@ -18,7 +18,7 @@ void main() {
       });
 
       test('has 3 timeouts, 1 review per period, 30s lineup', () {
-        expect(ruleset.timeoutsPerGame, 3);
+        expect(ruleset.timeoutsPerPeriod, 3);
         expect(ruleset.reviewsPerPeriod, 1);
         expect(ruleset.lineupDurationMs, 30 * 1000);
       });
@@ -80,7 +80,7 @@ void main() {
           jamsResetPerPeriod: false,
           lineupDurationMs: 30 * 1000,
           lineupOvertimeDurationMs: 60 * 1000,
-          timeoutsPerGame: 3,
+          timeoutsPerPeriod: 3,
           reviewsPerPeriod: 1,
           intermissionDurationsMs: [5 * 60 * 1000],
         );
@@ -106,7 +106,7 @@ void main() {
         expect(restored.jamsResetPerPeriod, original.jamsResetPerPeriod);
         expect(restored.lineupDurationMs, original.lineupDurationMs);
         expect(restored.lineupOvertimeDurationMs, original.lineupOvertimeDurationMs);
-        expect(restored.timeoutsPerGame, original.timeoutsPerGame);
+        expect(restored.timeoutsPerPeriod, original.timeoutsPerPeriod);
         expect(restored.reviewsPerPeriod, original.reviewsPerPeriod);
         expect(restored.intermissionDurationsMs, original.intermissionDurationsMs);
       });
@@ -121,7 +121,7 @@ void main() {
           jamsResetPerPeriod: true,
           lineupDurationMs: 25 * 1000,
           lineupOvertimeDurationMs: 45 * 1000,
-          timeoutsPerGame: 2,
+          timeoutsPerPeriod: 2,
           reviewsPerPeriod: 2,
           intermissionDurationsMs: [10 * 60 * 1000, 15 * 60 * 1000],
         );
@@ -132,7 +132,7 @@ void main() {
         expect(restored.isBuiltIn, false);
         expect(restored.periodCount, 3);
         expect(restored.jamDurationMs, 90 * 1000);
-        expect(restored.timeoutsPerGame, 2);
+        expect(restored.timeoutsPerPeriod, 2);
         expect(restored.reviewsPerPeriod, 2);
         expect(restored.intermissionDurationsMs, [10 * 60 * 1000, 15 * 60 * 1000]);
       });
@@ -148,7 +148,7 @@ void main() {
         // Unchanged fields carry over
         expect(modified.periodDurationMs, base.periodDurationMs);
         expect(modified.name, base.name);
-        expect(modified.timeoutsPerGame, base.timeoutsPerGame);
+        expect(modified.timeoutsPerPeriod, base.timeoutsPerPeriod);
       });
     });
   });

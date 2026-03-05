@@ -101,10 +101,10 @@ class LocalGameEngine with WidgetsBindingObserver implements GameEngine {
     _state.team2.score = 0;
 
     // Set timeouts and reviews
-    _state.team1.timeouts = ruleset.timeoutsPerGame;
+    _state.team1.timeouts = ruleset.timeoutsPerPeriod;
     _state.team1.officialReviews = ruleset.reviewsPerPeriod;
     _state.team1.retainedOfficialReview = false;
-    _state.team2.timeouts = ruleset.timeoutsPerGame;
+    _state.team2.timeouts = ruleset.timeoutsPerPeriod;
     _state.team2.officialReviews = ruleset.reviewsPerPeriod;
     _state.team2.retainedOfficialReview = false;
 
@@ -563,7 +563,9 @@ class LocalGameEngine with WidgetsBindingObserver implements GameEngine {
       _currentJam = 0;
     }
 
-    // Reset official reviews for new period
+    // Reset timeouts and official reviews for new period
+    _state.team1.timeouts = ruleset.timeoutsPerPeriod;
+    _state.team2.timeouts = ruleset.timeoutsPerPeriod;
     _state.team1.officialReviews = ruleset.reviewsPerPeriod;
     _state.team2.officialReviews = ruleset.reviewsPerPeriod;
     _state.team1.retainedOfficialReview = false;
@@ -805,6 +807,24 @@ class LocalGameEngine with WidgetsBindingObserver implements GameEngine {
 
     switch (action.type) {
       case _UndoType.unstopJam:
+        // If the undo fires while still in a timeout (operator hit undo before
+        // ending the timeout), restore the assigned team's resources and clear
+        // the timeout state before reinstating the jam.
+        if (_phase == GamePhase.timeout) {
+          final owner = _state.timeoutOwner;
+          final wasOr = _state.isOfficialReview;
+          if (owner == '1') {
+            if (wasOr) { _state.team1.officialReviews++; }
+            else { _state.team1.timeouts++; }
+          } else if (owner == '2') {
+            if (wasOr) { _state.team2.officialReviews++; }
+            else { _state.team2.timeouts++; }
+          }
+          _state.timeoutOwner = "";
+          _state.officialReview = "false";
+          _state.clocks['Timeout']!.running = false;
+        }
+
         // Calculate jam time accounting for elapsed time since stop
         final newJamTimeInternal = (action.jamTimeInternal ?? 0) - elapsed;
 

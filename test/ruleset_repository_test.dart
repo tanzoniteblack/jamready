@@ -18,7 +18,7 @@ Ruleset _makeCustomRuleset({
     jamsResetPerPeriod: false,
     lineupDurationMs: 30 * 1000,
     lineupOvertimeDurationMs: 60 * 1000,
-    timeoutsPerGame: 3,
+    timeoutsPerPeriod: 3,
     reviewsPerPeriod: 1,
     intermissionDurationsMs: [5 * 60 * 1000],
   );
