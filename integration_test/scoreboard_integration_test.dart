@@ -635,6 +635,8 @@ void main() {
     await client.startNewGame();
     await _ensureSwipeToLineup(tester);
     await swipeToStartLineup(tester);
+    // start the jam
+    await tapJamControl(tester, scoreboardState(tester).labelStart);
     await _waitForTeamServerIds(tester);
 
     // Verify initial OR count for WFTDA (1 per team per period)
@@ -708,45 +710,46 @@ void main() {
     'Overtime transition on tied game',
     skip: !_versionAtLeast(_scoreboardVersion(), 2025, 4),
     (tester) async {
-    final client = await _launchAppAndConnect(tester);
-    addTearDown(client.close);
-    addTearDown(() async {
-      await tester.pumpWidget(const SizedBox.shrink());
-      await tester.pump();
-    });
+      final client = await _launchAppAndConnect(tester);
+      addTearDown(client.close);
+      addTearDown(() async {
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pump();
+      });
 
-    // Games started with 0-0 scores are tied, so the server will offer
-    // overtime after the final period via Label(Stop) = "Overtime Lineup".
-    final gameId = await _startGame(tester, client);
+      // Games started with 0-0 scores are tied, so the server will offer
+      // overtime after the final period via Label(Stop) = "Overtime Lineup".
+      final gameId = await _startGame(tester, client);
 
-    // Period 1
-    await _runPeriod(tester, client, gameId);
-    await _runIntermission(tester, client, gameId);
+      // Period 1
+      await _runPeriod(tester, client, gameId);
+      await _runIntermission(tester, client, gameId);
 
-    // Period 2 (final) — scores remain tied at 0-0
-    await _runPeriod(tester, client, gameId);
+      // Period 2 (final) — scores remain tied at 0-0
+      await _runPeriod(tester, client, gameId);
 
-    await validateActiveDisplay(tester, ActiveDisplay.unofficialScore);
+      await validateActiveDisplay(tester, ActiveDisplay.unofficialScore);
 
-    // The purple overtime SwipeButton appears once Label(Stop) signals overtime.
-    final overtimeButton = find.ancestor(
-      of: find.textContaining('OVERTIME LINEUP'),
-      matching: find.byType(SwipeButton),
-    );
-    await pumpUntil(
-      tester,
-      () => overtimeButton.evaluate().isNotEmpty,
-      timeout: const Duration(seconds: 5),
-    );
+      // The purple overtime SwipeButton appears once Label(Stop) signals overtime.
+      final overtimeButton = find.ancestor(
+        of: find.textContaining('OVERTIME LINEUP'),
+        matching: find.byType(SwipeButton),
+      );
+      await pumpUntil(
+        tester,
+        () => overtimeButton.evaluate().isNotEmpty,
+        timeout: const Duration(seconds: 5),
+      );
 
-    // sleep or server doesn't respect the signal submission
-    sleep(Duration(seconds: 5));
+      // sleep or server doesn't respect the signal submission
+      sleep(Duration(seconds: 5));
 
-    await swipeButton(tester, overtimeButton.first);
-    await validateActiveDisplay(
-      tester,
-      ActiveDisplay.lineup,
-      timeout: Duration(seconds: 5),
-    );
-  });
+      await swipeButton(tester, overtimeButton.first);
+      await validateActiveDisplay(
+        tester,
+        ActiveDisplay.lineup,
+        timeout: Duration(seconds: 5),
+      );
+    },
+  );
 }

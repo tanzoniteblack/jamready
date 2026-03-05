@@ -38,10 +38,8 @@ class RemoteGameEngine implements GameEngine {
   String? _lastUrl;
   final Random _random = Random();
 
-  RemoteGameEngine(
-    this._state, {
-    WebSocketChannelFactory? channelFactory,
-  }) : _channelFactory = channelFactory ?? WebSocketChannel.connect;
+  RemoteGameEngine(this._state, {WebSocketChannelFactory? channelFactory})
+    : _channelFactory = channelFactory ?? WebSocketChannel.connect;
 
   @override
   bool get isActive => _isConnected;
@@ -234,9 +232,7 @@ class RemoteGameEngine implements GameEngine {
         Duration(seconds: cappedSeconds) + Duration(milliseconds: jitterMs);
 
     _reconnectAttempts += 1;
-    _state.setConnectionStatus(
-      "Reconnecting in ${delay.inSeconds}s...",
-    );
+    _state.setConnectionStatus("Reconnecting in ${delay.inSeconds}s...");
 
     _reconnectTimer = Timer(delay, () {
       _reconnectTimer = null;
