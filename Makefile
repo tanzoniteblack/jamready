@@ -6,7 +6,7 @@ unit:
 
 # Run integration tests (requires a connected device or running simulator)
 integration:
-	flutter test integration_test
+	flutter test integration_test/offline_game_integration_test.dart
 
 # Run all tests
 test: unit integration
@@ -16,7 +16,7 @@ build-scoreboards:
 	./scripts/build-scoreboard-images.sh
 
 # Run scoreboard integration tests against each Docker image
-test-scoreboards:
+test-scoreboards: build-scoreboards
 	./scripts/test-all-scoreboards.sh
 
 # Build iOS release archive only (tests must pass first)
@@ -28,6 +28,6 @@ build-android: test
 	flutter build appbundle --release
 
 # Run all tests against all scoreboard versions, then build both release artifacts
-release: unit test-scoreboards
+release: test test-scoreboards
 	flutter build ipa
 	flutter build appbundle --release
