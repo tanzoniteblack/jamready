@@ -1,14 +1,22 @@
 #!/bin/bash
 # Build Docker images for each scoreboard release.
-# Run this once before testing. Each image is tagged crg-scoreboard:<version>.
+# Run this once before running scoreboard integration tests.
+# Each image is tagged crg-scoreboard:<version>.
 #
 # Usage: ./scripts/build-scoreboard-images.sh [path/to/scoreboard/repo]
+#
+# If no path is given, the scoreboard repo is cloned/updated automatically
+# into vendor/scoreboard (relative to the project root, not checked in).
 #
 # Requires: docker, ant, java 8+
 
 set -euo pipefail
 
-SCOREBOARD_REPO="${1:-/Users/ryan/Code/opensource/scoreboard}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+DEFAULT_REPO="$PROJECT_ROOT/vendor/scoreboard"
+SCOREBOARD_REPO="${1:-$DEFAULT_REPO}"
+
 VERSIONS=(
   v2023.7
   v2025.0
@@ -22,6 +30,17 @@ VERSIONS=(
   v2025.8
   v2025.9
 )
+
+# Clone or update the scoreboard repo if using the default location
+if [ "$SCOREBOARD_REPO" = "$DEFAULT_REPO" ]; then
+  if [ ! -d "$SCOREBOARD_REPO/.git" ]; then
+    echo "==> Cloning scoreboard repo into $SCOREBOARD_REPO"
+    git clone git@github.com:rollerderby/scoreboard.git "$SCOREBOARD_REPO"
+  else
+    echo "==> Fetching latest tags from scoreboard repo"
+    git -C "$SCOREBOARD_REPO" fetch --tags
+  fi
+fi
 
 if [ ! -d "$SCOREBOARD_REPO/.git" ]; then
   echo "error: $SCOREBOARD_REPO is not a git repository" >&2
