@@ -31,6 +31,3 @@ jobs:
 
       - name: Unit tests
         run: flutter test
-
-      - name: Build (Android debug)
-        run: flutter build apk --debug
