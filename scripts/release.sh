@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env zsh
 # Create a new release: bumps pubspec version, generates a changelog via claude,
 # commits, tags, and (optionally) pushes to trigger the GitHub Actions release workflow.
 #
@@ -6,8 +6,8 @@
 
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+SCRIPT_DIR="${0:A:h}"
+PROJECT_ROOT="${SCRIPT_DIR:h}"
 PUBSPEC="$PROJECT_ROOT/pubspec.yaml"
 
 # ---------------------------------------------------------------------------
@@ -37,9 +37,36 @@ last_tag() {
   git tag -l | sort -rV | grep -E "$1" | head -1 || true
 }
 
+# Given a tag like v1.0.0-rc1, echo the base semver (1.0.0).
+prerelease_base() { echo "${${1#v}%%-*}"; }
+
+# Given a tag like v1.0.0-rc1, echo the incremented suffix (rc2), or empty if not parseable.
+next_prerelease_suffix() {
+  local suffix="${1#*-}"          # rc1
+  local prefix="${suffix%%[0-9]*}" # rc
+  local num="${suffix##*[^0-9]}"  # 1
+  [[ -n "$num" ]] && echo "${prefix}$((num + 1))" || echo ""
+}
+
+pick() {
+  fzf --height=~10 --layout=reverse --no-multi --prompt="$1: "
+}
+
+confirm() {
+  local answer
+  printf '%s [y/N] ' "$1"
+  read -r answer
+  [[ "$answer" =~ ^[Yy]$ ]]
+}
+
 # ---------------------------------------------------------------------------
 # Pre-flight checks
 # ---------------------------------------------------------------------------
+
+if ! command -v fzf &>/dev/null; then
+  echo "error: fzf not found — install it with: brew install fzf" >&2
+  exit 1
+fi
 
 if ! command -v claude &>/dev/null; then
   echo "error: 'claude' CLI not found — install it to generate changelogs automatically" >&2
@@ -55,15 +82,8 @@ fi
 # Release type
 # ---------------------------------------------------------------------------
 
-echo ""
-echo "Release type:"
-PS3="> "
-select CHOICE in "stable" "pre-release (beta/rc)"; do
-  case "$REPLY" in
-    1) BETA=false; break ;;
-    2) BETA=true;  break ;;
-  esac
-done
+RELEASE_TYPE=$(printf "stable\npre-release (beta/rc)" | pick "Release type") || { echo "Aborted."; exit 0; }
+[[ "$RELEASE_TYPE" == stable ]] && BETA=false || BETA=true
 
 # ---------------------------------------------------------------------------
 # Version
@@ -74,24 +94,41 @@ CURRENT_NAME=$(version_name "$CURRENT_FULL")
 CURRENT_BUILD=$(build_number "$CURRENT_FULL")
 NEW_BUILD=$((CURRENT_BUILD + 1))
 
-echo ""
-echo "Current version: $CURRENT_NAME (build $CURRENT_BUILD)"
-echo "Bump:"
-select CHOICE in \
-  "patch  → $(bump_version "$CURRENT_NAME" patch)" \
-  "minor  → $(bump_version "$CURRENT_NAME" minor)" \
-  "major  → $(bump_version "$CURRENT_NAME" major)" \
-  "manual"; do
-  case "$REPLY" in
-    1) NEW_NAME=$(bump_version "$CURRENT_NAME" patch); break ;;
-    2) NEW_NAME=$(bump_version "$CURRENT_NAME" minor); break ;;
-    3) NEW_NAME=$(bump_version "$CURRENT_NAME" major); break ;;
-    4) read -rp "Version (e.g. 1.2.3): " NEW_NAME; break ;;
+# When creating a pre-release, check if the last tag is also a pre-release so we
+# can offer "same version, next suffix" (e.g. rc1 → rc2) as the default option.
+DEFAULT_SUFFIX=""
+LAST_PRERELEASE=""
+if $BETA; then
+  LAST_PRERELEASE=$(last_tag '^v[0-9]+\.[0-9]+\.[0-9]+-')
+fi
+
+if [[ -n "$LAST_PRERELEASE" ]]; then
+  PREV_BASE=$(prerelease_base "$LAST_PRERELEASE")
+  NEXT_SUFFIX=$(next_prerelease_suffix "$LAST_PRERELEASE")
+  BUMP_MENU="same   → v${PREV_BASE}-${NEXT_SUFFIX}\npatch  → $(bump_version "$PREV_BASE" patch)\nminor  → $(bump_version "$PREV_BASE" minor)\nmajor  → $(bump_version "$PREV_BASE" major)\nmanual"
+  BUMP=$(printf "$BUMP_MENU" | pick "Bump ($CURRENT_NAME, build $CURRENT_BUILD)") || { echo "Aborted."; exit 0; }
+  case "${BUMP%% *}" in
+    same)   NEW_NAME="$PREV_BASE"; DEFAULT_SUFFIX="$NEXT_SUFFIX" ;;
+    patch)  NEW_NAME=$(bump_version "$PREV_BASE" patch) ;;
+    minor)  NEW_NAME=$(bump_version "$PREV_BASE" minor) ;;
+    major)  NEW_NAME=$(bump_version "$PREV_BASE" major) ;;
+    manual) read "NEW_NAME?Version (e.g. 1.2.3): " ;;
   esac
-done
+else
+  BUMP=$(printf \
+    "patch  → $(bump_version "$CURRENT_NAME" patch)\nminor  → $(bump_version "$CURRENT_NAME" minor)\nmajor  → $(bump_version "$CURRENT_NAME" major)\nmanual" \
+    | pick "Bump ($CURRENT_NAME, build $CURRENT_BUILD)") || { echo "Aborted."; exit 0; }
+  case "${BUMP%% *}" in
+    patch) NEW_NAME=$(bump_version "$CURRENT_NAME" patch) ;;
+    minor) NEW_NAME=$(bump_version "$CURRENT_NAME" minor) ;;
+    major) NEW_NAME=$(bump_version "$CURRENT_NAME" major) ;;
+    manual) read "NEW_NAME?Version (e.g. 1.2.3): " ;;
+  esac
+fi
 
 if $BETA; then
-  read -rp "Pre-release suffix (e.g. beta1, rc1): " SUFFIX
+  read "SUFFIX?Pre-release suffix${DEFAULT_SUFFIX:+ [$DEFAULT_SUFFIX]}: "
+  SUFFIX="${SUFFIX:-$DEFAULT_SUFFIX}"
   TAG="v${NEW_NAME}-${SUFFIX}"
 else
   TAG="v${NEW_NAME}"
@@ -103,8 +140,7 @@ echo ""
 echo "  Version : $NEW_VERSION"
 echo "  Tag     : $TAG"
 echo ""
-read -rp "Continue? [y/N] " CONFIRM
-[[ "$CONFIRM" =~ ^[Yy]$ ]] || { echo "Aborted."; exit 0; }
+confirm "Continue?" || { echo "Aborted."; exit 0; }
 
 # ---------------------------------------------------------------------------
 # Changelog via claude
@@ -138,8 +174,7 @@ echo "--- Changelog ---"
 echo "$CHANGELOG"
 echo "-----------------"
 echo ""
-read -rp "Proceed with this changelog? [Y/n] " CONFIRM
-[[ "$CONFIRM" =~ ^[Nn]$ ]] && { echo "Aborted. Edit and re-run."; exit 0; }
+confirm "Proceed with this changelog?" || { echo "Aborted. Edit and re-run."; exit 0; }
 
 # ---------------------------------------------------------------------------
 # Commit and tag
@@ -155,8 +190,7 @@ git tag -a "$TAG" -m "$CHANGELOG"
 echo ""
 echo "Created commit and annotated tag $TAG."
 echo ""
-read -rp "Push to origin now? [y/N] " PUSH
-if [[ "$PUSH" =~ ^[Yy]$ ]]; then
+if confirm "Push to origin now?"; then
   git push --atomic origin HEAD "$TAG"
   echo ""
   echo "Pushed. GitHub Actions will build and publish the release."
