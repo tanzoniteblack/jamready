@@ -36,39 +36,28 @@ flutter run -d <device-id>
 
 ## Testing
 
-Run unit and widget tests:
-
 ```bash
-flutter test
-```
-
-Run the offline integration test (requires a connected device or emulator):
-
-```bash
-flutter test integration_test/offline_game_integration_test.dart
+make unit        # unit and widget tests (no device required)
+make integration # offline integration test (requires a connected device or emulator)
+make test        # both of the above
 ```
 
 ## Scoreboard Integration Tests
 
-The scoreboard integration tests connect to a live CRG scoreboard and verify compatibility across multiple versions. They require Docker, a Java 8+ JDK, and Apache Ant.
-
-**Step 1 — Build the scoreboard Docker images:**
+The scoreboard integration tests connect to a live CRG scoreboard and verify compatibility across multiple versions. They require Docker and git (the build runs entirely inside Docker — no local JDK or Ant needed).
 
 ```bash
-./scripts/build-scoreboard-images.sh
+make build-scoreboards  # build a Docker image for each supported scoreboard version (run once)
+make test-scoreboards   # run the full suite against each image, newest version first
 ```
 
-This clones `git@github.com:rollerderby/scoreboard.git` into `vendor/scoreboard` (not checked in) on first run, then builds a Docker image for each supported version.
+The source for each scoreboard version is cloned and compiled inside a multi-stage Docker build (`scripts/scoreboard.Dockerfile`). The test suite requires a connected Android device or emulator, and stops on the first failure.
 
-**Step 2 — Run the tests:**
+To pass options to the test runner (e.g. to test specific versions), call the script directly:
 
 ```bash
-./scripts/test-all-scoreboards.sh
+./scripts/test-all-scoreboards.sh --versions v2025.9,v2025.8
 ```
-
-This runs the scoreboard integration test suite against each version sequentially, newest first, stopping on the first failure. It requires a connected Android device or emulator (the tests use the Android emulator's host alias to reach the Docker container).
-
-Options:
 
 ```
 --versions  Comma-separated list of versions to test
@@ -76,6 +65,40 @@ Options:
 --host      Host address the tests connect to (default: 10.0.2.2)
 --port      Docker host port (default: 8001)
 ```
+
+## Releasing
+
+The release script handles versioning, changelog generation, and tagging. It requires the [`claude` CLI](https://claude.ai/download) to generate the changelog.
+
+```bash
+./scripts/release.sh
+```
+
+It will ask whether this is a stable or pre-release, which version component to bump, and (for pre-releases) a suffix like `rc1` or `beta1`. It then generates a changelog from commits since the last release using Claude, shows it for confirmation, commits the version bump to `pubspec.yaml`, creates an annotated git tag, and offers to push. Pushing the tag triggers the GitHub Actions release workflow, which publishes a GitHub release with the changelog as the release notes.
+
+### Store builds (manual)
+
+The GitHub release contains release notes only — store builds must be created and uploaded manually using `make release`, which runs all tests (including scoreboard compatibility tests) and then builds both artifacts:
+
+```bash
+make release
+```
+
+This requires:
+
+- A connected Android device or emulator for the integration tests
+- `android/key.properties` pointing to your upload keystore (not checked in) for the Android build:
+  ```
+  storeFile=/path/to/upload-keystore.jks
+  storePassword=...
+  keyAlias=upload
+  keyPassword=...
+  ```
+- Xcode with a valid signing certificate and provisioning profile for the iOS build
+
+Once built, upload the artifacts via their respective consoles:
+- **Android**: `build/app/outputs/bundle/release/app-release.aab` → Play Console
+- **iOS**: `build/ios/ipa/*.ipa` → Xcode Organizer or `xcrun altool`
 
 ## Static Analysis
 
@@ -91,5 +114,4 @@ test/                unit and widget tests
 integration_test/    integration tests (run separately)
 assets/              app assets
 scripts/             build and test utilities
-vendor/              local dependencies (not checked in)
 ```
