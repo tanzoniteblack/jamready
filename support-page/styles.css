@@ -113,6 +113,10 @@ h1 {
   max-width: 42ch;
 }
 
+.store-badges {
+  margin-top: 1.4rem;
+}
+
 .hero-actions {
   display: flex;
   gap: 0.75rem;
