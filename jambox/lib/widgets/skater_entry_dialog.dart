@@ -6,25 +6,23 @@ import '../styles/text_styles.dart';
 class SkaterEntryResult {
   final String number;
   final SkaterPosition position;
-  final bool fouledOut;
 
-  const SkaterEntryResult({
-    required this.number,
-    required this.position,
-    this.fouledOut = false,
-  });
+  const SkaterEntryResult({required this.number, required this.position});
 }
 
 /// Dialog to enter a skater's number and position when they report to the box.
+/// Set [barrierDismissible] to true when starting an anonymous seat — the timer
+/// is already running and the user can dismiss without entering a number.
 Future<SkaterEntryResult?> showSkaterEntryDialog(
   BuildContext context, {
   SkaterPosition initialPosition = SkaterPosition.blocker,
   bool allowJammer = true,
   String? teamName,
+  bool barrierDismissible = false,
 }) {
   return showDialog<SkaterEntryResult>(
     context: context,
-    barrierDismissible: false,
+    barrierDismissible: barrierDismissible,
     builder: (ctx) => _SkaterEntryDialog(
       initialPosition: initialPosition,
       allowJammer: allowJammer,
@@ -51,7 +49,6 @@ class _SkaterEntryDialog extends StatefulWidget {
 class _SkaterEntryDialogState extends State<_SkaterEntryDialog> {
   final _controller = TextEditingController();
   late SkaterPosition _position;
-  bool _fouledOut = false;
 
   @override
   void initState() {
@@ -68,13 +65,7 @@ class _SkaterEntryDialogState extends State<_SkaterEntryDialog> {
   void _submit() {
     final number = _controller.text.trim();
     if (number.isEmpty) return;
-    Navigator.of(context).pop(
-      SkaterEntryResult(
-        number: number,
-        position: _position,
-        fouledOut: _fouledOut,
-      ),
-    );
+    Navigator.of(context).pop(SkaterEntryResult(number: number, position: _position));
   }
 
   @override
@@ -160,24 +151,6 @@ class _SkaterEntryDialogState extends State<_SkaterEntryDialog> {
                   onTap: () => setState(() => _position = SkaterPosition.blocker),
                 ),
               ],
-            ),
-            const SizedBox(height: 16),
-            GestureDetector(
-              onTap: () => setState(() => _fouledOut = !_fouledOut),
-              child: Row(
-                children: [
-                  Checkbox(
-                    value: _fouledOut,
-                    onChanged: (v) => setState(() => _fouledOut = v ?? false),
-                    activeColor: Colors.red.shade600,
-                    side: const BorderSide(color: Colors.white38),
-                  ),
-                  Text(
-                    'Fouled Out (7th penalty)',
-                    style: AppTextStyles.infoText.copyWith(color: Colors.white70),
-                  ),
-                ],
-              ),
             ),
             const SizedBox(height: 24),
             Row(

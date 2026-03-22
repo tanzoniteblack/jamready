@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:provider/provider.dart';
@@ -24,7 +26,15 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _isLoading = false;
 
   AppRole _selectedRole = AppRole.pbm;
-  int _selectedTeam = 1;
+
+  // Phase 2 state
+  bool _showRoleSelector = false;
+  RemotePenaltyEngine? _previewEngine;
+  PenaltyBoxState? _previewState;
+  String _team1Name = 'Team 1';
+  String _team2Name = 'Team 2';
+  Timer? _teamNameTimer;
+  VoidCallback? _teamNameListener;
 
   @override
   void initState() {
@@ -44,7 +54,6 @@ class _HomeScreenState extends State<HomeScreen> {
           orElse: () => AppRole.pbm,
         );
       }
-      _selectedTeam = prefs.getInt('pbm_team') ?? 1;
     });
   }
 
@@ -53,38 +62,94 @@ class _HomeScreenState extends State<HomeScreen> {
     await prefs.setString('pbm_host', _hostController.text.trim());
     await prefs.setString('pbm_port', _portController.text.trim());
     await prefs.setString('pbm_role', _selectedRole.name);
-    await prefs.setInt('pbm_team', _selectedTeam);
   }
 
-  Future<void> _connectAndGo() async {
+  Future<void> _connectAndFetchTeams() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _isLoading = true);
 
     await _saveSettings();
+    _disposePreview();
 
-    if (!mounted) return;
-
-    final state = PenaltyBoxState(
-      role: _selectedRole,
-      teamIndex: _selectedRole == AppRole.boxTimerTeam1
-          ? 1
-          : _selectedRole == AppRole.boxTimerTeam2
-              ? 2
-              : null,
-    );
-
+    final state = PenaltyBoxState();
     final engine = RemotePenaltyEngine(state);
+    _previewState = state;
+    _previewEngine = engine;
+
     final url = 'http://${_hostController.text.trim()}:${_portController.text.trim()}';
     engine.connect(url);
 
+    // Listen for team names to arrive, with a 3-second timeout fallback.
+    _teamNameListener = () {
+      final t1 = state.team1.name;
+      final t2 = state.team2.name;
+      if (t1 != 'Team 1' || t2 != 'Team 2') {
+        _advanceToRoleSelector(t1, t2);
+      }
+    };
+    state.addListener(_teamNameListener!);
+
+    _teamNameTimer = Timer(const Duration(seconds: 3), () {
+      _advanceToRoleSelector(_previewState?.team1.name ?? 'Team 1', _previewState?.team2.name ?? 'Team 2');
+    });
+
+    if (mounted) setState(() => _isLoading = false);
+  }
+
+  void _advanceToRoleSelector(String t1, String t2) {
+    _teamNameTimer?.cancel();
+    _teamNameTimer = null;
+    if (_teamNameListener != null) {
+      _previewState?.removeListener(_teamNameListener!);
+      _teamNameListener = null;
+    }
     if (!mounted) return;
-    setState(() => _isLoading = false);
-    _navigateToGame(state, engine);
+    setState(() {
+      _team1Name = t1.isNotEmpty ? t1 : 'Team 1';
+      _team2Name = t2.isNotEmpty ? t2 : 'Team 2';
+      _showRoleSelector = true;
+    });
   }
 
   Future<void> _goOffline() async {
     await _saveSettings();
+    _disposePreview();
+
+    final state = PenaltyBoxState();
+    _previewState = state;
+    // _previewEngine stays null for offline
+
     if (!mounted) return;
+    setState(() {
+      _team1Name = 'Team 1';
+      _team2Name = 'Team 2';
+      _showRoleSelector = true;
+    });
+  }
+
+  void _resetConnection() {
+    _disposePreview();
+    setState(() {
+      _showRoleSelector = false;
+      _team1Name = 'Team 1';
+      _team2Name = 'Team 2';
+    });
+  }
+
+  void _disposePreview() {
+    _teamNameTimer?.cancel();
+    _teamNameTimer = null;
+    if (_teamNameListener != null) {
+      _previewState?.removeListener(_teamNameListener!);
+      _teamNameListener = null;
+    }
+    _previewEngine?.dispose();
+    _previewEngine = null;
+    _previewState = null;
+  }
+
+  Future<void> _startGame() async {
+    await _saveSettings();
 
     final teamIdx = _selectedRole == AppRole.boxTimerTeam1
         ? 1
@@ -92,17 +157,33 @@ class _HomeScreenState extends State<HomeScreen> {
             ? 2
             : null;
 
-    final state = PenaltyBoxState(role: _selectedRole, teamIndex: teamIdx);
-    final engine = LocalPenaltyEngine(state);
-    await engine.initialize();
+    PenaltyBoxState state;
+    dynamic engine;
+
+    if (_previewEngine != null) {
+      // Reuse the already-connected remote engine; update role on the existing state.
+      state = _previewState!;
+      state.role = _selectedRole;
+      state.teamIndex = teamIdx;
+      engine = _previewEngine!;
+      // Clear references so dispose() doesn't shut it down.
+      _previewEngine = null;
+      _previewState = null;
+    } else {
+      // Offline path.
+      state = _previewState ?? PenaltyBoxState();
+      state.role = _selectedRole;
+      state.teamIndex = teamIdx;
+      final localEngine = LocalPenaltyEngine(state);
+      await localEngine.initialize();
+      engine = localEngine;
+      _previewState = null;
+    }
 
     if (!mounted) return;
-    _navigateToGame(state, engine);
-  }
 
-  void _navigateToGame(PenaltyBoxState state, dynamic engine) {
     Widget screen;
-    switch (state.role) {
+    switch (_selectedRole) {
       case AppRole.pbm:
         screen = PbmScreen(engine: engine);
       case AppRole.boxTimerTeam1:
@@ -148,6 +229,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   void dispose() {
+    _disposePreview();
     _hostController.dispose();
     _portController.dispose();
     super.dispose();
@@ -179,23 +261,8 @@ class _HomeScreenState extends State<HomeScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // Role selection
-                Text(
-                  'YOUR ROLE',
-                  style: AppTextStyles.clockLabel.copyWith(
-                    color: Colors.white70,
-                    fontSize: 13,
-                    letterSpacing: 1.5,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                _RoleSelector(
-                  selected: _selectedRole,
-                  onChanged: (r) => setState(() => _selectedRole = r),
-                ),
-                const SizedBox(height: 32),
-
-                // CRG connection section
+                // ── Phase 1: Connection (hidden once role selector is shown) ──
+                if (!_showRoleSelector) ...[
                 Text(
                   'REMOTE SCOREBOARD',
                   style: AppTextStyles.clockLabel.copyWith(
@@ -207,10 +274,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 const SizedBox(height: 8),
                 Text(
                   'Connect to sync with CRG scoreboard.',
-                  style: AppTextStyles.clockLabel.copyWith(
-                    color: Colors.white38,
-                    fontSize: 12,
-                  ),
+                  style: AppTextStyles.clockLabel.copyWith(color: Colors.white38, fontSize: 12),
                 ),
                 const SizedBox(height: 16),
 
@@ -265,67 +329,129 @@ class _HomeScreenState extends State<HomeScreen> {
                   },
                 ),
                 const SizedBox(height: 28),
-
-                SizedBox(
-                  height: 54,
-                  child: ElevatedButton(
-                    onPressed: _isLoading ? null : _connectAndGo,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.deepOrange.shade700,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
-                    child: _isLoading
-                        ? const CircularProgressIndicator(color: Colors.white)
-                        : Text(
-                            'CONNECT & START',
-                            style: AppTextStyles.buttonText.copyWith(fontSize: 17),
-                          ),
-                  ),
-                ),
-
-                const SizedBox(height: 28),
-                Row(
-                  children: [
-                    Expanded(child: Divider(color: Colors.white24)),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: Text('OR', style: AppTextStyles.clockLabel.copyWith(color: Colors.white38, fontSize: 11)),
-                    ),
-                    Expanded(child: Divider(color: Colors.white24)),
-                  ],
-                ),
-                const SizedBox(height: 20),
-
-                Text(
-                  'OFFLINE MODE',
-                  style: AppTextStyles.clockLabel.copyWith(
-                    color: Colors.orange.withValues(alpha: 0.88),
-                    fontSize: 13,
-                    letterSpacing: 1.5,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Run JamBox without CRG. Use manual jam control.',
-                  style: AppTextStyles.clockLabel.copyWith(color: Colors.white38, fontSize: 12),
-                ),
-                const SizedBox(height: 16),
-                SizedBox(
-                  height: 54,
-                  child: OutlinedButton(
-                    onPressed: _goOffline,
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.orange,
-                      side: const BorderSide(color: Colors.orange, width: 2),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
-                    child: Text(
-                      'START OFFLINE',
-                      style: AppTextStyles.buttonText.copyWith(fontSize: 15, color: Colors.orange),
+                  SizedBox(
+                    height: 54,
+                    child: ElevatedButton(
+                      onPressed: _isLoading ? null : _connectAndFetchTeams,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.deepOrange.shade700,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      child: _isLoading
+                          ? const CircularProgressIndicator(color: Colors.white)
+                          : Text(
+                              'CONNECT',
+                              style: AppTextStyles.buttonText.copyWith(fontSize: 17),
+                            ),
                     ),
                   ),
+                  const SizedBox(height: 28),
+                  Row(
+                    children: [
+                      Expanded(child: Divider(color: Colors.white24)),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: Text('OR', style: AppTextStyles.clockLabel.copyWith(color: Colors.white38, fontSize: 11)),
+                      ),
+                      Expanded(child: Divider(color: Colors.white24)),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+                  Text(
+                    'OFFLINE MODE',
+                    style: AppTextStyles.clockLabel.copyWith(
+                      color: Colors.orange.withValues(alpha: 0.88),
+                      fontSize: 13,
+                      letterSpacing: 1.5,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Run JamBox without CRG. Use manual jam control.',
+                    style: AppTextStyles.clockLabel.copyWith(color: Colors.white38, fontSize: 12),
+                  ),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    height: 54,
+                    child: OutlinedButton(
+                      onPressed: _goOffline,
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.orange,
+                        side: const BorderSide(color: Colors.orange, width: 2),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      child: Text(
+                        'START OFFLINE',
+                        style: AppTextStyles.buttonText.copyWith(fontSize: 15, color: Colors.orange),
+                      ),
+                    ),
+                  ),
+                ],
+
+                // ── Phase 2: Role selection (animated reveal) ────────────
+                AnimatedSize(
+                  duration: const Duration(milliseconds: 300),
+                  curve: Curves.easeOut,
+                  child: _showRoleSelector
+                      ? Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            const SizedBox(height: 8),
+                            Container(height: 1, color: Colors.white.withValues(alpha: 0.1)),
+                            const SizedBox(height: 24),
+                            Row(
+                              children: [
+                                Text(
+                                  'YOUR ROLE',
+                                  style: AppTextStyles.clockLabel.copyWith(
+                                    color: Colors.white70,
+                                    fontSize: 13,
+                                    letterSpacing: 1.5,
+                                  ),
+                                ),
+                                const Spacer(),
+                                TextButton.icon(
+                                  onPressed: _resetConnection,
+                                  icon: const Icon(Icons.edit_outlined, size: 14, color: Colors.white38),
+                                  label: Text(
+                                    'Change connection',
+                                    style: AppTextStyles.infoText.copyWith(color: Colors.white38, fontSize: 12),
+                                  ),
+                                  style: TextButton.styleFrom(
+                                    padding: EdgeInsets.zero,
+                                    minimumSize: Size.zero,
+                                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                            _RoleSelector(
+                              selected: _selectedRole,
+                              team1Name: _team1Name,
+                              team2Name: _team2Name,
+                              onChanged: (r) => setState(() => _selectedRole = r),
+                            ),
+                            const SizedBox(height: 24),
+                            SizedBox(
+                              height: 54,
+                              child: ElevatedButton(
+                                onPressed: _startGame,
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.deepOrange.shade700,
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                ),
+                                child: Text(
+                                  'START',
+                                  style: AppTextStyles.buttonText.copyWith(fontSize: 17),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 24),
+                          ],
+                        )
+                      : const SizedBox.shrink(),
                 ),
-                const SizedBox(height: 24),
               ],
             ),
           ),
@@ -365,9 +491,16 @@ class _HomeScreenState extends State<HomeScreen> {
 /// Role selector chips.
 class _RoleSelector extends StatelessWidget {
   final AppRole selected;
+  final String team1Name;
+  final String team2Name;
   final ValueChanged<AppRole> onChanged;
 
-  const _RoleSelector({required this.selected, required this.onChanged});
+  const _RoleSelector({
+    required this.selected,
+    required this.team1Name,
+    required this.team2Name,
+    required this.onChanged,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -403,7 +536,7 @@ class _RoleSelector extends StatelessWidget {
               role: AppRole.boxTimerTeam1,
               selected: selected,
               label: 'Timer T1',
-              subtitle: 'Team 1 only',
+              subtitle: team1Name,
               icon: Icons.timer,
               color: Colors.blue.shade400,
               onTap: onChanged,
@@ -413,7 +546,7 @@ class _RoleSelector extends StatelessWidget {
               role: AppRole.boxTimerTeam2,
               selected: selected,
               label: 'Timer T2',
-              subtitle: 'Team 2 only',
+              subtitle: team2Name,
               icon: Icons.timer,
               color: Colors.red.shade400,
               onTap: onChanged,

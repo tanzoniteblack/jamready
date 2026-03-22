@@ -9,11 +9,12 @@ import 'skater_entry_dialog.dart';
 /// Displays a single penalty box seat with countdown timer.
 ///
 /// States:
-///   empty   → tap to seat a skater
-///   running → countdown; tap to add +30s penalty
-///   standing (≤10s) → "STAND" cue, amber
-///   done (0:00) → "DONE" cue, red; tap to clear
-///   paused → time frozen between jams
+///   empty        → tap to start anonymous timer + open number dialog
+///   running ('?')→ tap to enter skater number
+///   running      → +30s button inline; no tap action
+///   standing (≤10s) → "STAND" cue, amber, pulses
+///   done (0:00)  → "DONE" cue, red; tap to clear
+///   paused       → time frozen between jams; jammer tap starts timer
 class SeatCard extends StatefulWidget {
   final SkaterSeat seat;
   final bool compact;
@@ -51,18 +52,21 @@ class _SeatCardState extends State<SeatCard> with SingleTickerProviderStateMixin
     final seat = widget.seat;
     switch (seat.state) {
       case SeatState.empty:
-        await _seatSkater(state);
+        await _startAnonymousAndGetNumber(state);
       case SeatState.done:
         _hapticLight();
         state.clearSeat(seat);
       case SeatState.running:
       case SeatState.standing:
-        _hapticLight();
-        state.addPenaltyToSeat(seat);
+        // '?' → ask for number; named → no tap action (+30s button handles penalty)
+        if (seat.skaterNumber == '?') {
+          await _getSkaterNumber(state);
+        }
       case SeatState.paused:
-        // If jammer and jam is running, start their timer
         if (seat.position == SkaterPosition.jammer && state.jamRunning) {
           state.startJammerTimer(seat.teamIndex);
+        } else if (seat.skaterNumber == '?') {
+          await _getSkaterNumber(state);
         }
     }
   }
@@ -72,39 +76,58 @@ class _SeatCardState extends State<SeatCard> with SingleTickerProviderStateMixin
     if (seat.isEmpty) return;
     _hapticMedium();
     final confirmed = await _showClearConfirm();
-    if (confirmed == true) {
+    if (confirmed == true && mounted) {
       state.clearSeat(seat);
     }
   }
 
-  Future<void> _seatSkater(PenaltyBoxState state) async {
+  /// Immediately starts an anonymous timer, then shows a non-blocking number dialog.
+  Future<void> _startAnonymousAndGetNumber(PenaltyBoxState state) async {
     final seat = widget.seat;
-    final isJammerSeat = seat.position == SkaterPosition.jammer;
+    final isJammer = seat.position == SkaterPosition.jammer;
 
-    // Check if this is a blocker seat and both are full → should go to queue
-    if (!isJammerSeat) {
+    if (!isJammer) {
       final blockers = state.blockerSeats(seat.teamIndex);
-      final allFull = blockers.every((s) => s.isOccupied);
-      if (allFull) {
+      if (blockers.every((s) => s.isOccupied)) {
         await _addToQueue(state);
         return;
       }
     }
 
+    // Start timer immediately with placeholder '?'
+    state.startSeatAnonymously(seat);
+
+    if (!mounted) return;
+
+    // Non-blocking: user can dismiss without entering a number
     final result = await showSkaterEntryDialog(
       context,
-      initialPosition: isJammerSeat ? SkaterPosition.jammer : SkaterPosition.blocker,
-      allowJammer: isJammerSeat,
+      initialPosition: isJammer ? SkaterPosition.jammer : SkaterPosition.blocker,
+      allowJammer: isJammer,
       teamName: state.teamInfo(seat.teamIndex).name,
+      barrierDismissible: true,
     );
 
     if (result != null && mounted) {
-      state.seatSkater(
-        seat: seat,
-        number: result.number,
-        position: result.position,
-        fouledOut: result.fouledOut,
-      );
+      state.setSkaterNumber(seat, result.number, position: result.position);
+    }
+  }
+
+  /// Shows number-entry dialog for an already-running anonymous seat.
+  Future<void> _getSkaterNumber(PenaltyBoxState state) async {
+    final seat = widget.seat;
+    final isJammer = seat.position == SkaterPosition.jammer;
+
+    final result = await showSkaterEntryDialog(
+      context,
+      initialPosition: isJammer ? SkaterPosition.jammer : SkaterPosition.blocker,
+      allowJammer: isJammer,
+      teamName: state.teamInfo(seat.teamIndex).name,
+      barrierDismissible: true,
+    );
+
+    if (result != null && mounted) {
+      state.setSkaterNumber(seat, result.number, position: result.position);
     }
   }
 
@@ -122,6 +145,21 @@ class _SeatCardState extends State<SeatCard> with SingleTickerProviderStateMixin
         position: result.position,
       );
     }
+  }
+
+  void _addPenalty(BuildContext context, PenaltyBoxState state) {
+    _hapticLight();
+    state.addPenaltyToSeat(widget.seat);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Text('+30s penalty added'),
+        duration: const Duration(seconds: 4),
+        action: SnackBarAction(
+          label: 'UNDO',
+          onPressed: () => state.removePenaltyFromSeat(widget.seat),
+        ),
+      ),
+    );
   }
 
   Future<bool?> _showClearConfirm() {
@@ -191,14 +229,14 @@ class _SeatCardState extends State<SeatCard> with SingleTickerProviderStateMixin
         child: Padding(
           padding: EdgeInsets.all(compact ? 12 : 16),
           child: seatState == SeatState.empty
-              ? _buildEmpty(teamColor, compact)
-              : _buildOccupied(seat, seatState, timeStr, teamColor, compact),
+              ? _buildEmpty(compact)
+              : _buildOccupied(context, state, seat, seatState, timeStr, teamColor, compact),
         ),
       ),
     );
   }
 
-  Widget _buildEmpty(Color teamColor, bool compact) {
+  Widget _buildEmpty(bool compact) {
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
@@ -221,6 +259,8 @@ class _SeatCardState extends State<SeatCard> with SingleTickerProviderStateMixin
   }
 
   Widget _buildOccupied(
+    BuildContext context,
+    PenaltyBoxState state,
     SkaterSeat seat,
     SeatState seatState,
     String timeStr,
@@ -230,6 +270,7 @@ class _SeatCardState extends State<SeatCard> with SingleTickerProviderStateMixin
     final isStanding = seatState == SeatState.standing;
     final isDone = seatState == SeatState.done;
     final isPaused = seatState == SeatState.paused;
+    final isRunningOrStanding = seatState == SeatState.running || isStanding;
 
     final alertColor = isDone
         ? Colors.red.shade400
@@ -237,38 +278,47 @@ class _SeatCardState extends State<SeatCard> with SingleTickerProviderStateMixin
             ? Colors.amber.shade400
             : Colors.white;
 
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        // Position label + foulout indicator
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              _positionLabel(seat.position),
-              style: AppTextStyles.clockLabel.copyWith(
-                color: teamColor.withValues(alpha: 0.8),
-                fontSize: compact ? 11 : 13,
-                letterSpacing: 1.5,
-              ),
-            ),
-            if (seat.isFouledOut)
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+    // +30s button anchored to bottom of card via Stack — doesn't push center content
+    final addPenaltyButton = !compact && isRunningOrStanding
+        ? Align(
+            alignment: Alignment.bottomCenter,
+            child: GestureDetector(
+              onTap: () => _addPenalty(context, state),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
                 decoration: BoxDecoration(
-                  color: Colors.red.shade900,
-                  borderRadius: BorderRadius.circular(4),
+                  color: Colors.white.withValues(alpha: 0.08),
+                  border: Border.all(color: Colors.white24),
+                  borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
-                  'FO',
+                  '+30s',
                   style: AppTextStyles.clockLabel.copyWith(
-                    color: Colors.red.shade300,
-                    fontSize: 10,
-                    letterSpacing: 1,
+                    color: Colors.white54,
+                    fontSize: 13,
+                    letterSpacing: 0.5,
                   ),
                 ),
               ),
-          ],
+            ),
+          )
+        : null;
+
+    final timerContent = Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // Position label
+        Align(
+          alignment: Alignment.centerLeft,
+          child: Text(
+            _positionLabel(seat.position),
+            style: AppTextStyles.clockLabel.copyWith(
+              color: teamColor.withValues(alpha: 0.8),
+              fontSize: compact ? 11 : 13,
+              letterSpacing: 1.5,
+            ),
+          ),
         ),
         SizedBox(height: compact ? 6 : 8),
 
@@ -291,23 +341,27 @@ class _SeatCardState extends State<SeatCard> with SingleTickerProviderStateMixin
             ),
           )
         else if (isStanding)
-          Column(
-            children: [
-              Text(
-                'STAND',
-                style: AppTextStyles.alertLabel.copyWith(
-                  color: Colors.amber.shade400,
-                  fontSize: compact ? 16 : 20,
+          ScaleTransition(
+            scale: _pulseAnimation,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'STAND',
+                  style: AppTextStyles.alertLabel.copyWith(
+                    color: Colors.amber.shade400,
+                    fontSize: compact ? 16 : 20,
+                  ),
                 ),
-              ),
-              Text(
-                timeStr,
-                style: AppTextStyles.clockTimeSmall.copyWith(
-                  color: alertColor,
-                  fontSize: compact ? 32 : 42,
+                Text(
+                  timeStr,
+                  style: AppTextStyles.clockTimeSmall.copyWith(
+                    color: alertColor,
+                    fontSize: compact ? 32 : 42,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           )
         else
           ScaleTransition(
@@ -333,19 +387,15 @@ class _SeatCardState extends State<SeatCard> with SingleTickerProviderStateMixin
               ),
             ),
           ),
+      ],
+    );
 
-        if (!isDone && !compact)
-          Padding(
-            padding: const EdgeInsets.only(top: 8),
-            child: Text(
-              'TAP TO ADD PENALTY',
-              style: AppTextStyles.clockLabel.copyWith(
-                color: Colors.white24,
-                fontSize: 10,
-                letterSpacing: 1,
-              ),
-            ),
-          ),
+    if (addPenaltyButton == null) return Center(child: timerContent);
+
+    return Stack(
+      children: [
+        Center(child: timerContent),
+        addPenaltyButton,
       ],
     );
   }

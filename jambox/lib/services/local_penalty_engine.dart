@@ -22,6 +22,9 @@ class LocalPenaltyEngine extends PenaltyEngine with WidgetsBindingObserver {
   Future<void> initialize() async {
     WidgetsBinding.instance.addObserver(this);
     _startTicker();
+    // Start in jam-running mode so timers are live immediately
+    _state.jamNumber = 1;
+    _state.onJamStart();
   }
 
   @override
@@ -61,9 +64,7 @@ class LocalPenaltyEngine extends PenaltyEngine with WidgetsBindingObserver {
     if (_state.jamRunning) {
       _state.onJamEnd();
     } else {
-      if (_state.jamRunning == false) {
-        _state.jamNumber++;
-      }
+      _state.jamNumber++;
       _state.onJamStart();
     }
   }

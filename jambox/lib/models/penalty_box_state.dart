@@ -78,6 +78,8 @@ class PenaltyBoxState extends ChangeNotifier {
     notifyListeners();
   }
 
+  void setTeamColor(int teamIdx, Color color) => updateTeam(teamIdx, color: color);
+
   void updateRoster(int teamIdx, String skaterNumber, String skaterId) {
     if (teamIdx == 1) {
       _rosterTeam1[skaterNumber] = skaterId;
@@ -94,23 +96,16 @@ class PenaltyBoxState extends ChangeNotifier {
   void onJamStart() {
     jamRunning = true;
 
-    // Jammer sync: if a jammer arrived between jams, they start their timer now
-    for (final seat in [team1Jammer, team2Jammer]) {
-      if (seat.isOccupied && seat.arrivedBetweenJams) {
-        seat.isRunning = true;
-        seat.arrivedBetweenJams = false;
-      }
-    }
-
-    // Release jammers that were marked for release at jam start
-    _applyJammerSync();
-
-    // Start all occupied blocker timers
+    // Start all occupied seat timers (jammers included — they auto-start on jam start)
     for (final seat in seats) {
-      if (seat.isOccupied && !seat.isRunning && seat.position != SkaterPosition.jammer) {
+      if (seat.isOccupied && !seat.isRunning) {
         seat.isRunning = true;
       }
+      seat.arrivedBetweenJams = false;
     }
+
+    // Release jammers at 0:00 that have served their time between jams
+    _applyJammerSync();
 
     notifyListeners();
   }
@@ -125,11 +120,7 @@ class PenaltyBoxState extends ChangeNotifier {
   }
 
   void _applyJammerSync() {
-    // WFTDA 4.4: when both jammers were seated between jams, both release at jam start
-    // (i.e. their time was already at 0 or they are done — handled by done state)
-    // If one jammer was sitting between jams while the other was not,
-    // the between-jams jammer releases at next jam start.
-    // This is handled by: if arrivedBetweenJams AND time <= 0 → clear seat
+    // WFTDA 4.4: jammers who are done (0:00) at jam start are released
     for (final seat in [team1Jammer, team2Jammer]) {
       if (seat.isOccupied && seat.timeRemaining <= Duration.zero) {
         seat.clear();
@@ -167,12 +158,10 @@ class PenaltyBoxState extends ChangeNotifier {
     required SkaterSeat seat,
     required String number,
     required SkaterPosition position,
-    bool fouledOut = false,
   }) {
     seat.setSkater(
       number: number,
       pos: position,
-      fouledOut: fouledOut,
       arrivedBetween: !jamRunning,
     );
     if (jamRunning && position != SkaterPosition.jammer) {
@@ -181,10 +170,36 @@ class PenaltyBoxState extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Starts a seat immediately with placeholder number '?' — timer runs if jam is running
+  /// and position is not jammer (jammers require manual start).
+  void startSeatAnonymously(SkaterSeat seat) {
+    seat.skaterNumber = '?';
+    seat.timeRemaining = const Duration(seconds: 30);
+    seat.arrivedBetweenJams = !jamRunning;
+    seat.isRunning = jamRunning && seat.position != SkaterPosition.jammer;
+    notifyListeners();
+  }
+
+  /// Updates the skater number (and optionally position) on an already-running seat.
+  void setSkaterNumber(SkaterSeat seat, String number, {SkaterPosition? position}) {
+    seat.skaterNumber = number;
+    if (position != null) seat.position = position;
+    notifyListeners();
+  }
+
   void addPenaltyToSeat(SkaterSeat seat) {
     seat.addPenalty();
     if (jamRunning && !seat.isRunning) {
       seat.isRunning = true;
+    }
+    notifyListeners();
+  }
+
+  void removePenaltyFromSeat(SkaterSeat seat) {
+    seat.timeRemaining -= const Duration(seconds: 30);
+    if (seat.timeRemaining <= Duration.zero) {
+      seat.timeRemaining = Duration.zero;
+      seat.isRunning = false;
     }
     notifyListeners();
   }
@@ -198,7 +213,6 @@ class PenaltyBoxState extends ChangeNotifier {
       seat.setSkater(
         number: next.skaterNumber,
         pos: next.position,
-        fouledOut: next.isFouledOut,
         arrivedBetween: !jamRunning,
       );
       if (jamRunning) seat.isRunning = true;

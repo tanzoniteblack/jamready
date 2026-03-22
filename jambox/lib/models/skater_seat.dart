@@ -13,7 +13,6 @@ class SkaterSeat {
   int teamIndex; // 1 or 2
   Duration timeRemaining;
   bool isRunning;
-  bool isFouledOut;
   bool isInQueue;
 
   // Whether this skater arrived between jams (affects jammer sync logic)
@@ -26,7 +25,6 @@ class SkaterSeat {
     required this.teamIndex,
     this.timeRemaining = Duration.zero,
     this.isRunning = false,
-    this.isFouledOut = false,
     this.isInQueue = false,
     this.arrivedBetweenJams = false,
   });
@@ -59,15 +57,12 @@ class SkaterSeat {
 
   void addPenalty() {
     timeRemaining += const Duration(seconds: 30);
-    if (isRunning) return; // already running
   }
 
   void clear() {
     skaterNumber = '';
-    position = SkaterPosition.blocker;
     timeRemaining = Duration.zero;
     isRunning = false;
-    isFouledOut = false;
     isInQueue = false;
     arrivedBetweenJams = false;
   }
@@ -75,14 +70,12 @@ class SkaterSeat {
   void setSkater({
     required String number,
     required SkaterPosition pos,
-    bool fouledOut = false,
     bool arrivedBetween = false,
   }) {
     skaterNumber = number;
     position = pos;
     timeRemaining = const Duration(seconds: 30);
     isRunning = false;
-    isFouledOut = fouledOut;
     arrivedBetweenJams = arrivedBetween;
   }
 
@@ -92,7 +85,6 @@ class SkaterSeat {
     int? teamIndex,
     Duration? timeRemaining,
     bool? isRunning,
-    bool? isFouledOut,
     bool? isInQueue,
     bool? arrivedBetweenJams,
   }) {
@@ -103,7 +95,6 @@ class SkaterSeat {
       teamIndex: teamIndex ?? this.teamIndex,
       timeRemaining: timeRemaining ?? this.timeRemaining,
       isRunning: isRunning ?? this.isRunning,
-      isFouledOut: isFouledOut ?? this.isFouledOut,
       isInQueue: isInQueue ?? this.isInQueue,
       arrivedBetweenJams: arrivedBetweenJams ?? this.arrivedBetweenJams,
     );

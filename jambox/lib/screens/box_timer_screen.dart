@@ -7,9 +7,10 @@ import '../styles/background.dart';
 import '../styles/text_styles.dart';
 import '../widgets/seat_card.dart';
 import '../widgets/queue_panel.dart';
+import 'home_screen.dart';
 
 /// Single-team box timer view.
-/// Shows one team's jammer (inner) seat and up to 2 blocker (outer) seats.
+/// Shows one team's jammer (inner) seat and two blocker (outer) seats stacked vertically.
 class BoxTimerScreen extends StatelessWidget {
   final PenaltyEngine engine;
 
@@ -29,6 +30,7 @@ class BoxTimerScreen extends StatelessWidget {
       accentColor: accentColor,
       child: Scaffold(
         backgroundColor: Colors.transparent,
+        resizeToAvoidBottomInset: false,
         appBar: _buildAppBar(context, state, teamInfo, engine),
         body: SafeArea(
           child: Padding(
@@ -39,23 +41,22 @@ class BoxTimerScreen extends StatelessWidget {
                 _JamStatusBar(state: state, engine: engine),
                 const SizedBox(height: 16),
 
-                // Jammer seat (inner) — prominent
+                // Jammer seat — prominent, full width
                 Expanded(
                   flex: 5,
                   child: SeatCard(seat: jammer),
                 ),
                 const SizedBox(height: 12),
 
-                // Blocker seats (outer) — side by side
+                // Bug 3: Blocker seats stacked vertically (full width each)
                 Expanded(
-                  flex: 4,
-                  child: Row(
-                    children: [
-                      Expanded(child: SeatCard(seat: blockers[0], compact: true)),
-                      const SizedBox(width: 10),
-                      Expanded(child: SeatCard(seat: blockers[1], compact: true)),
-                    ],
-                  ),
+                  flex: 3,
+                  child: SeatCard(seat: blockers[0], compact: true),
+                ),
+                const SizedBox(height: 10),
+                Expanded(
+                  flex: 3,
+                  child: SeatCard(seat: blockers[1], compact: true),
                 ),
                 const SizedBox(height: 12),
 
@@ -101,12 +102,13 @@ class BoxTimerScreen extends StatelessWidget {
       scrolledUnderElevation: 0,
       title: Row(
         children: [
-          Container(
-            width: 10,
-            height: 10,
-            decoration: BoxDecoration(
-              color: teamInfo.color,
-              shape: BoxShape.circle,
+          // Bug 11: tappable color dot in local mode
+          GestureDetector(
+            onTap: engine.isLocal ? () => _showColorPicker(context, state, teamInfo.index) : null,
+            child: Container(
+              width: 10,
+              height: 10,
+              decoration: _colorSwatchDecoration(teamInfo.color),
             ),
           ),
           const SizedBox(width: 10),
@@ -115,10 +117,12 @@ class BoxTimerScreen extends StatelessWidget {
             style: AppTextStyles.appBarTitle,
           ),
           const Spacer(),
-          Text(
-            'P${state.periodNumber}  J${state.jamNumber}',
-            style: AppTextStyles.clockLabel.copyWith(fontSize: 14),
-          ),
+          // Bug 6: hide P/J counter in local mode
+          if (!engine.isLocal)
+            Text(
+              'P${state.periodNumber}  J${state.jamNumber}',
+              style: AppTextStyles.clockLabel.copyWith(fontSize: 14),
+            ),
           const SizedBox(width: 8),
           _ConnectionDot(state: state),
         ],
@@ -127,11 +131,21 @@ class BoxTimerScreen extends StatelessWidget {
         alignment: Alignment.bottomCenter,
         child: Container(height: 1, color: Colors.white.withValues(alpha: 0.1)),
       ),
+      // Bug 1: back button disposes engine and replaces with HomeScreen
       leading: IconButton(
         icon: const Icon(Icons.arrow_back, color: Colors.white70),
-        onPressed: () => Navigator.of(context).pop(),
+        onPressed: () => _navigateBack(context, engine),
       ),
     );
+  }
+
+  void _showColorPicker(BuildContext context, PenaltyBoxState state, int teamIdx) {
+    showDialog<Color>(
+      context: context,
+      builder: (_) => _TeamColorPickerDialog(currentColor: state.teamInfo(teamIdx).color),
+    ).then((color) {
+      if (color != null) state.setTeamColor(teamIdx, color);
+    });
   }
 }
 
@@ -150,6 +164,7 @@ class PbmScreen extends StatelessWidget {
       accentColor: accentColor,
       child: Scaffold(
         backgroundColor: Colors.transparent,
+        resizeToAvoidBottomInset: false,
         appBar: _buildAppBar(context, state, engine),
         body: SafeArea(
           child: Padding(
@@ -161,12 +176,10 @@ class PbmScreen extends StatelessWidget {
                 Expanded(
                   child: Row(
                     children: [
-                      // Team 1 column
                       Expanded(
                         child: _TeamColumn(teamIndex: 1, state: state),
                       ),
                       const SizedBox(width: 16),
-                      // Team 2 column
                       Expanded(
                         child: _TeamColumn(teamIndex: 2, state: state),
                       ),
@@ -199,10 +212,12 @@ class PbmScreen extends StatelessWidget {
         children: [
           Text('JAMBOX', style: AppTextStyles.appBarTitle),
           const Spacer(),
-          Text(
-            'P${state.periodNumber}  J${state.jamNumber}',
-            style: AppTextStyles.clockLabel.copyWith(fontSize: 14),
-          ),
+          // Bug 6: hide P/J counter in local mode
+          if (!engine.isLocal)
+            Text(
+              'P${state.periodNumber}  J${state.jamNumber}',
+              style: AppTextStyles.clockLabel.copyWith(fontSize: 14),
+            ),
           const SizedBox(width: 8),
           _ConnectionDot(state: state),
         ],
@@ -211,9 +226,10 @@ class PbmScreen extends StatelessWidget {
         alignment: Alignment.bottomCenter,
         child: Container(height: 1, color: Colors.white.withValues(alpha: 0.1)),
       ),
+      // Bug 1: back button disposes engine and replaces with HomeScreen
       leading: IconButton(
         icon: const Icon(Icons.arrow_back, color: Colors.white70),
-        onPressed: () => Navigator.of(context).pop(),
+        onPressed: () => _navigateBack(context, engine),
       ),
     );
   }
@@ -239,7 +255,7 @@ class _TeamColumn extends StatelessWidget {
             Container(
               width: 8,
               height: 8,
-              decoration: BoxDecoration(color: teamInfo.color, shape: BoxShape.circle),
+              decoration: _colorSwatchDecoration(teamInfo.color),
             ),
             const SizedBox(width: 6),
             Expanded(
@@ -294,6 +310,7 @@ class SoloScreen extends StatelessWidget {
       accentColor: accentColor,
       child: Scaffold(
         backgroundColor: Colors.transparent,
+        resizeToAvoidBottomInset: false,
         appBar: _buildAppBar(context, state, engine),
         body: SafeArea(
           child: Padding(
@@ -337,10 +354,12 @@ class SoloScreen extends StatelessWidget {
         children: [
           Text('JAMBOX', style: AppTextStyles.appBarTitle),
           const Spacer(),
-          Text(
-            'P${state.periodNumber}  J${state.jamNumber}',
-            style: AppTextStyles.clockLabel.copyWith(fontSize: 14),
-          ),
+          // Bug 6: hide P/J counter in local mode
+          if (!engine.isLocal)
+            Text(
+              'P${state.periodNumber}  J${state.jamNumber}',
+              style: AppTextStyles.clockLabel.copyWith(fontSize: 14),
+            ),
           const SizedBox(width: 8),
           _ConnectionDot(state: state),
         ],
@@ -349,9 +368,10 @@ class SoloScreen extends StatelessWidget {
         alignment: Alignment.bottomCenter,
         child: Container(height: 1, color: Colors.white.withValues(alpha: 0.1)),
       ),
+      // Bug 1: back button disposes engine and replaces with HomeScreen
       leading: IconButton(
         icon: const Icon(Icons.arrow_back, color: Colors.white70),
-        onPressed: () => Navigator.of(context).pop(),
+        onPressed: () => _navigateBack(context, engine),
       ),
     );
   }
@@ -454,7 +474,9 @@ class _JamStatusBar extends StatelessWidget {
           ),
           const SizedBox(width: 10),
           Text(
-            running ? 'JAM RUNNING' : 'BETWEEN JAMS',
+            engine.isLocal
+                ? (running ? 'TIMERS RUNNING' : 'TIMERS PAUSED')
+                : (running ? 'JAM RUNNING' : 'BETWEEN JAMS'),
             style: AppTextStyles.clockLabel.copyWith(
               color: running ? Colors.greenAccent : Colors.white38,
               fontSize: 13,
@@ -462,7 +484,7 @@ class _JamStatusBar extends StatelessWidget {
             ),
           ),
           const Spacer(),
-          // Manual jam toggle for offline/local mode
+          // Manual timer toggle for offline/local mode
           if (engine.isLocal)
             TextButton(
               onPressed: engine.toggleJam,
@@ -474,7 +496,7 @@ class _JamStatusBar extends StatelessWidget {
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
               ),
               child: Text(
-                running ? 'END JAM' : 'START JAM',
+                running ? 'PAUSE ALL' : 'RESUME ALL',
                 style: AppTextStyles.buttonText.copyWith(
                   fontSize: 13,
                   color: running ? Colors.red.shade300 : Colors.green.shade300,
@@ -510,6 +532,112 @@ class _ConnectionDot extends StatelessWidget {
         height: 8,
         decoration: BoxDecoration(color: color, shape: BoxShape.circle),
       ),
+    );
+  }
+}
+
+// Team color picker dialog — preset palette including black and white
+class _TeamColorPickerDialog extends StatelessWidget {
+  final Color currentColor;
+
+  const _TeamColorPickerDialog({required this.currentColor});
+
+  static final _palette = [
+    Colors.black,
+    Colors.white,
+    Colors.deepOrange.shade400,
+    Colors.red.shade400,
+    Colors.pink.shade400,
+    Colors.purple.shade400,
+    Colors.deepPurple.shade400,
+    Colors.indigo.shade400,
+    Colors.blue.shade400,
+    Colors.teal.shade400,
+    Colors.green.shade400,
+    Colors.lime.shade400,
+    Colors.amber.shade400,
+    Colors.cyan.shade400,
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: const Color(0xFF1A1C21),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'TEAM COLOR',
+              style: AppTextStyles.clockLabel.copyWith(
+                color: Colors.white54,
+                fontSize: 13,
+                letterSpacing: 1.5,
+              ),
+            ),
+            const SizedBox(height: 20),
+            Wrap(
+              spacing: 16,
+              runSpacing: 16,
+              children: _palette.map((color) {
+                final isSelected = color == currentColor;
+                return GestureDetector(
+                  onTap: () => Navigator.of(context).pop(color),
+                  child: Container(
+                    width: 40,
+                    height: 40,
+                    decoration: _colorSwatchDecoration(color, selected: isSelected),
+                  ),
+                );
+              }).toList(),
+            ),
+            const SizedBox(height: 16),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// BoxDecoration for a color swatch circle.
+/// Black gets a persistent white glow so it's visible on the dark background.
+/// White gets a subtle grey border. Others glow with their own color when selected.
+BoxDecoration _colorSwatchDecoration(Color color, {bool selected = false}) {
+  final isBlack = color == Colors.black;
+  final isWhite = color == Colors.white;
+
+  final border = Border.all(
+    color: selected
+        ? Colors.white
+        : (isBlack || isWhite)
+            ? Colors.white38
+            : Colors.transparent,
+    width: selected ? 3 : 1.5,
+  );
+
+  final List<BoxShadow> shadows = isBlack
+      ? [BoxShadow(color: Colors.white.withValues(alpha: selected ? 0.7 : 0.35), blurRadius: 10, spreadRadius: 1)]
+      : selected
+          ? [BoxShadow(color: color.withValues(alpha: 0.6), blurRadius: 8)]
+          : [];
+
+  return BoxDecoration(
+    color: color,
+    shape: BoxShape.circle,
+    border: border,
+    boxShadow: shadows,
+  );
+}
+
+/// Shared back navigation: disposes engine, pushes HomeScreen.
+Future<void> _navigateBack(BuildContext context, PenaltyEngine engine) async {
+  await engine.dispose();
+  if (context.mounted) {
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(builder: (_) => const HomeScreen()),
     );
   }
 }
