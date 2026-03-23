@@ -8,6 +8,7 @@ import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:web_socket_channel/status.dart' as status;
 import '../models/penalty_box_state.dart';
+import '../models/skater_seat.dart';
 import 'penalty_engine.dart';
 import 'local_penalty_engine.dart';
 
@@ -32,10 +33,14 @@ class RemotePenaltyEngine extends PenaltyEngine with WidgetsBindingObserver {
   bool _isConnected = false;
   bool _isConnecting = false;
   bool _manualDisconnect = false;
+  bool _boxSeatMode = false;
   int _reconnectAttempts = 0;
   String? _lastUrl;
   final Random _random = Random();
   late final LocalPenaltyEngine _localEngine;
+
+  // Blocker3 queue tracking for BoxSeat mode
+  final Map<int, SkaterSeat?> _blocker3QueueSeat = {1: null, 2: null};
 
   RemotePenaltyEngine(this._state) {
     _localEngine = LocalPenaltyEngine(_state);
@@ -136,6 +141,16 @@ class RemotePenaltyEngine extends PenaltyEngine with WidgetsBindingObserver {
       'ScoreBoard.CurrentGame.Team(1).Skater(*).Name',
       'ScoreBoard.CurrentGame.Team(2).Skater(*).Number',
       'ScoreBoard.CurrentGame.Team(2).Skater(*).Name',
+      // Skater role (for jammer number display in BoxSeat mode)
+      'ScoreBoard.CurrentGame.Team(1).Skater(*).Role',
+      'ScoreBoard.CurrentGame.Team(2).Skater(*).Role',
+      // BoxSeat/BoxClock (katpet/feature-pbt — ignored silently on other versions)
+      'ScoreBoard.CurrentGame.BoxClock(*).Time',
+      'ScoreBoard.CurrentGame.BoxClock(*).Running',
+      'ScoreBoard.CurrentGame.Team(1).BoxSeat(*).Started',
+      'ScoreBoard.CurrentGame.Team(1).BoxSeat(*).BoxSkater',
+      'ScoreBoard.CurrentGame.Team(2).BoxSeat(*).Started',
+      'ScoreBoard.CurrentGame.Team(2).BoxSeat(*).BoxSkater',
     ];
 
     _log.d('Registering paths');
@@ -241,6 +256,41 @@ class RemotePenaltyEngine extends PenaltyEngine with WidgetsBindingObserver {
       return;
     }
 
+    // Skater role — used in BoxSeat mode to display jammer number
+    final roleMatch = RegExp(
+      r'ScoreBoard\.CurrentGame\.Team\((\d)\)\.Skater\(([^)]+)\)\.Role$',
+    ).firstMatch(key);
+    if (roleMatch != null) {
+      final t = int.parse(roleMatch.group(1)!);
+      final uuid = roleMatch.group(2)!;
+      _onSkaterRole(t, uuid, value?.toString() ?? '');
+      return;
+    }
+
+    // BoxClock: ScoreBoard.CurrentGame.BoxClock(Team1Jammer).Time or .Running
+    final boxClockMatch = RegExp(
+      r'ScoreBoard\.CurrentGame\.BoxClock\(Team(\d)(Jammer|Blocker[123])\)\.(Time|Running)$',
+    ).firstMatch(key);
+    if (boxClockMatch != null) {
+      final t = int.parse(boxClockMatch.group(1)!);
+      final seatId = boxClockMatch.group(2)!;
+      final prop = boxClockMatch.group(3)!;
+      _onBoxClockUpdate(t, seatId, prop, value);
+      return;
+    }
+
+    // BoxSeat: ScoreBoard.CurrentGame.Team(N).BoxSeat(SeatId).Started or .BoxSkater
+    final boxSeatMatch = RegExp(
+      r'ScoreBoard\.CurrentGame\.Team\((\d)\)\.BoxSeat\((Jammer|Blocker[123])\)\.(Started|BoxSkater)$',
+    ).firstMatch(key);
+    if (boxSeatMatch != null) {
+      final t = int.parse(boxSeatMatch.group(1)!);
+      final seatId = boxSeatMatch.group(2)!;
+      final prop = boxSeatMatch.group(3)!;
+      _onBoxSeatUpdate(t, seatId, prop, value);
+      return;
+    }
+
     // Legacy roster: Game.Team(t).Skater — value is a map
     final legacySkaterMatch = RegExp(r'Game\.Team\((\d)\)\.Skater$').firstMatch(key);
     if (legacySkaterMatch != null && value is Map) {
@@ -269,6 +319,153 @@ class RemotePenaltyEngine extends PenaltyEngine with WidgetsBindingObserver {
       return Color(int.parse(fullHex, radix: 16));
     } catch (_) {
       return null;
+    }
+  }
+
+  /// Send a CRG WebSocket Set command.
+  void _wsSet(String key, dynamic value) {
+    _channel?.sink.add(jsonEncode({'action': 'Set', 'key': key, 'value': value, 'flag': ''}));
+  }
+
+  /// Map a SkaterSeat id to (teamIndex, boxSeatId) for WS commands.
+  (int?, String?) _seatToBoxSeatId(SkaterSeat seat) {
+    return switch (seat.id) {
+      't1j' => (1, 'Jammer'),
+      't1b1' => (1, 'Blocker1'),
+      't1b2' => (1, 'Blocker2'),
+      't2j' => (2, 'Jammer'),
+      't2b1' => (2, 'Blocker1'),
+      't2b2' => (2, 'Blocker2'),
+      _ => (null, null),
+    };
+  }
+
+  /// Map BoxClock ID components to a SkaterSeat (null for Blocker3 → use queue).
+  SkaterSeat? _boxClockToSeat(int teamIdx, String seatId) {
+    return switch ('$teamIdx:$seatId') {
+      '1:Jammer' => _state.team1Jammer,
+      '1:Blocker1' => _state.team1Blocker1,
+      '1:Blocker2' => _state.team1Blocker2,
+      '2:Jammer' => _state.team2Jammer,
+      '2:Blocker1' => _state.team2Blocker1,
+      '2:Blocker2' => _state.team2Blocker2,
+      _ => null, // Blocker3 — handled via queue
+    };
+  }
+
+  /// Activate BoxSeat sync mode: pause local ticker and wire up action callbacks.
+  void _enterBoxSeatMode() {
+    if (_boxSeatMode) return;
+    _boxSeatMode = true;
+    _localEngine.pauseTicker();
+
+    _state.onSeatStarted = (seat) {
+      final (teamIdx, seatId) = _seatToBoxSeatId(seat);
+      if (teamIdx != null) {
+        _wsSet('ScoreBoard.CurrentGame.Team($teamIdx).BoxSeat($seatId).StartBox', true);
+      }
+    };
+    _state.onSeatCleared = (seat) {
+      final (teamIdx, seatId) = _seatToBoxSeatId(seat);
+      if (teamIdx != null) {
+        _wsSet('ScoreBoard.CurrentGame.Team($teamIdx).BoxSeat($seatId).ResetBox', true);
+      }
+    };
+    _state.onSeatTimeChanged = (seat, seconds) {
+      final (teamIdx, seatId) = _seatToBoxSeatId(seat);
+      if (teamIdx != null) {
+        _wsSet('ScoreBoard.CurrentGame.Team($teamIdx).BoxSeat($seatId).BoxTimeChange', seconds);
+      }
+    };
+    _state.onSkaterAssigned = (seat, number) {
+      final (teamIdx, seatId) = _seatToBoxSeatId(seat);
+      if (teamIdx != null && seatId != 'Jammer') {
+        _wsSet('ScoreBoard.CurrentGame.Team($teamIdx).BoxSeat($seatId).BoxSkater', number);
+      }
+    };
+
+    _log.i('BoxSeat mode activated — local ticker paused, WS commands enabled');
+  }
+
+  void _onBoxClockUpdate(int teamIdx, String seatId, String prop, dynamic value) {
+    _enterBoxSeatMode();
+    final seat = _boxClockToSeat(teamIdx, seatId);
+    if (seat != null) {
+      if (prop == 'Time') {
+        final ms = (value is num) ? value.toInt() : int.tryParse(value.toString()) ?? 0;
+        seat.timeRemaining = Duration(milliseconds: ms.clamp(0, 5 * 60 * 1000));
+      } else if (prop == 'Running') {
+        seat.isRunning = value == true || value == 'true';
+      }
+    } else if (seatId == 'Blocker3' && prop == 'Time') {
+      // Sync queue entry time for Blocker3
+      final ms = (value is num) ? value.toInt() : int.tryParse(value.toString()) ?? 0;
+      final queueSeat = _blocker3QueueSeat[teamIdx];
+      if (queueSeat != null) {
+        queueSeat.timeRemaining = Duration(milliseconds: ms.clamp(0, 5 * 60 * 1000));
+      }
+    }
+    _state.notifyFromEngine();
+  }
+
+  void _onBoxSeatUpdate(int teamIdx, String seatId, String prop, dynamic value) {
+    _enterBoxSeatMode();
+    final seat = _boxClockToSeat(teamIdx, seatId);
+
+    if (prop == 'Started') {
+      final started = value == true || value == 'true';
+      if (seatId == 'Blocker3') {
+        _onBlocker3Started(teamIdx, started);
+        return;
+      }
+      if (seat == null) return;
+      if (!started) {
+        seat.clear();
+      } else if (seat.isEmpty) {
+        seat.skaterNumber = '?'; // placeholder until BoxSkater or Role arrives
+        seat.timeRemaining = const Duration(seconds: 30);
+      }
+    } else if (prop == 'BoxSkater') {
+      final number = value?.toString() ?? '';
+      if (seat == null) return;
+      if (number.isEmpty) {
+        if (seat.skaterNumber == '?') return; // keep placeholder
+        seat.skaterNumber = '?';
+      } else {
+        seat.skaterNumber = number;
+        _state.addKnownNumber(teamIdx, number);
+      }
+    }
+    _state.notifyFromEngine();
+  }
+
+  void _onBlocker3Started(int teamIdx, bool started) {
+    if (started) {
+      if (_blocker3QueueSeat[teamIdx] == null) {
+        final q = _state.addToQueue(
+          teamIdx: teamIdx,
+          number: '?',
+          position: SkaterPosition.blocker,
+        );
+        _blocker3QueueSeat[teamIdx] = q;
+      }
+    } else {
+      final q = _blocker3QueueSeat[teamIdx];
+      if (q != null) {
+        _state.removeFromQueue(q);
+        _blocker3QueueSeat[teamIdx] = null;
+      }
+    }
+  }
+
+  void _onSkaterRole(int teamIdx, String uuid, String role) {
+    if (role != 'Jammer') return;
+    final number = _state.skaterNumberByUuid(teamIdx, uuid);
+    if (number == null || number.isEmpty) return;
+    final seat = _state.jammerSeat(teamIdx);
+    if (seat.skaterNumber != number) {
+      seat.skaterNumber = number;
+      _state.notifyFromEngine();
     }
   }
 
@@ -341,6 +538,7 @@ class RemotePenaltyEngine extends PenaltyEngine with WidgetsBindingObserver {
   @override
   Future<void> dispose() async {
     disconnect();
+    _state.clearBoxSeatCallbacks();
     await _localEngine.dispose();
     WidgetsBinding.instance.removeObserver(this);
   }
@@ -357,6 +555,12 @@ class RemotePenaltyEngine extends PenaltyEngine with WidgetsBindingObserver {
     _reconnectTimer = null;
     _closeChannel();
     _disconnectCleanup();
+    // Reset BoxSeat mode so it's re-detected on fresh connection
+    _boxSeatMode = false;
+    _blocker3QueueSeat[1] = null;
+    _blocker3QueueSeat[2] = null;
+    _state.clearBoxSeatCallbacks();
+    _localEngine.resumeTicker();
     await connect(_lastUrl!);
   }
 

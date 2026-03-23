@@ -90,6 +90,7 @@ class PenaltyBoxState extends ChangeNotifier {
     } else {
       _rosterTeam2[skaterNumber] = skaterId;
     }
+    recordSkaterUuid(teamIdx, skaterId, skaterNumber);
     addKnownNumber(teamIdx, skaterNumber);
     // no listener notification needed — roster changes don't affect UI directly
   }
@@ -98,9 +99,37 @@ class PenaltyBoxState extends ChangeNotifier {
     return teamIdx == 1 ? _rosterTeam1[skaterNumber] : _rosterTeam2[skaterNumber];
   }
 
+  // Reverse UUID→number lookup (used by engine for Role=Jammer mapping)
+  final Map<String, String> _uuidToNumber1 = {};
+  final Map<String, String> _uuidToNumber2 = {};
+
+  void recordSkaterUuid(int teamIdx, String uuid, String number) {
+    (teamIdx == 1 ? _uuidToNumber1 : _uuidToNumber2)[uuid] = number;
+  }
+
+  String? skaterNumberByUuid(int teamIdx, String uuid) =>
+      (teamIdx == 1 ? _uuidToNumber1 : _uuidToNumber2)[uuid];
+
   VoidCallback? _onKnownNumbersChanged;
 
   void setKnownNumbersSaveCallback(VoidCallback? cb) => _onKnownNumbersChanged = cb;
+
+  // BoxSeat action callbacks — set by RemotePenaltyEngine when in BoxSeat sync mode.
+  // null = local mode (no WS commands sent).
+  void Function(SkaterSeat)? onSeatStarted;
+  void Function(SkaterSeat)? onSeatCleared;
+  void Function(SkaterSeat, int seconds)? onSeatTimeChanged;
+  void Function(SkaterSeat, String number)? onSkaterAssigned;
+
+  /// Called by the remote engine to push UI updates when seat state is mutated directly.
+  void notifyFromEngine() => notifyListeners();
+
+  void clearBoxSeatCallbacks() {
+    onSeatStarted = null;
+    onSeatCleared = null;
+    onSeatTimeChanged = null;
+    onSkaterAssigned = null;
+  }
 
   List<String> knownNumbers(int teamIdx) {
     final s = teamIdx == 1 ? _knownNumbersTeam1 : _knownNumbersTeam2;
@@ -187,16 +216,18 @@ class PenaltyBoxState extends ChangeNotifier {
     if (jamRunning) {
       seat.isRunning = true;
     }
+    onSeatStarted?.call(seat);
+    onSkaterAssigned?.call(seat, number);
     notifyListeners();
   }
 
-  /// Starts a seat immediately with placeholder number '?' — timer runs if jam is running
-  /// and position is not jammer (jammers require manual start).
+  /// Starts a seat immediately with placeholder number '?' — timer runs if jam is running.
   void startSeatAnonymously(SkaterSeat seat) {
     seat.skaterNumber = '?';
     seat.timeRemaining = const Duration(seconds: 30);
     seat.arrivedBetweenJams = !jamRunning;
     seat.isRunning = jamRunning;
+    onSeatStarted?.call(seat);
     notifyListeners();
   }
 
@@ -213,6 +244,7 @@ class PenaltyBoxState extends ChangeNotifier {
     if (jamRunning && !seat.isRunning) {
       seat.isRunning = true;
     }
+    onSeatTimeChanged?.call(seat, 30);
     notifyListeners();
   }
 
@@ -221,6 +253,7 @@ class PenaltyBoxState extends ChangeNotifier {
     seat.timeRemaining = newTime.isNegative ? Duration.zero : newTime > const Duration(minutes: 5) ? const Duration(minutes: 5) : newTime;
     if (seat.timeRemaining > Duration.zero && !seat.isRunning && jamRunning) seat.isRunning = true;
     if (seat.timeRemaining <= Duration.zero) seat.isRunning = false;
+    onSeatTimeChanged?.call(seat, delta.inSeconds);
     notifyListeners();
   }
 
@@ -230,13 +263,15 @@ class PenaltyBoxState extends ChangeNotifier {
       seat.timeRemaining = Duration.zero;
       seat.isRunning = false;
     }
+    onSeatTimeChanged?.call(seat, -30);
     notifyListeners();
   }
 
   void clearSeat(SkaterSeat seat) {
-    // Check if there's someone in queue to fill this seat
+    // In BoxSeat mode, always clear locally and let server confirm.
+    // In local mode, promote from queue if available.
     final teamQueue = queueForTeam(seat.teamIndex);
-    if (teamQueue.isNotEmpty && seat.position != SkaterPosition.jammer) {
+    if (onSeatCleared == null && teamQueue.isNotEmpty && seat.position != SkaterPosition.jammer) {
       final next = teamQueue.first;
       queue.remove(next);
       seat.setSkater(
@@ -248,6 +283,7 @@ class PenaltyBoxState extends ChangeNotifier {
     } else {
       seat.clear();
     }
+    onSeatCleared?.call(seat);
     notifyListeners();
   }
 
@@ -277,6 +313,7 @@ class PenaltyBoxState extends ChangeNotifier {
     final seat = jammerSeat(teamIdx);
     if (seat.isOccupied && jamRunning) {
       seat.isRunning = true;
+      onSeatStarted?.call(seat);
       notifyListeners();
     }
   }
