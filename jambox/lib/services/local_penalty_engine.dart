@@ -8,10 +8,12 @@ import 'penalty_engine.dart';
 /// Drives all timers locally; supports manual jam start/stop for offline use.
 class LocalPenaltyEngine extends PenaltyEngine with WidgetsBindingObserver {
   final PenaltyBoxState _state;
+  final DateTime Function() _clock;
   Timer? _ticker;
   DateTime? _lastTick;
 
-  LocalPenaltyEngine(this._state);
+  LocalPenaltyEngine(this._state, {@visibleForTesting DateTime Function()? clock})
+      : _clock = clock ?? DateTime.now;
 
   @override
   PenaltyBoxState get state => _state;
@@ -54,7 +56,7 @@ class LocalPenaltyEngine extends PenaltyEngine with WidgetsBindingObserver {
   }
 
   void _startTicker() {
-    _lastTick = DateTime.now();
+    _lastTick = _clock();
     _ticker = Timer.periodic(const Duration(milliseconds: 100), _onTick);
   }
 
@@ -64,8 +66,11 @@ class LocalPenaltyEngine extends PenaltyEngine with WidgetsBindingObserver {
     _lastTick = null;
   }
 
+  @visibleForTesting
+  void startTicker() => _startTicker();
+
   void _onTick(Timer _) {
-    final now = DateTime.now();
+    final now = _clock();
     final elapsed = _lastTick != null ? now.difference(_lastTick!) : Duration.zero;
     _lastTick = now;
     _state.tick(elapsed);
@@ -75,7 +80,7 @@ class LocalPenaltyEngine extends PenaltyEngine with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       // Reset tick baseline so we don't jump timers forward on resume
-      _lastTick = DateTime.now();
+      _lastTick = _clock();
     }
   }
 

@@ -98,6 +98,7 @@ class SkaterSeat {
     bool? isRunning,
     bool? isInQueue,
     bool? arrivedBetweenJams,
+    int? penaltyCount,
   }) {
     return SkaterSeat(
       id: id,
@@ -108,6 +109,7 @@ class SkaterSeat {
       isRunning: isRunning ?? this.isRunning,
       isInQueue: isInQueue ?? this.isInQueue,
       arrivedBetweenJams: arrivedBetweenJams ?? this.arrivedBetweenJams,
+      penaltyCount: penaltyCount ?? this.penaltyCount,
     );
   }
 }

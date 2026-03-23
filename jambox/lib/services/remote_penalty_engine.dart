@@ -39,6 +39,9 @@ class RemotePenaltyEngine extends PenaltyEngine with WidgetsBindingObserver {
   String? _lastUrl;
   final Random _random = Random();
   late final LocalPenaltyEngine _localEngine;
+  final WebSocketChannel Function(Uri)? _channelFactoryOverride;
+  final void Function()? _wakelockEnableOverride;
+  final void Function()? _wakelockDisableOverride;
 
   // Blocker3 queue tracking for BoxSeat mode
   final Map<int, SkaterSeat?> _blocker3QueueSeat = {1: null, 2: null};
@@ -52,7 +55,14 @@ class RemotePenaltyEngine extends PenaltyEngine with WidgetsBindingObserver {
   static final _reBoxSeat = RegExp(r'ScoreBoard\.CurrentGame\.Team\((\d)\)\.BoxSeat\((Jammer|Blocker[123])\)\.(Started|BoxSkater)$');
   static final _reLegacySkater = RegExp(r'Game\.Team\((\d)\)\.Skater$');
 
-  RemotePenaltyEngine(this._state) {
+  RemotePenaltyEngine(
+    this._state, {
+    @visibleForTesting WebSocketChannel Function(Uri)? channelFactory,
+    @visibleForTesting void Function()? wakelockEnable,
+    @visibleForTesting void Function()? wakelockDisable,
+  })  : _channelFactoryOverride = channelFactory,
+        _wakelockEnableOverride = wakelockEnable,
+        _wakelockDisableOverride = wakelockDisable {
     _localEngine = LocalPenaltyEngine(_state);
   }
 
@@ -87,7 +97,8 @@ class RemotePenaltyEngine extends PenaltyEngine with WidgetsBindingObserver {
         queryParameters: {'source': 'pbm', 'platform': 'mobile'},
       );
 
-      _channel = WebSocketChannel.connect(wsUrl);
+      final factory = _channelFactoryOverride ?? WebSocketChannel.connect;
+      _channel = factory(wsUrl);
       await _channel!.ready;
 
       if (_manualDisconnect) {
@@ -100,7 +111,7 @@ class RemotePenaltyEngine extends PenaltyEngine with WidgetsBindingObserver {
       _isConnecting = false;
       _reconnectAttempts = 0;
       _state.setConnectionStatus(ConnectionStatus.connected, message: 'Connected');
-      WakelockPlus.enable();
+      (_wakelockEnableOverride ?? WakelockPlus.enable)();
 
       _channel!.stream.listen(
         _handleMessage,
@@ -175,7 +186,7 @@ class RemotePenaltyEngine extends PenaltyEngine with WidgetsBindingObserver {
       _isConnecting = false;
       _reconnectAttempts = 0;
       _state.setConnectionStatus(ConnectionStatus.connected, message: 'Connected');
-      WakelockPlus.enable();
+      (_wakelockEnableOverride ?? WakelockPlus.enable)();
     }
 
     try {
@@ -523,7 +534,7 @@ class RemotePenaltyEngine extends PenaltyEngine with WidgetsBindingObserver {
       error != null ? ConnectionStatus.disconnected : ConnectionStatus.disconnected,
       message: error != null ? 'Error: $error' : 'Disconnected',
     );
-    WakelockPlus.disable();
+    (_wakelockDisableOverride ?? WakelockPlus.disable)();
   }
 
   void _scheduleReconnect() {

@@ -214,6 +214,7 @@ class PenaltyBoxState extends ChangeNotifier {
     arriving.timeRemaining = arrivingTime;
     sitting.timeRemaining = sittingTime;
     if (sittingTime <= Duration.zero) sitting.isRunning = false;
+    if (arrivingTime <= Duration.zero) arriving.isRunning = false;
   }
 
   void setJamInfo(int period, int jam) {
