@@ -64,9 +64,6 @@ class LocalPenaltyEngine extends PenaltyEngine with WidgetsBindingObserver {
     _lastTick = null;
   }
 
-  void pauseTicker() => _stopTicker();
-  void resumeTicker() { if (_ticker == null) _startTicker(); }
-
   void _onTick(Timer _) {
     final now = DateTime.now();
     final elapsed = _lastTick != null ? now.difference(_lastTick!) : Duration.zero;

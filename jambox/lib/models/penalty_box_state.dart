@@ -177,6 +177,45 @@ class PenaltyBoxState extends ChangeNotifier {
     }
   }
 
+  /// WFTDA §4.4 — jammer arrival sync.
+  /// Called when a jammer is seated while a jam is running and the other
+  /// jammer is already serving time. Synchronizes both clocks per the rules.
+  void _applyJammerArrivalSync(SkaterSeat arriving) {
+    const pd = Duration(seconds: 30);
+    final sitting = jammerSeat(arriving.teamIndex == 1 ? 2 : 1);
+    if (!sitting.isOccupied || !sitting.isRunning) return;
+
+    var sittingMax = pd * sitting.penaltyCount;
+    var arrivingMax = pd * arriving.penaltyCount;
+    var sittingTime = sitting.timeRemaining;
+    var arrivingTime = arrivingMax;
+
+    // Cancel penalty pairs one-for-one (§4.4.2)
+    while (sittingTime >= pd && arrivingTime >= pd) {
+      sittingTime -= pd;
+      arrivingTime -= pd;
+      sittingMax -= pd;
+      arrivingMax -= pd;
+    }
+
+    if (sittingMax == Duration.zero || arrivingMax == Duration.zero) {
+      // One side fully cancelled — values already correct after loop
+    } else if (sittingMax == arrivingMax) {
+      // Simple case (§4.4.1): release sitting, arriving serves elapsed
+      final elapsed = sittingMax - sitting.timeRemaining;
+      arrivingTime = elapsed.isNegative ? Duration.zero : elapsed > arrivingMax ? arrivingMax : elapsed;
+      sittingTime = Duration.zero;
+    } else {
+      // Nightmare scenario (§4.4.3): uneven penalty counts, keep existing times
+      arrivingTime = arrivingMax;
+      sittingTime = sitting.timeRemaining;
+    }
+
+    arriving.timeRemaining = arrivingTime;
+    sitting.timeRemaining = sittingTime;
+    if (sittingTime <= Duration.zero) sitting.isRunning = false;
+  }
+
   void setJamInfo(int period, int jam) {
     periodNumber = period;
     jamNumber = jam;
@@ -215,6 +254,7 @@ class PenaltyBoxState extends ChangeNotifier {
     );
     if (jamRunning) {
       seat.isRunning = true;
+      if (position == SkaterPosition.jammer) _applyJammerArrivalSync(seat);
     }
     onSeatStarted?.call(seat);
     onSkaterAssigned?.call(seat, number);
@@ -225,8 +265,12 @@ class PenaltyBoxState extends ChangeNotifier {
   void startSeatAnonymously(SkaterSeat seat) {
     seat.skaterNumber = '?';
     seat.timeRemaining = const Duration(seconds: 30);
+    seat.penaltyCount = 1;
     seat.arrivedBetweenJams = !jamRunning;
     seat.isRunning = jamRunning;
+    if (jamRunning && seat.position == SkaterPosition.jammer) {
+      _applyJammerArrivalSync(seat);
+    }
     onSeatStarted?.call(seat);
     notifyListeners();
   }
@@ -258,6 +302,7 @@ class PenaltyBoxState extends ChangeNotifier {
   }
 
   void removePenaltyFromSeat(SkaterSeat seat) {
+    seat.removePenalty();
     seat.timeRemaining -= const Duration(seconds: 30);
     if (seat.timeRemaining <= Duration.zero) {
       seat.timeRemaining = Duration.zero;

@@ -34,6 +34,7 @@ class RemotePenaltyEngine extends PenaltyEngine with WidgetsBindingObserver {
   bool _isConnecting = false;
   bool _manualDisconnect = false;
   bool _boxSeatMode = false;
+  bool _bootstrapping = true;
   int _reconnectAttempts = 0;
   String? _lastUrl;
   final Random _random = Random();
@@ -41,6 +42,15 @@ class RemotePenaltyEngine extends PenaltyEngine with WidgetsBindingObserver {
 
   // Blocker3 queue tracking for BoxSeat mode
   final Map<int, SkaterSeat?> _blocker3QueueSeat = {1: null, 2: null};
+
+  // Cached regex patterns for _parsePath (compiled once, not per message)
+  static final _reTeamName = RegExp(r'ScoreBoard\.CurrentGame\.Team\((\d)\)\.Name$');
+  static final _reTeamColor = RegExp(r'ScoreBoard\.CurrentGame\.Team\((\d)\)\.Color\(operator\.fg\)$');
+  static final _reSkaterNumber = RegExp(r'ScoreBoard\.CurrentGame\.Team\((\d)\)\.Skater\(([^)]+)\)\.Number$');
+  static final _reSkaterRole = RegExp(r'ScoreBoard\.CurrentGame\.Team\((\d)\)\.Skater\(([^)]+)\)\.Role$');
+  static final _reBoxClock = RegExp(r'ScoreBoard\.CurrentGame\.BoxClock\(Team(\d)(Jammer|Blocker[123])\)\.(Time|Running)$');
+  static final _reBoxSeat = RegExp(r'ScoreBoard\.CurrentGame\.Team\((\d)\)\.BoxSeat\((Jammer|Blocker[123])\)\.(Started|BoxSkater)$');
+  static final _reLegacySkater = RegExp(r'Game\.Team\((\d)\)\.Skater$');
 
   RemotePenaltyEngine(this._state) {
     _localEngine = LocalPenaltyEngine(_state);
@@ -209,11 +219,13 @@ class RemotePenaltyEngine extends PenaltyEngine with WidgetsBindingObserver {
     // Jam running: ScoreBoard.CurrentGame.InJam or Clock(Jam).Running
     if (key == 'ScoreBoard.CurrentGame.InJam') {
       _state.jamRunning = value == true || value == 'true';
+      _bootstrapping = false;
       return;
     }
     if (key == 'ScoreBoard.CurrentGame.Clock(Jam).Running') {
       // Only use as fallback if InJam not available
       _state.jamRunning = value == true || value == 'true';
+      _bootstrapping = false;
       return;
     }
     if (key == 'ScoreBoard.CurrentGame.Clock(Jam).Number') {
@@ -228,7 +240,7 @@ class RemotePenaltyEngine extends PenaltyEngine with WidgetsBindingObserver {
     }
 
     // Team names
-    final teamNameMatch = RegExp(r'ScoreBoard\.CurrentGame\.Team\((\d)\)\.Name$').firstMatch(key);
+    final teamNameMatch = _reTeamName.firstMatch(key);
     if (teamNameMatch != null) {
       final t = int.parse(teamNameMatch.group(1)!);
       _state.updateTeam(t, name: value?.toString() ?? '');
@@ -236,7 +248,7 @@ class RemotePenaltyEngine extends PenaltyEngine with WidgetsBindingObserver {
     }
 
     // Team colors (use operator.fg for text/accent)
-    final teamColorMatch = RegExp(r'ScoreBoard\.CurrentGame\.Team\((\d)\)\.Color\(operator\.fg\)$').firstMatch(key);
+    final teamColorMatch = _reTeamColor.firstMatch(key);
     if (teamColorMatch != null) {
       final t = int.parse(teamColorMatch.group(1)!);
       final color = _parseColor(value?.toString());
@@ -245,9 +257,7 @@ class RemotePenaltyEngine extends PenaltyEngine with WidgetsBindingObserver {
     }
 
     // Roster: ScoreBoard.CurrentGame.Team(t).Skater(uuid).Number
-    final skaterMatch = RegExp(
-      r'ScoreBoard\.CurrentGame\.Team\((\d)\)\.Skater\(([^)]+)\)\.Number$',
-    ).firstMatch(key);
+    final skaterMatch = _reSkaterNumber.firstMatch(key);
     if (skaterMatch != null) {
       final t = int.parse(skaterMatch.group(1)!);
       final skaterId = skaterMatch.group(2)!;
@@ -257,9 +267,7 @@ class RemotePenaltyEngine extends PenaltyEngine with WidgetsBindingObserver {
     }
 
     // Skater role — used in BoxSeat mode to display jammer number
-    final roleMatch = RegExp(
-      r'ScoreBoard\.CurrentGame\.Team\((\d)\)\.Skater\(([^)]+)\)\.Role$',
-    ).firstMatch(key);
+    final roleMatch = _reSkaterRole.firstMatch(key);
     if (roleMatch != null) {
       final t = int.parse(roleMatch.group(1)!);
       final uuid = roleMatch.group(2)!;
@@ -268,9 +276,7 @@ class RemotePenaltyEngine extends PenaltyEngine with WidgetsBindingObserver {
     }
 
     // BoxClock: ScoreBoard.CurrentGame.BoxClock(Team1Jammer).Time or .Running
-    final boxClockMatch = RegExp(
-      r'ScoreBoard\.CurrentGame\.BoxClock\(Team(\d)(Jammer|Blocker[123])\)\.(Time|Running)$',
-    ).firstMatch(key);
+    final boxClockMatch = _reBoxClock.firstMatch(key);
     if (boxClockMatch != null) {
       final t = int.parse(boxClockMatch.group(1)!);
       final seatId = boxClockMatch.group(2)!;
@@ -280,9 +286,7 @@ class RemotePenaltyEngine extends PenaltyEngine with WidgetsBindingObserver {
     }
 
     // BoxSeat: ScoreBoard.CurrentGame.Team(N).BoxSeat(SeatId).Started or .BoxSkater
-    final boxSeatMatch = RegExp(
-      r'ScoreBoard\.CurrentGame\.Team\((\d)\)\.BoxSeat\((Jammer|Blocker[123])\)\.(Started|BoxSkater)$',
-    ).firstMatch(key);
+    final boxSeatMatch = _reBoxSeat.firstMatch(key);
     if (boxSeatMatch != null) {
       final t = int.parse(boxSeatMatch.group(1)!);
       final seatId = boxSeatMatch.group(2)!;
@@ -292,7 +296,7 @@ class RemotePenaltyEngine extends PenaltyEngine with WidgetsBindingObserver {
     }
 
     // Legacy roster: Game.Team(t).Skater — value is a map
-    final legacySkaterMatch = RegExp(r'Game\.Team\((\d)\)\.Skater$').firstMatch(key);
+    final legacySkaterMatch = _reLegacySkater.firstMatch(key);
     if (legacySkaterMatch != null && value is Map) {
       final t = int.parse(legacySkaterMatch.group(1)!);
       value.forEach((skaterId, skaterData) {
@@ -306,7 +310,7 @@ class RemotePenaltyEngine extends PenaltyEngine with WidgetsBindingObserver {
   }
 
   int? _parseInt(dynamic value) {
-    if (value is int) return value;
+    if (value is num) return value.toInt();
     if (value is String) return int.tryParse(value);
     return null;
   }
@@ -342,70 +346,90 @@ class RemotePenaltyEngine extends PenaltyEngine with WidgetsBindingObserver {
 
   /// Map BoxClock ID components to a SkaterSeat (null for Blocker3 → use queue).
   SkaterSeat? _boxClockToSeat(int teamIdx, String seatId) {
-    return switch ('$teamIdx:$seatId') {
-      '1:Jammer' => _state.team1Jammer,
-      '1:Blocker1' => _state.team1Blocker1,
-      '1:Blocker2' => _state.team1Blocker2,
-      '2:Jammer' => _state.team2Jammer,
-      '2:Blocker1' => _state.team2Blocker1,
-      '2:Blocker2' => _state.team2Blocker2,
-      _ => null, // Blocker3 — handled via queue
-    };
+    if (seatId == 'Jammer') return _state.jammerSeat(teamIdx);
+    if (seatId == 'Blocker3') return null;
+    final idx = int.parse(seatId[seatId.length - 1]) - 1; // 'Blocker1'→0, 'Blocker2'→1
+    return _state.blockerSeats(teamIdx)[idx];
   }
 
-  /// Activate BoxSeat sync mode: pause local ticker and wire up action callbacks.
+  /// Whether this device owns the given seat (and should send WS commands for it).
+  /// PBM/solo roles own all seats; boxTimer role owns only their team's seats.
+  bool _ownsSet(SkaterSeat seat) =>
+      _state.role == AppRole.pbm ||
+      _state.role == AppRole.solo ||
+      seat.teamIndex == _state.teamIndex;
+
+  /// Activate BoxSeat sync mode: wire up action callbacks for owned seats.
   void _enterBoxSeatMode() {
     if (_boxSeatMode) return;
     _boxSeatMode = true;
-    _localEngine.pauseTicker();
 
     _state.onSeatStarted = (seat) {
+      if (!_ownsSet(seat)) return;
       final (teamIdx, seatId) = _seatToBoxSeatId(seat);
       if (teamIdx != null) {
         _wsSet('ScoreBoard.CurrentGame.Team($teamIdx).BoxSeat($seatId).StartBox', true);
       }
     };
     _state.onSeatCleared = (seat) {
+      if (!_ownsSet(seat)) return;
       final (teamIdx, seatId) = _seatToBoxSeatId(seat);
       if (teamIdx != null) {
         _wsSet('ScoreBoard.CurrentGame.Team($teamIdx).BoxSeat($seatId).ResetBox', true);
       }
     };
     _state.onSeatTimeChanged = (seat, seconds) {
+      if (!_ownsSet(seat)) return;
       final (teamIdx, seatId) = _seatToBoxSeatId(seat);
       if (teamIdx != null) {
         _wsSet('ScoreBoard.CurrentGame.Team($teamIdx).BoxSeat($seatId).BoxTimeChange', seconds);
       }
     };
     _state.onSkaterAssigned = (seat, number) {
+      if (!_ownsSet(seat)) return;
       final (teamIdx, seatId) = _seatToBoxSeatId(seat);
       if (teamIdx != null && seatId != 'Jammer') {
         _wsSet('ScoreBoard.CurrentGame.Team($teamIdx).BoxSeat($seatId).BoxSkater', number);
       }
     };
 
-    _log.i('BoxSeat mode activated — local ticker paused, WS commands enabled');
+    _log.i('BoxSeat mode activated — WS commands enabled for owned seats');
   }
 
   void _onBoxClockUpdate(int teamIdx, String seatId, String prop, dynamic value) {
     _enterBoxSeatMode();
     final seat = _boxClockToSeat(teamIdx, seatId);
+    bool changed = false;
+
     if (seat != null) {
       if (prop == 'Time') {
-        final ms = (value is num) ? value.toInt() : int.tryParse(value.toString()) ?? 0;
-        seat.timeRemaining = Duration(milliseconds: ms.clamp(0, 5 * 60 * 1000));
+        final ms = (_parseInt(value) ?? 0).clamp(0, 5 * 60 * 1000);
+        final serverTime = Duration(milliseconds: ms);
+        final delta = (seat.timeRemaining - serverTime).abs();
+        // Owned seats: only apply on bootstrap or intentional server correction (>1s delta).
+        // Non-owned seats: always follow server (server is authoritative for peer devices).
+        if (!_ownsSet(seat) || _bootstrapping || delta > const Duration(seconds: 1)) {
+          if (seat.timeRemaining != serverTime) { seat.timeRemaining = serverTime; changed = true; }
+        }
       } else if (prop == 'Running') {
-        seat.isRunning = value == true || value == 'true';
+        final running = value == true || value == 'true';
+        // Non-owned seats: always follow server.
+        // Owned seats: only apply Running=true as a catch-up (seat occupied but not yet running
+        // locally — e.g. another device started this seat). Never apply Running=false from server;
+        // local onJamEnd() handles stopping owned seats.
+        final applyIt = !_ownsSet(seat) || (running && seat.isOccupied && !seat.isRunning);
+        if (applyIt && seat.isRunning != running) { seat.isRunning = running; changed = true; }
       }
     } else if (seatId == 'Blocker3' && prop == 'Time') {
-      // Sync queue entry time for Blocker3
-      final ms = (value is num) ? value.toInt() : int.tryParse(value.toString()) ?? 0;
+      final ms = (_parseInt(value) ?? 0).clamp(0, 5 * 60 * 1000);
       final queueSeat = _blocker3QueueSeat[teamIdx];
       if (queueSeat != null) {
-        queueSeat.timeRemaining = Duration(milliseconds: ms.clamp(0, 5 * 60 * 1000));
+        final newTime = Duration(milliseconds: ms);
+        if (queueSeat.timeRemaining != newTime) { queueSeat.timeRemaining = newTime; changed = true; }
       }
     }
-    _state.notifyFromEngine();
+
+    if (changed) _state.notifyFromEngine();
   }
 
   void _onBoxSeatUpdate(int teamIdx, String seatId, String prop, dynamic value) {
@@ -424,17 +448,22 @@ class RemotePenaltyEngine extends PenaltyEngine with WidgetsBindingObserver {
       } else if (seat.isEmpty) {
         seat.skaterNumber = '?'; // placeholder until BoxSkater or Role arrives
         seat.timeRemaining = const Duration(seconds: 30);
+      } else {
+        return; // already occupied, no change
       }
     } else if (prop == 'BoxSkater') {
       final number = value?.toString() ?? '';
       if (seat == null) return;
       if (number.isEmpty) {
-        if (seat.skaterNumber == '?') return; // keep placeholder
+        if (seat.skaterNumber == '?') return;
         seat.skaterNumber = '?';
       } else {
+        if (seat.skaterNumber == number) return;
         seat.skaterNumber = number;
         _state.addKnownNumber(teamIdx, number);
       }
+    } else {
+      return;
     }
     _state.notifyFromEngine();
   }
@@ -557,10 +586,10 @@ class RemotePenaltyEngine extends PenaltyEngine with WidgetsBindingObserver {
     _disconnectCleanup();
     // Reset BoxSeat mode so it's re-detected on fresh connection
     _boxSeatMode = false;
+    _bootstrapping = true;
     _blocker3QueueSeat[1] = null;
     _blocker3QueueSeat[2] = null;
     _state.clearBoxSeatCallbacks();
-    _localEngine.resumeTicker();
     await connect(_lastUrl!);
   }
 

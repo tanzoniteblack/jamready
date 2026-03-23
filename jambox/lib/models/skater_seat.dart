@@ -18,6 +18,9 @@ class SkaterSeat {
   // Whether this skater arrived between jams (affects jammer sync logic)
   bool arrivedBetweenJams;
 
+  // Total penalties being served in this box trip; used for §4.4 jammer sync math
+  int penaltyCount;
+
   SkaterSeat({
     required this.id,
     this.skaterNumber = '',
@@ -27,6 +30,7 @@ class SkaterSeat {
     this.isRunning = false,
     this.isInQueue = false,
     this.arrivedBetweenJams = false,
+    this.penaltyCount = 0,
   });
 
   SeatState get state {
@@ -57,6 +61,11 @@ class SkaterSeat {
 
   void addPenalty() {
     timeRemaining += const Duration(seconds: 30);
+    penaltyCount++;
+  }
+
+  void removePenalty() {
+    if (penaltyCount > 1) penaltyCount--;
   }
 
   void clear() {
@@ -65,6 +74,7 @@ class SkaterSeat {
     isRunning = false;
     isInQueue = false;
     arrivedBetweenJams = false;
+    penaltyCount = 0;
   }
 
   void setSkater({
@@ -77,6 +87,7 @@ class SkaterSeat {
     timeRemaining = const Duration(seconds: 30);
     isRunning = false;
     arrivedBetweenJams = arrivedBetween;
+    penaltyCount = 1;
   }
 
   SkaterSeat copyWith({
