@@ -351,6 +351,16 @@ class RemotePenaltyEngine extends PenaltyEngine with WidgetsBindingObserver {
   }
 
   @override
+  Future<void> reconnect() async {
+    if (_lastUrl == null) return;
+    _reconnectTimer?.cancel();
+    _reconnectTimer = null;
+    _closeChannel();
+    _disconnectCleanup();
+    await connect(_lastUrl!);
+  }
+
+  @override
   void reportPenalty({
     required int teamIndex,
     required String skaterNumber,

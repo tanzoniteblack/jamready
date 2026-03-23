@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/widgets.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/penalty_box_state.dart';
 import 'penalty_engine.dart';
 
@@ -21,10 +22,29 @@ class LocalPenaltyEngine extends PenaltyEngine with WidgetsBindingObserver {
   @override
   Future<void> initialize() async {
     WidgetsBinding.instance.addObserver(this);
+    await _loadKnownNumbers();
+    _state.setKnownNumbersSaveCallback(_saveKnownNumbers);
     _startTicker();
     // Start in jam-running mode so timers are live immediately
     _state.jamNumber = 1;
     _state.onJamStart();
+  }
+
+  Future<void> _loadKnownNumbers() async {
+    final prefs = await SharedPreferences.getInstance();
+    for (final n in prefs.getStringList('jambox_known_t1') ?? []) {
+      _state.addKnownNumber(1, n);
+    }
+    for (final n in prefs.getStringList('jambox_known_t2') ?? []) {
+      _state.addKnownNumber(2, n);
+    }
+  }
+
+  void _saveKnownNumbers() {
+    SharedPreferences.getInstance().then((prefs) {
+      prefs.setStringList('jambox_known_t1', _state.knownNumbers(1));
+      prefs.setStringList('jambox_known_t2', _state.knownNumbers(2));
+    });
   }
 
   @override
@@ -68,6 +88,9 @@ class LocalPenaltyEngine extends PenaltyEngine with WidgetsBindingObserver {
       _state.onJamStart();
     }
   }
+
+  @override
+  Future<void> reconnect() async {} // no-op in local mode
 
   @override
   void reportPenalty({

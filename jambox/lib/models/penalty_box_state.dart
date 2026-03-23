@@ -98,6 +98,10 @@ class PenaltyBoxState extends ChangeNotifier {
     return teamIdx == 1 ? _rosterTeam1[skaterNumber] : _rosterTeam2[skaterNumber];
   }
 
+  VoidCallback? _onKnownNumbersChanged;
+
+  void setKnownNumbersSaveCallback(VoidCallback? cb) => _onKnownNumbersChanged = cb;
+
   List<String> knownNumbers(int teamIdx) {
     final s = teamIdx == 1 ? _knownNumbersTeam1 : _knownNumbersTeam2;
     return s.toList()..sort();
@@ -105,7 +109,8 @@ class PenaltyBoxState extends ChangeNotifier {
 
   void addKnownNumber(int teamIdx, String number) {
     if (number.isEmpty || number == '?') return;
-    (teamIdx == 1 ? _knownNumbersTeam1 : _knownNumbersTeam2).add(number);
+    final set = teamIdx == 1 ? _knownNumbersTeam1 : _knownNumbersTeam2;
+    if (set.add(number)) _onKnownNumbersChanged?.call();
   }
 
   void onJamStart() {

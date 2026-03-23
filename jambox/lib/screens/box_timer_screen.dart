@@ -32,47 +32,42 @@ class BoxTimerScreen extends StatelessWidget {
         backgroundColor: Colors.transparent,
         resizeToAvoidBottomInset: false,
         appBar: _buildAppBar(context, state, teamInfo, engine),
-        body: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              children: [
-                // Jam status bar
-                _JamStatusBar(state: state, engine: engine),
-                const SizedBox(height: 16),
-
-                // Jammer seat — prominent, full width
-                Expanded(
-                  flex: 5,
-                  child: SeatCard(seat: jammer),
-                ),
-                const SizedBox(height: 12),
-
-                // Bug 3: Blocker seats stacked vertically (full width each)
-                Expanded(
-                  flex: 3,
-                  child: SeatCard(seat: blockers[0], compact: true),
-                ),
-                const SizedBox(height: 10),
-                Expanded(
-                  flex: 3,
-                  child: SeatCard(seat: blockers[1], compact: true),
-                ),
-                const SizedBox(height: 12),
-
-                // Queue panel
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.04),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.white12),
+        body: RefreshIndicator(
+          onRefresh: engine.reconnect,
+          child: CustomScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            slivers: [
+              SliverFillRemaining(
+                hasScrollBody: false,
+                child: SafeArea(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      children: [
+                        _JamStatusBar(state: state, engine: engine),
+                        const SizedBox(height: 16),
+                        Expanded(flex: 5, child: SeatCard(seat: jammer)),
+                        const SizedBox(height: 12),
+                        Expanded(flex: 3, child: SeatCard(seat: blockers[0], compact: true)),
+                        const SizedBox(height: 10),
+                        Expanded(flex: 3, child: SeatCard(seat: blockers[1], compact: true)),
+                        const SizedBox(height: 12),
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.04),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: Colors.white12),
+                          ),
+                          child: QueuePanel(teamIndex: teamIdx, compact: true),
+                        ),
+                        const SizedBox(height: 8),
+                      ],
+                    ),
                   ),
-                  child: QueuePanel(teamIndex: teamIdx, compact: true),
                 ),
-                const SizedBox(height: 8),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
@@ -166,15 +161,22 @@ class PbmScreen extends StatelessWidget {
         backgroundColor: Colors.transparent,
         resizeToAvoidBottomInset: false,
         appBar: _buildAppBar(context, state, engine),
-        body: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              children: [
-                _JamStatusBar(state: state, engine: engine),
-                const SizedBox(height: 16),
-                Expanded(
-                  child: OrientationBuilder(
+        body: RefreshIndicator(
+          onRefresh: engine.reconnect,
+          child: CustomScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            slivers: [
+              SliverFillRemaining(
+                hasScrollBody: false,
+                child: SafeArea(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      children: [
+                        _JamStatusBar(state: state, engine: engine),
+                        const SizedBox(height: 16),
+                        Expanded(
+                          child: OrientationBuilder(
                     builder: (ctx, orientation) {
                       final isPortrait = orientation == Orientation.portrait;
                       return isPortrait
@@ -197,6 +199,10 @@ class PbmScreen extends StatelessWidget {
                 ),
               ],
             ),
+          ),
+        ),
+              ),
+            ],
           ),
         ),
       ),
@@ -306,25 +312,36 @@ class SoloScreen extends StatelessWidget {
         backgroundColor: Colors.transparent,
         resizeToAvoidBottomInset: false,
         appBar: _buildAppBar(context, state, engine),
-        body: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(12),
-            child: Column(
-              children: [
-                _JamStatusBar(state: state, engine: engine),
-                const SizedBox(height: 12),
-                Expanded(
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(child: _SoloTeamColumn(teamIndex: 1, state: state)),
-                      const SizedBox(width: 12),
-                      Expanded(child: _SoloTeamColumn(teamIndex: 2, state: state)),
-                    ],
+        body: RefreshIndicator(
+          onRefresh: engine.reconnect,
+          child: CustomScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            slivers: [
+              SliverFillRemaining(
+                hasScrollBody: false,
+                child: SafeArea(
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Column(
+                      children: [
+                        _JamStatusBar(state: state, engine: engine),
+                        const SizedBox(height: 12),
+                        Expanded(
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Expanded(child: _SoloTeamColumn(teamIndex: 1, state: state)),
+                              const SizedBox(width: 12),
+                              Expanded(child: _SoloTeamColumn(teamIndex: 2, state: state)),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),

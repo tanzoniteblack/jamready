@@ -12,6 +12,9 @@ abstract class PenaltyEngine {
   /// Called when the user manually toggles the jam (offline mode only).
   void toggleJam();
 
+  /// Reconnect to the remote scoreboard; no-op in local mode.
+  Future<void> reconnect();
+
   /// Report a penalty to CRG (no-op in local mode).
   void reportPenalty({
     required int teamIndex,
