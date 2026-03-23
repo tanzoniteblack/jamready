@@ -114,7 +114,7 @@ class BoxTimerScreen extends StatelessWidget {
           const SizedBox(width: 10),
           Text(
             teamInfo.name.toUpperCase(),
-            style: AppTextStyles.appBarTitle,
+            style: AppTextStyles.appBarTitle.copyWith(color: teamInfo.color),
           ),
           const Spacer(),
           // Bug 6: hide P/J counter in local mode
@@ -174,16 +174,25 @@ class PbmScreen extends StatelessWidget {
                 _JamStatusBar(state: state, engine: engine),
                 const SizedBox(height: 16),
                 Expanded(
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: _TeamColumn(teamIndex: 1, state: state),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: _TeamColumn(teamIndex: 2, state: state),
-                      ),
-                    ],
+                  child: OrientationBuilder(
+                    builder: (ctx, orientation) {
+                      final isPortrait = orientation == Orientation.portrait;
+                      return isPortrait
+                          ? Column(
+                              children: [
+                                Expanded(child: _PbmTeamColumn(teamIndex: 1, state: state)),
+                                const SizedBox(height: 12),
+                                Expanded(child: _PbmTeamColumn(teamIndex: 2, state: state)),
+                              ],
+                            )
+                          : Row(
+                              children: [
+                                Expanded(child: _PbmTeamColumn(teamIndex: 1, state: state)),
+                                const SizedBox(width: 16),
+                                Expanded(child: _PbmTeamColumn(teamIndex: 2, state: state)),
+                              ],
+                            );
+                    },
                   ),
                 ),
               ],
@@ -235,11 +244,11 @@ class PbmScreen extends StatelessWidget {
   }
 }
 
-class _TeamColumn extends StatelessWidget {
+class _PbmTeamColumn extends StatelessWidget {
   final int teamIndex;
   final PenaltyBoxState state;
 
-  const _TeamColumn({required this.teamIndex, required this.state});
+  const _PbmTeamColumn({required this.teamIndex, required this.state});
 
   @override
   Widget build(BuildContext context) {
@@ -273,23 +282,8 @@ class _TeamColumn extends StatelessWidget {
         ),
         const SizedBox(height: 10),
 
-        // Jammer seat
-        Expanded(
-          flex: 5,
-          child: SeatCard(seat: jammer),
-        ),
-        const SizedBox(height: 8),
-
-        // Queue
-        Container(
-          padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.04),
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
-          ),
-          child: QueuePanel(teamIndex: teamIndex, compact: true),
-        ),
+        // Jammer seat only — PBM does not manage blockers or queue
+        Expanded(child: SeatCard(seat: jammer)),
       ],
     );
   }
@@ -632,12 +626,11 @@ BoxDecoration _colorSwatchDecoration(Color color, {bool selected = false}) {
   );
 }
 
-/// Shared back navigation: disposes engine, pushes HomeScreen.
+/// Shared back navigation: retains the live engine and returns to role selector.
 Future<void> _navigateBack(BuildContext context, PenaltyEngine engine) async {
-  await engine.dispose();
   if (context.mounted) {
     Navigator.of(context).pushReplacement(
-      MaterialPageRoute(builder: (_) => const HomeScreen()),
+      MaterialPageRoute(builder: (_) => HomeScreen(existingEngine: engine)),
     );
   }
 }

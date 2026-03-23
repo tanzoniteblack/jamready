@@ -49,7 +49,7 @@ class SkaterSeat {
       case SeatState.standing:
         return Colors.amber.shade600;
       case SeatState.running:
-        return teamColor.withValues(alpha: 0.7);
+        return Colors.green.shade500;
       case SeatState.paused:
         return Colors.white24;
     }

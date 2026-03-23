@@ -31,6 +31,10 @@ class PenaltyBoxState extends ChangeNotifier {
   final Map<String, String> _rosterTeam1 = {};
   final Map<String, String> _rosterTeam2 = {};
 
+  // Known skater numbers (from roster + local history)
+  final Set<String> _knownNumbersTeam1 = {};
+  final Set<String> _knownNumbersTeam2 = {};
+
   // Active seats: indexed by seat id
   // Seat layout: team1Jammer, team1Blocker1, team1Blocker2, team2Jammer, team2Blocker1, team2Blocker2
   final List<SkaterSeat> seats = [
@@ -86,11 +90,22 @@ class PenaltyBoxState extends ChangeNotifier {
     } else {
       _rosterTeam2[skaterNumber] = skaterId;
     }
+    addKnownNumber(teamIdx, skaterNumber);
     // no listener notification needed — roster changes don't affect UI directly
   }
 
   String? lookupSkaterId(int teamIdx, String skaterNumber) {
     return teamIdx == 1 ? _rosterTeam1[skaterNumber] : _rosterTeam2[skaterNumber];
+  }
+
+  List<String> knownNumbers(int teamIdx) {
+    final s = teamIdx == 1 ? _knownNumbersTeam1 : _knownNumbersTeam2;
+    return s.toList()..sort();
+  }
+
+  void addKnownNumber(int teamIdx, String number) {
+    if (number.isEmpty || number == '?') return;
+    (teamIdx == 1 ? _knownNumbersTeam1 : _knownNumbersTeam2).add(number);
   }
 
   void onJamStart() {
@@ -164,7 +179,7 @@ class PenaltyBoxState extends ChangeNotifier {
       pos: position,
       arrivedBetween: !jamRunning,
     );
-    if (jamRunning && position != SkaterPosition.jammer) {
+    if (jamRunning) {
       seat.isRunning = true;
     }
     notifyListeners();
@@ -176,7 +191,7 @@ class PenaltyBoxState extends ChangeNotifier {
     seat.skaterNumber = '?';
     seat.timeRemaining = const Duration(seconds: 30);
     seat.arrivedBetweenJams = !jamRunning;
-    seat.isRunning = jamRunning && seat.position != SkaterPosition.jammer;
+    seat.isRunning = jamRunning;
     notifyListeners();
   }
 
@@ -184,6 +199,7 @@ class PenaltyBoxState extends ChangeNotifier {
   void setSkaterNumber(SkaterSeat seat, String number, {SkaterPosition? position}) {
     seat.skaterNumber = number;
     if (position != null) seat.position = position;
+    addKnownNumber(seat.teamIndex, number);
     notifyListeners();
   }
 
@@ -192,6 +208,14 @@ class PenaltyBoxState extends ChangeNotifier {
     if (jamRunning && !seat.isRunning) {
       seat.isRunning = true;
     }
+    notifyListeners();
+  }
+
+  void adjustTime(SkaterSeat seat, Duration delta) {
+    final newTime = seat.timeRemaining + delta;
+    seat.timeRemaining = newTime.isNegative ? Duration.zero : newTime > const Duration(minutes: 5) ? const Duration(minutes: 5) : newTime;
+    if (seat.timeRemaining > Duration.zero && !seat.isRunning && jamRunning) seat.isRunning = true;
+    if (seat.timeRemaining <= Duration.zero) seat.isRunning = false;
     notifyListeners();
   }
 

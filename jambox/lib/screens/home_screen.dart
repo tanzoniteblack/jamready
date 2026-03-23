@@ -7,13 +7,17 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/penalty_box_state.dart';
 import '../models/skater_seat.dart';
 import '../services/local_penalty_engine.dart';
+import '../services/penalty_engine.dart';
 import '../services/remote_penalty_engine.dart';
 import '../styles/background.dart';
 import '../styles/text_styles.dart';
 import 'box_timer_screen.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  /// When returning from a game screen, pass the live engine to skip Phase 1.
+  final PenaltyEngine? existingEngine;
+
+  const HomeScreen({super.key, this.existingEngine});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -29,7 +33,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   // Phase 2 state
   bool _showRoleSelector = false;
-  RemotePenaltyEngine? _previewEngine;
+  PenaltyEngine? _previewEngine;
   PenaltyBoxState? _previewState;
   String _team1Name = 'Team 1';
   String _team2Name = 'Team 2';
@@ -40,6 +44,14 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     _loadSettings();
+    if (widget.existingEngine != null) {
+      final engine = widget.existingEngine!;
+      _previewEngine = engine;
+      _previewState = engine.state;
+      _team1Name = engine.state.team1.name;
+      _team2Name = engine.state.team2.name;
+      _showRoleSelector = true;
+    }
   }
 
   Future<void> _loadSettings() async {
@@ -161,7 +173,7 @@ class _HomeScreenState extends State<HomeScreen> {
     dynamic engine;
 
     if (_previewEngine != null) {
-      // Reuse the already-connected remote engine; update role on the existing state.
+      // Reuse the live engine (remote or local); update role on the existing state.
       state = _previewState!;
       state.role = _selectedRole;
       state.teamIndex = teamIdx;
@@ -170,7 +182,7 @@ class _HomeScreenState extends State<HomeScreen> {
       _previewEngine = null;
       _previewState = null;
     } else {
-      // Offline path.
+      // Fresh offline path.
       state = _previewState ?? PenaltyBoxState();
       state.role = _selectedRole;
       state.teamIndex = teamIdx;
@@ -249,6 +261,12 @@ class _HomeScreenState extends State<HomeScreen> {
           backgroundColor: Colors.transparent,
           elevation: 0,
           scrolledUnderElevation: 0,
+          leading: _showRoleSelector
+              ? IconButton(
+                  icon: const Icon(Icons.arrow_back, color: Colors.white70),
+                  onPressed: _resetConnection,
+                )
+              : null,
           flexibleSpace: Align(
             alignment: Alignment.bottomCenter,
             child: Container(height: 1, color: Colors.white.withValues(alpha: 0.1)),
@@ -399,31 +417,13 @@ class _HomeScreenState extends State<HomeScreen> {
                             const SizedBox(height: 8),
                             Container(height: 1, color: Colors.white.withValues(alpha: 0.1)),
                             const SizedBox(height: 24),
-                            Row(
-                              children: [
-                                Text(
-                                  'YOUR ROLE',
-                                  style: AppTextStyles.clockLabel.copyWith(
-                                    color: Colors.white70,
-                                    fontSize: 13,
-                                    letterSpacing: 1.5,
-                                  ),
-                                ),
-                                const Spacer(),
-                                TextButton.icon(
-                                  onPressed: _resetConnection,
-                                  icon: const Icon(Icons.edit_outlined, size: 14, color: Colors.white38),
-                                  label: Text(
-                                    'Change connection',
-                                    style: AppTextStyles.infoText.copyWith(color: Colors.white38, fontSize: 12),
-                                  ),
-                                  style: TextButton.styleFrom(
-                                    padding: EdgeInsets.zero,
-                                    minimumSize: Size.zero,
-                                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                  ),
-                                ),
-                              ],
+                            Text(
+                              'YOUR ROLE',
+                              style: AppTextStyles.clockLabel.copyWith(
+                                color: Colors.white70,
+                                fontSize: 13,
+                                letterSpacing: 1.5,
+                              ),
                             ),
                             const SizedBox(height: 12),
                             _RoleSelector(
@@ -535,8 +535,8 @@ class _RoleSelector extends StatelessWidget {
             Expanded(child: _RoleOption(
               role: AppRole.boxTimerTeam1,
               selected: selected,
-              label: 'Timer T1',
-              subtitle: team1Name,
+              label: team1Name,
+              subtitle: 'Box Timer',
               icon: Icons.timer,
               color: Colors.blue.shade400,
               onTap: onChanged,
@@ -545,8 +545,8 @@ class _RoleSelector extends StatelessWidget {
             Expanded(child: _RoleOption(
               role: AppRole.boxTimerTeam2,
               selected: selected,
-              label: 'Timer T2',
-              subtitle: team2Name,
+              label: team2Name,
+              subtitle: 'Box Timer',
               icon: Icons.timer,
               color: Colors.red.shade400,
               onTap: onChanged,

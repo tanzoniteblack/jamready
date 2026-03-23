@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:vibration/vibration.dart';
@@ -11,10 +13,10 @@ import 'skater_entry_dialog.dart';
 /// States:
 ///   empty        → tap to start anonymous timer + open number dialog
 ///   running ('?')→ tap to enter skater number
-///   running      → +30s button inline; no tap action
-///   standing (≤10s) → "STAND" cue, amber, pulses
-///   done (0:00)  → "DONE" cue, red; tap to clear
-///   paused       → time frozen between jams; jammer tap starts timer
+///   running      → ±30s buttons inline
+///   standing (≤10s) → amber pulsing
+///   done (0:00)  → red pulsing, repeating haptic; tap to clear
+///   paused       → time frozen; jammer tap starts timer
 class SeatCard extends StatefulWidget {
   final SkaterSeat seat;
   final bool compact;
@@ -29,21 +31,23 @@ class _SeatCardState extends State<SeatCard> with SingleTickerProviderStateMixin
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
   SeatState? _lastState;
+  Timer? _doneHapticTimer;
 
   @override
   void initState() {
     super.initState();
     _pulseController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 800),
+      duration: const Duration(milliseconds: 700),
     )..repeat(reverse: true);
-    _pulseAnimation = Tween<double>(begin: 0.85, end: 1.0).animate(
+    _pulseAnimation = Tween<double>(begin: 0.88, end: 1.0).animate(
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
   }
 
   @override
   void dispose() {
+    _doneHapticTimer?.cancel();
     _pulseController.dispose();
     super.dispose();
   }
@@ -58,10 +62,7 @@ class _SeatCardState extends State<SeatCard> with SingleTickerProviderStateMixin
         state.clearSeat(seat);
       case SeatState.running:
       case SeatState.standing:
-        // '?' → ask for number; named → no tap action (+30s button handles penalty)
-        if (seat.skaterNumber == '?') {
-          await _getSkaterNumber(state);
-        }
+        if (seat.skaterNumber == '?') await _getSkaterNumber(state);
       case SeatState.paused:
         if (seat.position == SkaterPosition.jammer && state.jamRunning) {
           state.startJammerTimer(seat.teamIndex);
@@ -75,13 +76,9 @@ class _SeatCardState extends State<SeatCard> with SingleTickerProviderStateMixin
     final seat = widget.seat;
     if (seat.isEmpty) return;
     _hapticMedium();
-    final confirmed = await _showClearConfirm();
-    if (confirmed == true && mounted) {
-      state.clearSeat(seat);
-    }
+    await _showAdjustSheet(state);
   }
 
-  /// Immediately starts an anonymous timer, then shows a non-blocking number dialog.
   Future<void> _startAnonymousAndGetNumber(PenaltyBoxState state) async {
     final seat = widget.seat;
     final isJammer = seat.position == SkaterPosition.jammer;
@@ -94,18 +91,16 @@ class _SeatCardState extends State<SeatCard> with SingleTickerProviderStateMixin
       }
     }
 
-    // Start timer immediately with placeholder '?'
     state.startSeatAnonymously(seat);
-
     if (!mounted) return;
 
-    // Non-blocking: user can dismiss without entering a number
     final result = await showSkaterEntryDialog(
       context,
       initialPosition: isJammer ? SkaterPosition.jammer : SkaterPosition.blocker,
       allowJammer: isJammer,
       teamName: state.teamInfo(seat.teamIndex).name,
       barrierDismissible: true,
+      knownNumbers: state.knownNumbers(seat.teamIndex),
     );
 
     if (result != null && mounted) {
@@ -113,7 +108,6 @@ class _SeatCardState extends State<SeatCard> with SingleTickerProviderStateMixin
     }
   }
 
-  /// Shows number-entry dialog for an already-running anonymous seat.
   Future<void> _getSkaterNumber(PenaltyBoxState state) async {
     final seat = widget.seat;
     final isJammer = seat.position == SkaterPosition.jammer;
@@ -124,6 +118,7 @@ class _SeatCardState extends State<SeatCard> with SingleTickerProviderStateMixin
       allowJammer: isJammer,
       teamName: state.teamInfo(seat.teamIndex).name,
       barrierDismissible: true,
+      knownNumbers: state.knownNumbers(seat.teamIndex),
     );
 
     if (result != null && mounted) {
@@ -137,6 +132,7 @@ class _SeatCardState extends State<SeatCard> with SingleTickerProviderStateMixin
       initialPosition: SkaterPosition.blocker,
       allowJammer: false,
       teamName: state.teamInfo(widget.seat.teamIndex).name,
+      knownNumbers: state.knownNumbers(widget.seat.teamIndex),
     );
     if (result != null && mounted) {
       state.addToQueue(
@@ -147,52 +143,19 @@ class _SeatCardState extends State<SeatCard> with SingleTickerProviderStateMixin
     }
   }
 
-  void _addPenalty(BuildContext context, PenaltyBoxState state) {
-    _hapticLight();
-    state.addPenaltyToSeat(widget.seat);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Text('+30s penalty added'),
-        duration: const Duration(seconds: 4),
-        action: SnackBarAction(
-          label: 'UNDO',
-          onPressed: () => state.removePenaltyFromSeat(widget.seat),
-        ),
-      ),
-    );
-  }
-
-  Future<bool?> _showClearConfirm() {
-    return showDialog<bool>(
+  Future<void> _showAdjustSheet(PenaltyBoxState state) async {
+    await showModalBottomSheet(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF1A1C21),
-        title: Text('Clear Seat?', style: AppTextStyles.clockLabel.copyWith(color: Colors.white, fontSize: 18)),
-        content: Text(
-          'Remove #${widget.seat.skaterNumber} from the penalty box?',
-          style: AppTextStyles.infoText,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('CANCEL', style: TextStyle(color: Colors.white38)),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('CLEAR', style: TextStyle(color: Colors.redAccent)),
-          ),
-        ],
+      backgroundColor: const Color(0xFF1A1C21),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
+      builder: (ctx) => _SeatAdjustSheet(seat: widget.seat, state: state),
     );
   }
 
-  void _hapticLight() {
-    Vibration.vibrate(duration: 50);
-  }
-
-  void _hapticMedium() {
-    Vibration.vibrate(duration: 150);
-  }
+  void _hapticLight() => Vibration.vibrate(duration: 50);
+  void _hapticMedium() => Vibration.vibrate(duration: 150);
 
   @override
   Widget build(BuildContext context) {
@@ -202,18 +165,25 @@ class _SeatCardState extends State<SeatCard> with SingleTickerProviderStateMixin
     final teamColor = state.teamInfo(seat.teamIndex).color;
     final compact = widget.compact;
 
-    // Trigger haptic on state transitions
+    // State transition side-effects
     if (_lastState != seatState) {
       if (seatState == SeatState.standing && _lastState == SeatState.running) {
         Vibration.vibrate(pattern: [0, 100, 80, 100]);
-      } else if (seatState == SeatState.done && _lastState == SeatState.standing) {
-        Vibration.vibrate(duration: 500);
+      } else if (seatState == SeatState.done) {
+        Vibration.vibrate(duration: 600);
+        _doneHapticTimer?.cancel();
+        _doneHapticTimer = Timer.periodic(
+          const Duration(seconds: 2),
+          (_) => Vibration.vibrate(duration: 300),
+        );
+      } else if (_lastState == SeatState.done) {
+        _doneHapticTimer?.cancel();
+        _doneHapticTimer = null;
       }
       _lastState = seatState;
     }
 
     final accentColor = seat.alertColor(teamColor);
-    final timeStr = _formatTime(seat.timeRemaining);
 
     return GestureDetector(
       onTap: () => _onTap(state),
@@ -227,25 +197,21 @@ class _SeatCardState extends State<SeatCard> with SingleTickerProviderStateMixin
           borderRadius: BorderRadius.circular(16),
         ),
         child: Padding(
-          padding: EdgeInsets.all(compact ? 12 : 16),
+          padding: EdgeInsets.all(compact ? 10 : 14),
           child: seatState == SeatState.empty
-              ? _buildEmpty(compact)
-              : _buildOccupied(context, state, seat, seatState, timeStr, teamColor, compact),
+              ? _buildEmpty(teamColor, compact)
+              : _buildOccupied(context, state, seat, seatState, teamColor, compact),
         ),
       ),
     );
   }
 
-  Widget _buildEmpty(bool compact) {
+  Widget _buildEmpty(Color teamColor, bool compact) {
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        Icon(
-          Icons.add_circle_outline,
-          color: Colors.white24,
-          size: compact ? 28 : 36,
-        ),
-        const SizedBox(height: 8),
+        Icon(Icons.add_circle_outline, color: Colors.white24, size: compact ? 26 : 34),
+        const SizedBox(height: 6),
         Text(
           _positionLabel(widget.seat.position),
           style: AppTextStyles.clockLabel.copyWith(
@@ -263,139 +229,152 @@ class _SeatCardState extends State<SeatCard> with SingleTickerProviderStateMixin
     PenaltyBoxState state,
     SkaterSeat seat,
     SeatState seatState,
-    String timeStr,
     Color teamColor,
     bool compact,
   ) {
     final isStanding = seatState == SeatState.standing;
     final isDone = seatState == SeatState.done;
     final isPaused = seatState == SeatState.paused;
-    final isRunningOrStanding = seatState == SeatState.running || isStanding;
+    final isActive = seatState == SeatState.running || isStanding;
+    final timeStr = _formatTime(seat.timeRemaining);
+    final timerFontSize = compact ? 34.0 : 46.0;
 
-    final alertColor = isDone
-        ? Colors.red.shade400
-        : isStanding
-            ? Colors.amber.shade400
-            : Colors.white;
-
-    // +30s button anchored to bottom of card via Stack — doesn't push center content
-    final addPenaltyButton = !compact && isRunningOrStanding
-        ? Align(
-            alignment: Alignment.bottomCenter,
-            child: GestureDetector(
-              onTap: () => _addPenalty(context, state),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.08),
-                  border: Border.all(color: Colors.white24),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(
-                  '+30s',
-                  style: AppTextStyles.clockLabel.copyWith(
-                    color: Colors.white54,
-                    fontSize: 13,
-                    letterSpacing: 0.5,
-                  ),
-                ),
-              ),
-            ),
-          )
-        : null;
-
-    final timerContent = Column(
+    return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // Position label
-        Align(
-          alignment: Alignment.centerLeft,
-          child: Text(
-            _positionLabel(seat.position),
-            style: AppTextStyles.clockLabel.copyWith(
-              color: teamColor.withValues(alpha: 0.8),
-              fontSize: compact ? 11 : 13,
-              letterSpacing: 1.5,
+        // Row 1: position label (left) + skater number (right)
+        Row(
+          children: [
+            Text(
+              _positionLabel(seat.position),
+              style: AppTextStyles.clockLabel.copyWith(
+                color: teamColor.withValues(alpha: 0.85),
+                fontSize: compact ? 10 : 12,
+                letterSpacing: 1.5,
+              ),
             ),
-          ),
+            const Spacer(),
+            Text(
+              '#${seat.skaterNumber}',
+              style: AppTextStyles.skaterNumber.copyWith(fontSize: compact ? 18 : 22),
+            ),
+          ],
         ),
-        SizedBox(height: compact ? 6 : 8),
+        SizedBox(height: compact ? 4 : 8),
 
-        // Skater number
-        Text(
-          '#${seat.skaterNumber}',
-          style: AppTextStyles.skaterNumber.copyWith(
-            fontSize: compact ? 28 : 36,
-          ),
-        ),
-        SizedBox(height: compact ? 6 : 8),
-
-        // Timer display
+        // Row 2: timer / done / paused display
         if (isDone)
-          Text(
-            'DONE',
-            style: AppTextStyles.alertLabel.copyWith(
-              color: Colors.red.shade400,
-              fontSize: compact ? 20 : 26,
-            ),
-          )
-        else if (isStanding)
           ScaleTransition(
             scale: _pulseAnimation,
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  'STAND',
+                  'DONE',
+                  textAlign: TextAlign.center,
                   style: AppTextStyles.alertLabel.copyWith(
-                    color: Colors.amber.shade400,
-                    fontSize: compact ? 16 : 20,
+                    color: Colors.red.shade400,
+                    fontSize: compact ? 24 : 32,
                   ),
                 ),
                 Text(
-                  timeStr,
-                  style: AppTextStyles.clockTimeSmall.copyWith(
-                    color: alertColor,
-                    fontSize: compact ? 32 : 42,
+                  'tap to clear',
+                  textAlign: TextAlign.center,
+                  style: AppTextStyles.clockLabel.copyWith(
+                    color: Colors.red.shade300.withValues(alpha: 0.7),
+                    fontSize: 11,
+                    letterSpacing: 1,
                   ),
                 ),
               ],
             ),
           )
-        else
+        else if (isStanding)
           ScaleTransition(
-            scale: seat.isRunning ? _pulseAnimation : const AlwaysStoppedAnimation(1.0),
-            child: Text(
-              timeStr,
-              style: AppTextStyles.clockTimeSmall.copyWith(
-                color: isPaused ? Colors.white38 : Colors.white,
-                fontSize: compact ? 36 : 48,
+            scale: _pulseAnimation,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  'STAND  ',
+                  style: AppTextStyles.alertLabel.copyWith(
+                    color: Colors.amber.shade400,
+                    fontSize: compact ? 14 : 18,
+                  ),
+                ),
+                Text(
+                  timeStr,
+                  style: AppTextStyles.clockTimeSmall.copyWith(
+                    color: Colors.amber.shade300,
+                    fontSize: compact ? 28 : 38,
+                  ),
+                ),
+              ],
+            ),
+          )
+        else if (isPaused)
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              ScaleTransition(
+                scale: const AlwaysStoppedAnimation(1.0),
+                child: Text(
+                  timeStr,
+                  style: AppTextStyles.clockTimeSmall.copyWith(
+                    color: Colors.white38,
+                    fontSize: timerFontSize,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'PAUSED',
+                style: AppTextStyles.clockLabel.copyWith(
+                  color: Colors.white24,
+                  fontSize: 11,
+                  letterSpacing: 1.5,
+                ),
+              ),
+            ],
+          )
+        else
+          // running
+          Center(
+            child: ScaleTransition(
+              scale: _pulseAnimation,
+              child: Text(
+                timeStr,
+                style: AppTextStyles.clockTimeSmall.copyWith(
+                  color: Colors.white,
+                  fontSize: timerFontSize,
+                ),
               ),
             ),
           ),
 
-        if (isPaused && !isDone)
-          Padding(
-            padding: const EdgeInsets.only(top: 4),
-            child: Text(
-              'PAUSED',
-              style: AppTextStyles.clockLabel.copyWith(
-                color: Colors.white38,
-                fontSize: 11,
-                letterSpacing: 1.5,
+        // Row 3: penalty buttons (running or standing only)
+        if (isActive) ...[
+          SizedBox(height: compact ? 4 : 8),
+          Row(
+            children: [
+              _PenaltyButton(
+                label: '−30s',
+                color: Colors.white24,
+                onTap: seat.timeRemaining > Duration.zero
+                    ? () => state.removePenaltyFromSeat(seat)
+                    : null,
               ),
-            ),
+              const Spacer(),
+              _PenaltyButton(
+                label: '+30s',
+                color: Colors.white24,
+                onTap: () => state.addPenaltyToSeat(seat),
+              ),
+            ],
           ),
-      ],
-    );
-
-    if (addPenaltyButton == null) return Center(child: timerContent);
-
-    return Stack(
-      children: [
-        Center(child: timerContent),
-        addPenaltyButton,
+        ],
       ],
     );
   }
@@ -408,13 +387,185 @@ class _SeatCardState extends State<SeatCard> with SingleTickerProviderStateMixin
   }
 
   String _positionLabel(SkaterPosition pos) {
-    switch (pos) {
-      case SkaterPosition.jammer:
-        return 'JAMMER';
-      case SkaterPosition.pivot:
-        return 'PIVOT';
-      case SkaterPosition.blocker:
-        return 'BLOCKER';
-    }
+    return switch (pos) {
+      SkaterPosition.jammer => 'JAMMER',
+      SkaterPosition.pivot => 'PIVOT',
+      SkaterPosition.blocker => 'BLOCKER',
+    };
+  }
+}
+
+/// Inline ±30s / ±1s button chip.
+class _PenaltyButton extends StatelessWidget {
+  final String label;
+  final Color color;
+  final VoidCallback? onTap;
+
+  const _PenaltyButton({required this.label, required this.color, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final enabled = onTap != null;
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: enabled ? 0.07 : 0.03),
+          border: Border.all(color: enabled ? color : Colors.white12),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Text(
+          label,
+          style: AppTextStyles.clockLabel.copyWith(
+            color: enabled ? Colors.white54 : Colors.white24,
+            fontSize: 12,
+            letterSpacing: 0.5,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Bottom sheet for fine-tuning a seat's timer and clearing the seat.
+class _SeatAdjustSheet extends StatelessWidget {
+  final SkaterSeat seat;
+  final PenaltyBoxState state;
+
+  const _SeatAdjustSheet({required this.seat, required this.state});
+
+  @override
+  Widget build(BuildContext context) {
+    // Watch state so timer display updates live
+    context.watch<PenaltyBoxState>();
+
+    final m = seat.timeRemaining.inMinutes;
+    final s = seat.timeRemaining.inSeconds % 60;
+    final timeStr = seat.timeRemaining <= Duration.zero
+        ? '0:00'
+        : '$m:${s.toString().padLeft(2, '0')}';
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 12, 24, 32),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Drag handle
+          Container(
+            width: 40,
+            height: 4,
+            margin: const EdgeInsets.only(bottom: 20),
+            decoration: BoxDecoration(
+              color: Colors.white24,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+
+          // Seat info
+          Row(
+            children: [
+              Text(
+                _posLabel(seat.position),
+                style: AppTextStyles.clockLabel.copyWith(
+                  color: Colors.white54,
+                  fontSize: 13,
+                  letterSpacing: 1.5,
+                ),
+              ),
+              const Spacer(),
+              Text(
+                '#${seat.skaterNumber}',
+                style: AppTextStyles.skaterNumber.copyWith(fontSize: 20),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+
+          // Timer adjustment row
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              _SheetAdjustButton(
+                label: '−1s',
+                onTap: () => state.adjustTime(seat, const Duration(seconds: -1)),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: Text(
+                  timeStr,
+                  style: AppTextStyles.clockTimeSmall.copyWith(fontSize: 48),
+                ),
+              ),
+              _SheetAdjustButton(
+                label: '+1s',
+                onTap: () => state.adjustTime(seat, const Duration(seconds: 1)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 28),
+
+          // Clear button
+          SizedBox(
+            width: double.infinity,
+            height: 50,
+            child: ElevatedButton(
+              onPressed: () {
+                state.clearSeat(seat);
+                Navigator.of(context).pop();
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red.shade900,
+                foregroundColor: Colors.red.shade300,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              child: Text(
+                'CLEAR SEAT',
+                style: AppTextStyles.buttonText.copyWith(
+                  color: Colors.red.shade300,
+                  fontSize: 15,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _posLabel(SkaterPosition pos) => switch (pos) {
+    SkaterPosition.jammer => 'JAMMER',
+    SkaterPosition.pivot => 'PIVOT',
+    SkaterPosition.blocker => 'BLOCKER',
+  };
+}
+
+class _SheetAdjustButton extends StatelessWidget {
+  final String label;
+  final VoidCallback onTap;
+
+  const _SheetAdjustButton({required this.label, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.08),
+          border: Border.all(color: Colors.white24),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Text(
+          label,
+          style: AppTextStyles.clockLabel.copyWith(
+            color: Colors.white70,
+            fontSize: 16,
+            letterSpacing: 0.5,
+          ),
+        ),
+      ),
+    );
   }
 }
