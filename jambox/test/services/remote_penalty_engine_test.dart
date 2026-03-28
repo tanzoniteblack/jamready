@@ -314,22 +314,21 @@ void main() {
       expect(state.team2Jammer.isRunning, isFalse);
     });
 
-    test('Blocker3 queue time update syncs existing queue entry', () async {
+    test('Blocker3 clock time update syncs team1Blocker3 seat', () async {
       final (:engine, :channel, :state) = await setupEngine();
 
-      // First create a Blocker3 queue entry via BoxSeat.Started
+      // Occupy the seat first
       await sendAndPump(channel, {
         'ScoreBoard.CurrentGame.Team(1).BoxSeat(Blocker3).Started': true,
       });
-      expect(state.queueForTeam(1), hasLength(1));
+      expect(state.team1Blocker3.isOccupied, isTrue);
 
       // Now send a time update for Blocker3
       await sendAndPump(channel, {
         'ScoreBoard.CurrentGame.BoxClock(Team1Blocker3).Time': 18000,
       });
 
-      expect(state.queueForTeam(1).first.timeRemaining,
-          const Duration(seconds: 18));
+      expect(state.team1Blocker3.timeRemaining, const Duration(seconds: 18));
     });
   });
 
@@ -405,17 +404,17 @@ void main() {
       expect(state.team1Blocker1.skaterNumber, '?');
     });
 
-    test('Blocker3 Started=true creates a queue entry', () async {
+    test('Blocker3 Started=true occupies team1Blocker3 seat', () async {
       final (:engine, :channel, :state) = await setupEngine();
 
       await sendAndPump(channel, {
         'ScoreBoard.CurrentGame.Team(1).BoxSeat(Blocker3).Started': true,
       });
 
-      expect(state.queueForTeam(1), hasLength(1));
+      expect(state.team1Blocker3.isOccupied, isTrue);
     });
 
-    test('Blocker3 Started=false removes the queue entry', () async {
+    test('Blocker3 Started=false clears the team1Blocker3 seat', () async {
       final (:engine, :channel, :state) = await setupEngine();
 
       await sendAndPump(channel, {
@@ -425,7 +424,7 @@ void main() {
         'ScoreBoard.CurrentGame.Team(1).BoxSeat(Blocker3).Started': false,
       });
 
-      expect(state.queueForTeam(1), isEmpty);
+      expectSeatEmpty(state.team1Blocker3);
     });
   });
 

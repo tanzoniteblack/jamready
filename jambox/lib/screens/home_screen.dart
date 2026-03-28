@@ -14,10 +14,7 @@ import '../styles/text_styles.dart';
 import 'box_timer_screen.dart';
 
 class HomeScreen extends StatefulWidget {
-  /// When returning from a game screen, pass the live engine to skip Phase 1.
-  final PenaltyEngine? existingEngine;
-
-  const HomeScreen({super.key, this.existingEngine});
+  const HomeScreen({super.key});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -29,14 +26,13 @@ class _HomeScreenState extends State<HomeScreen> {
   final _portController = TextEditingController();
   bool _isLoading = false;
 
-  AppRole _selectedRole = AppRole.pbm;
-
   // Phase 2 state
   bool _showRoleSelector = false;
   PenaltyEngine? _previewEngine;
   PenaltyBoxState? _previewState;
-  String _team1Name = 'Team 1';
-  String _team2Name = 'Team 2';
+  PenaltyEngine? _activeEngine;
+  String _team1Name = 'Salt';
+  String _team2Name = 'Pepper';
   Timer? _teamNameTimer;
   VoidCallback? _teamNameListener;
 
@@ -44,14 +40,6 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     _loadSettings();
-    if (widget.existingEngine != null) {
-      final engine = widget.existingEngine!;
-      _previewEngine = engine;
-      _previewState = engine.state;
-      _team1Name = engine.state.team1.name;
-      _team2Name = engine.state.team2.name;
-      _showRoleSelector = true;
-    }
   }
 
   Future<void> _loadSettings() async {
@@ -59,13 +47,6 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() {
       _hostController.text = prefs.getString('pbm_host') ?? '10.0.2.2';
       _portController.text = prefs.getString('pbm_port') ?? '8000';
-      final roleName = prefs.getString('pbm_role');
-      if (roleName != null) {
-        _selectedRole = AppRole.values.firstWhere(
-          (r) => r.name == roleName,
-          orElse: () => AppRole.pbm,
-        );
-      }
     });
   }
 
@@ -73,7 +54,6 @@ class _HomeScreenState extends State<HomeScreen> {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('pbm_host', _hostController.text.trim());
     await prefs.setString('pbm_port', _portController.text.trim());
-    await prefs.setString('pbm_role', _selectedRole.name);
   }
 
   Future<void> _connectAndFetchTeams() async {
@@ -93,16 +73,14 @@ class _HomeScreenState extends State<HomeScreen> {
 
     // Listen for team names to arrive, with a 3-second timeout fallback.
     _teamNameListener = () {
-      final t1 = state.team1.name;
-      final t2 = state.team2.name;
-      if (t1 != 'Team 1' || t2 != 'Team 2') {
-        _advanceToRoleSelector(t1, t2);
+      if (state.teamNamesFromRemote) {
+        _advanceToRoleSelector(state.team1.name, state.team2.name);
       }
     };
     state.addListener(_teamNameListener!);
 
     _teamNameTimer = Timer(const Duration(seconds: 3), () {
-      _advanceToRoleSelector(_previewState?.team1.name ?? 'Team 1', _previewState?.team2.name ?? 'Team 2');
+      _advanceToRoleSelector(_previewState?.team1.name ?? 'Salt', _previewState?.team2.name ?? 'Pepper');
     });
 
     if (mounted) setState(() => _isLoading = false);
@@ -117,8 +95,8 @@ class _HomeScreenState extends State<HomeScreen> {
     }
     if (!mounted) return;
     setState(() {
-      _team1Name = t1.isNotEmpty ? t1 : 'Team 1';
-      _team2Name = t2.isNotEmpty ? t2 : 'Team 2';
+      _team1Name = t1.isNotEmpty ? t1 : 'Salt';
+      _team2Name = t2.isNotEmpty ? t2 : 'Pepper';
       _showRoleSelector = true;
     });
   }
@@ -133,8 +111,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
     if (!mounted) return;
     setState(() {
-      _team1Name = 'Team 1';
-      _team2Name = 'Team 2';
+      _team1Name = 'Salt';
+      _team2Name = 'Pepper';
       _showRoleSelector = true;
     });
   }
@@ -143,8 +121,8 @@ class _HomeScreenState extends State<HomeScreen> {
     _disposePreview();
     setState(() {
       _showRoleSelector = false;
-      _team1Name = 'Team 1';
-      _team2Name = 'Team 2';
+      _team1Name = 'Salt';
+      _team2Name = 'Pepper';
     });
   }
 
@@ -160,22 +138,20 @@ class _HomeScreenState extends State<HomeScreen> {
     _previewState = null;
   }
 
-  Future<void> _startGame() async {
-    await _saveSettings();
-
-    final teamIdx = _selectedRole == AppRole.boxTimerTeam1
+  Future<void> _startGame(AppRole role) async {
+    final teamIdx = role == AppRole.boxTimerTeam1
         ? 1
-        : _selectedRole == AppRole.boxTimerTeam2
+        : role == AppRole.boxTimerTeam2
             ? 2
             : null;
 
     PenaltyBoxState state;
-    dynamic engine;
+    PenaltyEngine engine;
 
     if (_previewEngine != null) {
-      // Reuse the live engine (remote or local); update role on the existing state.
+      // Reuse the live engine; update role on the existing state.
       state = _previewState!;
-      state.role = _selectedRole;
+      state.role = role;
       state.teamIndex = teamIdx;
       engine = _previewEngine!;
       // Clear references so dispose() doesn't shut it down.
@@ -184,7 +160,7 @@ class _HomeScreenState extends State<HomeScreen> {
     } else {
       // Fresh offline path.
       state = _previewState ?? PenaltyBoxState();
-      state.role = _selectedRole;
+      state.role = role;
       state.teamIndex = teamIdx;
       final localEngine = LocalPenaltyEngine(state);
       await localEngine.initialize();
@@ -192,10 +168,12 @@ class _HomeScreenState extends State<HomeScreen> {
       _previewState = null;
     }
 
+    _activeEngine = engine;
+
     if (!mounted) return;
 
     Widget screen;
-    switch (_selectedRole) {
+    switch (role) {
       case AppRole.pbm:
         screen = PbmScreen(engine: engine);
       case AppRole.boxTimerTeam1:
@@ -205,7 +183,7 @@ class _HomeScreenState extends State<HomeScreen> {
         screen = SoloScreen(engine: engine);
     }
 
-    Navigator.of(context).pushReplacement(
+    await Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => ChangeNotifierProvider.value(
           value: state,
@@ -213,6 +191,19 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
     );
+
+    // Returned from game screen — restore engine so user can re-enter
+    if (mounted && _activeEngine != null) {
+      final returned = _activeEngine!;
+      _activeEngine = null;
+      setState(() {
+        _previewEngine = returned;
+        _previewState = returned.state;
+        _team1Name = returned.state.team1.name;
+        _team2Name = returned.state.team2.name;
+        _showRoleSelector = true;
+      });
+    }
   }
 
   Future<void> _scanQRCode() async {
@@ -241,6 +232,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   void dispose() {
+    _activeEngine?.dispose();
+    _activeEngine = null;
     _disposePreview();
     _hostController.dispose();
     _portController.dispose();
@@ -427,25 +420,9 @@ class _HomeScreenState extends State<HomeScreen> {
                             ),
                             const SizedBox(height: 12),
                             _RoleSelector(
-                              selected: _selectedRole,
                               team1Name: _team1Name,
                               team2Name: _team2Name,
-                              onChanged: (r) => setState(() => _selectedRole = r),
-                            ),
-                            const SizedBox(height: 24),
-                            SizedBox(
-                              height: 54,
-                              child: ElevatedButton(
-                                onPressed: _startGame,
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.deepOrange.shade700,
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                ),
-                                child: Text(
-                                  'START',
-                                  style: AppTextStyles.buttonText.copyWith(fontSize: 17),
-                                ),
-                              ),
+                              onTap: _startGame,
                             ),
                             const SizedBox(height: 24),
                           ],
@@ -488,18 +465,16 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
-/// Role selector chips.
+/// Role selector — each card starts the game immediately on tap.
 class _RoleSelector extends StatelessWidget {
-  final AppRole selected;
   final String team1Name;
   final String team2Name;
-  final ValueChanged<AppRole> onChanged;
+  final void Function(AppRole) onTap;
 
   const _RoleSelector({
-    required this.selected,
     required this.team1Name,
     required this.team2Name,
-    required this.onChanged,
+    required this.onTap,
   });
 
   @override
@@ -510,22 +485,20 @@ class _RoleSelector extends StatelessWidget {
           children: [
             Expanded(child: _RoleOption(
               role: AppRole.pbm,
-              selected: selected,
               label: 'PBM',
               subtitle: 'Both jammers',
               icon: Icons.swap_horiz,
               color: Colors.deepOrange.shade400,
-              onTap: onChanged,
+              onTap: onTap,
             )),
             const SizedBox(width: 10),
             Expanded(child: _RoleOption(
               role: AppRole.solo,
-              selected: selected,
               label: 'Solo',
               subtitle: 'All seats',
               icon: Icons.grid_view,
               color: Colors.purple.shade400,
-              onTap: onChanged,
+              onTap: onTap,
             )),
           ],
         ),
@@ -534,22 +507,20 @@ class _RoleSelector extends StatelessWidget {
           children: [
             Expanded(child: _RoleOption(
               role: AppRole.boxTimerTeam1,
-              selected: selected,
               label: team1Name,
               subtitle: 'Box Timer',
               icon: Icons.timer,
               color: Colors.blue.shade400,
-              onTap: onChanged,
+              onTap: onTap,
             )),
             const SizedBox(width: 10),
             Expanded(child: _RoleOption(
               role: AppRole.boxTimerTeam2,
-              selected: selected,
               label: team2Name,
               subtitle: 'Box Timer',
               icon: Icons.timer,
               color: Colors.red.shade400,
-              onTap: onChanged,
+              onTap: onTap,
             )),
           ],
         ),
@@ -560,16 +531,14 @@ class _RoleSelector extends StatelessWidget {
 
 class _RoleOption extends StatelessWidget {
   final AppRole role;
-  final AppRole selected;
   final String label;
   final String subtitle;
   final IconData icon;
   final Color color;
-  final ValueChanged<AppRole> onTap;
+  final void Function(AppRole) onTap;
 
   const _RoleOption({
     required this.role,
-    required this.selected,
     required this.label,
     required this.subtitle,
     required this.icon,
@@ -579,23 +548,18 @@ class _RoleOption extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isSelected = role == selected;
     return GestureDetector(
       onTap: () => onTap(role),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 22),
         decoration: BoxDecoration(
-          color: isSelected ? color.withValues(alpha: 0.18) : Colors.white.withValues(alpha: 0.04),
-          border: Border.all(
-            color: isSelected ? color : Colors.white24,
-            width: isSelected ? 2 : 1,
-          ),
+          color: Colors.white.withValues(alpha: 0.04),
+          border: Border.all(color: Colors.white24),
           borderRadius: BorderRadius.circular(12),
         ),
         child: Row(
           children: [
-            Icon(icon, color: isSelected ? color : Colors.white38, size: 20),
+            Icon(icon, color: color, size: 20),
             const SizedBox(width: 10),
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -603,7 +567,7 @@ class _RoleOption extends StatelessWidget {
                 Text(
                   label,
                   style: AppTextStyles.clockLabel.copyWith(
-                    color: isSelected ? color : Colors.white70,
+                    color: Colors.white70,
                     fontSize: 14,
                     letterSpacing: 0.5,
                   ),

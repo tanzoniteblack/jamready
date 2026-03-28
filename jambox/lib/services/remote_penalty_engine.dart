@@ -43,16 +43,14 @@ class RemotePenaltyEngine extends PenaltyEngine with WidgetsBindingObserver {
   final void Function()? _wakelockEnableOverride;
   final void Function()? _wakelockDisableOverride;
 
-  // Blocker3 queue tracking for BoxSeat mode
-  final Map<int, SkaterSeat?> _blocker3QueueSeat = {1: null, 2: null};
 
   // Cached regex patterns for _parsePath (compiled once, not per message)
   static final _reTeamName = RegExp(r'ScoreBoard\.CurrentGame\.Team\((\d)\)\.Name$');
   static final _reTeamColor = RegExp(r'ScoreBoard\.CurrentGame\.Team\((\d)\)\.Color\(operator\.fg\)$');
   static final _reSkaterNumber = RegExp(r'ScoreBoard\.CurrentGame\.Team\((\d)\)\.Skater\(([^)]+)\)\.Number$');
   static final _reSkaterRole = RegExp(r'ScoreBoard\.CurrentGame\.Team\((\d)\)\.Skater\(([^)]+)\)\.Role$');
-  static final _reBoxClock = RegExp(r'ScoreBoard\.CurrentGame\.BoxClock\(Team(\d)(Jammer|Blocker[123])\)\.(Time|Running)$');
-  static final _reBoxSeat = RegExp(r'ScoreBoard\.CurrentGame\.Team\((\d)\)\.BoxSeat\((Jammer|Blocker[123])\)\.(Started|BoxSkater)$');
+  static final _reBoxClock = RegExp(r'ScoreBoard\.CurrentGame\.BoxClock\(Team(\d)(Jammer|Blocker[1234])\)\.(Time|Running)$');
+  static final _reBoxSeat = RegExp(r'ScoreBoard\.CurrentGame\.Team\((\d)\)\.BoxSeat\((Jammer|Blocker[1234])\)\.(Started|BoxSkater)$');
   static final _reLegacySkater = RegExp(r'Game\.Team\((\d)\)\.Skater$');
 
   RemotePenaltyEngine(
@@ -353,12 +351,16 @@ class RemotePenaltyEngine extends PenaltyEngine with WidgetsBindingObserver {
   /// Map a SkaterSeat id to (teamIndex, boxSeatId) for WS commands.
   (int?, String?) _seatToBoxSeatId(SkaterSeat seat) {
     return switch (seat.id) {
-      't1j' => (1, 'Jammer'),
+      't1j'  => (1, 'Jammer'),
       't1b1' => (1, 'Blocker1'),
       't1b2' => (1, 'Blocker2'),
-      't2j' => (2, 'Jammer'),
+      't1b3' => (1, 'Blocker3'),
+      't1b4' => (1, 'Blocker4'),
+      't2j'  => (2, 'Jammer'),
       't2b1' => (2, 'Blocker1'),
       't2b2' => (2, 'Blocker2'),
+      't2b3' => (2, 'Blocker3'),
+      't2b4' => (2, 'Blocker4'),
       _ => (null, null),
     };
   }
@@ -370,12 +372,13 @@ class RemotePenaltyEngine extends PenaltyEngine with WidgetsBindingObserver {
     return 'Team$teamIdx$seatId';
   }
 
-  /// Map BoxClock ID components to a SkaterSeat (null for Blocker3 → use queue).
+  /// Map BoxClock/BoxSeat ID components to a SkaterSeat.
   SkaterSeat? _boxClockToSeat(int teamIdx, String seatId) {
     if (seatId == 'Jammer') return _state.jammerSeat(teamIdx);
-    if (seatId == 'Blocker3') return null;
-    final idx = int.parse(seatId[seatId.length - 1]) - 1; // 'Blocker1'→0, 'Blocker2'→1
-    return _state.blockerSeats(teamIdx)[idx];
+    final idxChar = seatId[seatId.length - 1]; // '1'–'4'
+    final idx = int.tryParse(idxChar);
+    if (idx == null || idx < 1 || idx > 4) return null;
+    return _state.blockerSeats(teamIdx)[idx - 1]; // 'Blocker1'→0 … 'Blocker4'→3
   }
 
   /// Whether this device owns the given seat (and should send WS commands for it).
@@ -453,13 +456,6 @@ class RemotePenaltyEngine extends PenaltyEngine with WidgetsBindingObserver {
         final applyIt = !_ownsSet(seat) || !running || (running && seat.isOccupied && !seat.isRunning);
         if (applyIt && seat.isRunning != running) { seat.isRunning = running; changed = true; }
       }
-    } else if (seatId == 'Blocker3' && prop == 'Time') {
-      final ms = (_parseInt(value) ?? 0).clamp(0, 5 * 60 * 1000);
-      final queueSeat = _blocker3QueueSeat[teamIdx];
-      if (queueSeat != null) {
-        final newTime = Duration(milliseconds: ms);
-        if (queueSeat.timeRemaining != newTime) { queueSeat.timeRemaining = newTime; changed = true; }
-      }
     }
 
     if (changed) _state.notifyFromEngine();
@@ -471,10 +467,6 @@ class RemotePenaltyEngine extends PenaltyEngine with WidgetsBindingObserver {
 
     if (prop == 'Started') {
       final started = value == true || value == 'true';
-      if (seatId == 'Blocker3') {
-        _onBlocker3Started(teamIdx, started);
-        return;
-      }
       if (seat == null) return;
       if (!started) {
         seat.clear();
@@ -499,25 +491,6 @@ class RemotePenaltyEngine extends PenaltyEngine with WidgetsBindingObserver {
       return;
     }
     _state.notifyFromEngine();
-  }
-
-  void _onBlocker3Started(int teamIdx, bool started) {
-    if (started) {
-      if (_blocker3QueueSeat[teamIdx] == null) {
-        final q = _state.addToQueue(
-          teamIdx: teamIdx,
-          number: '?',
-          position: SkaterPosition.blocker,
-        );
-        _blocker3QueueSeat[teamIdx] = q;
-      }
-    } else {
-      final q = _blocker3QueueSeat[teamIdx];
-      if (q != null) {
-        _state.removeFromQueue(q);
-        _blocker3QueueSeat[teamIdx] = null;
-      }
-    }
   }
 
   void _onSkaterRole(int teamIdx, String uuid, String role) {
@@ -620,8 +593,6 @@ class RemotePenaltyEngine extends PenaltyEngine with WidgetsBindingObserver {
     // Reset BoxSeat mode so it's re-detected on fresh connection
     _boxSeatMode = false;
     _bootstrapping = true;
-    _blocker3QueueSeat[1] = null;
-    _blocker3QueueSeat[2] = null;
     _state.clearBoxSeatCallbacks();
     await connect(_lastUrl!);
   }

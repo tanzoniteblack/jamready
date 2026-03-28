@@ -6,8 +6,6 @@ import '../services/penalty_engine.dart';
 import '../styles/background.dart';
 import '../styles/text_styles.dart';
 import '../widgets/seat_card.dart';
-import '../widgets/queue_panel.dart';
-import 'home_screen.dart';
 
 /// Single-team box timer view.
 /// Shows one team's jammer (inner) seat and two blocker (outer) seats stacked vertically.
@@ -28,49 +26,91 @@ class BoxTimerScreen extends StatelessWidget {
 
     return DynamicBackground(
       accentColor: accentColor,
-      child: Scaffold(
-        backgroundColor: Colors.transparent,
-        resizeToAvoidBottomInset: false,
-        appBar: _buildAppBar(context, state, teamInfo, engine),
-        body: RefreshIndicator(
-          onRefresh: engine.reconnect,
-          child: CustomScrollView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            slivers: [
-              SliverFillRemaining(
-                hasScrollBody: false,
-                child: SafeArea(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      children: [
-                        _JamStatusBar(state: state, engine: engine),
-                        const SizedBox(height: 16),
-                        Expanded(flex: 5, child: SeatCard(seat: jammer)),
-                        const SizedBox(height: 12),
-                        Expanded(flex: 3, child: SeatCard(seat: blockers[0], compact: true)),
-                        const SizedBox(height: 10),
-                        Expanded(flex: 3, child: SeatCard(seat: blockers[1], compact: true)),
-                        const SizedBox(height: 12),
-                        Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.04),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: Colors.white12),
-                          ),
-                          child: QueuePanel(teamIndex: teamIdx, compact: true),
-                        ),
-                        const SizedBox(height: 8),
-                      ],
+      child: PopScope(
+        canPop: false,
+        onPopInvoked: (_) => _navigateBack(context, engine),
+        child: Scaffold(
+          backgroundColor: Colors.transparent,
+          resizeToAvoidBottomInset: false,
+          appBar: _buildAppBar(context, state, teamInfo, engine),
+          body: RefreshIndicator(
+            onRefresh: engine.reconnect,
+            child: CustomScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              slivers: [
+                SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: SafeArea(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: OrientationBuilder(
+                        builder: (ctx, orientation) => orientation == Orientation.landscape
+                            ? _buildLandscape(jammer, blockers)
+                            : _buildPortrait(jammer, blockers, state),
+                      ),
                     ),
                   ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPortrait(SkaterSeat jammer, List<SkaterSeat> blockers, PenaltyBoxState state) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _JamStatusBar(state: state, engine: engine),
+        const SizedBox(height: 16),
+        Expanded(flex: 5, child: SeatCard(seat: jammer)),
+        const SizedBox(height: 10),
+        Expanded(flex: 3, child: SeatCard(seat: blockers[0], compact: true)),
+        const SizedBox(height: 8),
+        Expanded(flex: 3, child: SeatCard(seat: blockers[1], compact: true)),
+        const SizedBox(height: 8),
+        Expanded(flex: 3, child: SeatCard(seat: blockers[2], compact: true)),
+        const SizedBox(height: 8),
+        Expanded(flex: 3, child: SeatCard(seat: blockers[3], compact: true)),
+        const SizedBox(height: 8),
+      ],
+    );
+  }
+
+  Widget _buildLandscape(SkaterSeat jammer, List<SkaterSeat> blockers) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Expanded(child: SeatCard(seat: jammer)),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            children: [
+              Expanded(
+                child: Row(
+                  children: [
+                    Expanded(child: SeatCard(seat: blockers[0], compact: true)),
+                    const SizedBox(width: 8),
+                    Expanded(child: SeatCard(seat: blockers[1], compact: true)),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 8),
+              Expanded(
+                child: Row(
+                  children: [
+                    Expanded(child: SeatCard(seat: blockers[2], compact: true)),
+                    const SizedBox(width: 8),
+                    Expanded(child: SeatCard(seat: blockers[3], compact: true)),
+                  ],
                 ),
               ),
             ],
           ),
         ),
-      ),
+      ],
     );
   }
 
@@ -157,7 +197,10 @@ class PbmScreen extends StatelessWidget {
 
     return DynamicBackground(
       accentColor: accentColor,
-      child: Scaffold(
+      child: PopScope(
+        canPop: false,
+        onPopInvoked: (_) => _navigateBack(context, engine),
+        child: Scaffold(
         backgroundColor: Colors.transparent,
         resizeToAvoidBottomInset: false,
         appBar: _buildAppBar(context, state, engine),
@@ -205,6 +248,7 @@ class PbmScreen extends StatelessWidget {
             ],
           ),
         ),
+      ),
       ),
     );
   }
@@ -308,40 +352,73 @@ class SoloScreen extends StatelessWidget {
 
     return DynamicBackground(
       accentColor: accentColor,
-      child: Scaffold(
-        backgroundColor: Colors.transparent,
-        resizeToAvoidBottomInset: false,
-        appBar: _buildAppBar(context, state, engine),
-        body: RefreshIndicator(
-          onRefresh: engine.reconnect,
-          child: CustomScrollView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            slivers: [
-              SliverFillRemaining(
-                hasScrollBody: false,
-                child: SafeArea(
-                  child: Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: Column(
-                      children: [
-                        _JamStatusBar(state: state, engine: engine),
-                        const SizedBox(height: 12),
-                        Expanded(
-                          child: Row(
+      child: PopScope(
+        canPop: false,
+        onPopInvoked: (_) => _navigateBack(context, engine),
+        child: Scaffold(
+          backgroundColor: Colors.transparent,
+          resizeToAvoidBottomInset: false,
+          appBar: _buildAppBar(context, state, engine),
+          body: RefreshIndicator(
+            onRefresh: engine.reconnect,
+            child: OrientationBuilder(
+              builder: (ctx, orientation) {
+                final isLandscape = orientation == Orientation.landscape;
+                if (isLandscape) {
+                  return CustomScrollView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    slivers: [
+                      SliverFillRemaining(
+                        hasScrollBody: false,
+                        child: SafeArea(
+                          child: Padding(
+                            padding: const EdgeInsets.all(12),
+                            child: Column(
+                              children: [
+                                _JamStatusBar(state: state, engine: engine),
+                                const SizedBox(height: 12),
+                                Expanded(
+                                  child: Row(
+                                    children: [
+                                      Expanded(child: _SoloTeamColumn(teamIndex: 1, state: state, landscape: true)),
+                                      const SizedBox(width: 24),
+                                      Expanded(child: _SoloTeamColumn(teamIndex: 2, state: state, landscape: true)),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  );
+                }
+                // Portrait: single outer scroll, AspectRatio cards keep columns equal height
+                return SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  child: SafeArea(
+                    child: Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: Column(
+                        children: [
+                          _JamStatusBar(state: state, engine: engine),
+                          const SizedBox(height: 12),
+                          Row(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Expanded(child: _SoloTeamColumn(teamIndex: 1, state: state)),
-                              const SizedBox(width: 12),
+                              const SizedBox(width: 24),
                               Expanded(child: _SoloTeamColumn(teamIndex: 2, state: state)),
                             ],
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
-                ),
-              ),
-            ],
+                );
+              },
+            ),
           ),
         ),
       ),
@@ -365,7 +442,6 @@ class SoloScreen extends StatelessWidget {
         children: [
           Text('JAMBOX', style: AppTextStyles.appBarTitle),
           const Spacer(),
-          // Bug 6: hide P/J counter in local mode
           if (!engine.isLocal)
             Text(
               'P${state.periodNumber}  J${state.jamNumber}',
@@ -379,7 +455,6 @@ class SoloScreen extends StatelessWidget {
         alignment: Alignment.bottomCenter,
         child: Container(height: 1, color: Colors.white.withValues(alpha: 0.1)),
       ),
-      // Bug 1: back button disposes engine and replaces with HomeScreen
       leading: IconButton(
         icon: const Icon(Icons.arrow_back, color: Colors.white70),
         onPressed: () => _navigateBack(context, engine),
@@ -391,8 +466,9 @@ class SoloScreen extends StatelessWidget {
 class _SoloTeamColumn extends StatelessWidget {
   final int teamIndex;
   final PenaltyBoxState state;
+  final bool landscape;
 
-  const _SoloTeamColumn({required this.teamIndex, required this.state});
+  const _SoloTeamColumn({required this.teamIndex, required this.state, this.landscape = false});
 
   @override
   Widget build(BuildContext context) {
@@ -400,49 +476,75 @@ class _SoloTeamColumn extends StatelessWidget {
     final blockers = state.blockerSeats(teamIndex);
     final teamInfo = state.teamInfo(teamIndex);
 
-    return SingleChildScrollView(
-      child: Column(
+    final header = Row(
+      children: [
+        Container(
+          width: 8,
+          height: 8,
+          decoration: BoxDecoration(color: teamInfo.color, shape: BoxShape.circle),
+        ),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Text(
+            teamInfo.name,
+            style: AppTextStyles.clockLabel.copyWith(
+              color: teamInfo.color,
+              fontSize: 12,
+              letterSpacing: 1.2,
+            ),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
+    );
+
+    if (landscape) {
+      return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(
-            children: [
-              Container(
-                width: 8,
-                height: 8,
-                decoration: BoxDecoration(color: teamInfo.color, shape: BoxShape.circle),
-              ),
-              const SizedBox(width: 6),
-              Expanded(
-                child: Text(
-                  teamInfo.name,
-                  style: AppTextStyles.clockLabel.copyWith(
-                    color: teamInfo.color,
-                    fontSize: 12,
-                    letterSpacing: 1.2,
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ],
+          header,
+          const SizedBox(height: 8),
+          Expanded(child: SeatCard(seat: jammer)),
+          const SizedBox(height: 8),
+          Expanded(
+            child: Row(
+              children: [
+                Expanded(child: SeatCard(seat: blockers[0], compact: true)),
+                const SizedBox(width: 8),
+                Expanded(child: SeatCard(seat: blockers[1], compact: true)),
+              ],
+            ),
           ),
           const SizedBox(height: 8),
-          AspectRatio(aspectRatio: 1.0, child: SeatCard(seat: jammer)),
-          const SizedBox(height: 8),
-          AspectRatio(aspectRatio: 1.6, child: SeatCard(seat: blockers[0], compact: true)),
-          const SizedBox(height: 8),
-          AspectRatio(aspectRatio: 1.6, child: SeatCard(seat: blockers[1], compact: true)),
-          const SizedBox(height: 8),
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.04),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+          Expanded(
+            child: Row(
+              children: [
+                Expanded(child: SeatCard(seat: blockers[2], compact: true)),
+                const SizedBox(width: 8),
+                Expanded(child: SeatCard(seat: blockers[3], compact: true)),
+              ],
             ),
-            child: QueuePanel(teamIndex: teamIndex, compact: true),
           ),
         ],
-      ),
+      );
+    }
+
+    // Portrait: AspectRatio cards so both columns have equal natural height
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        header,
+        const SizedBox(height: 8),
+        AspectRatio(aspectRatio: 1.0, child: SeatCard(seat: jammer)),
+        const SizedBox(height: 8),
+        AspectRatio(aspectRatio: 1.6, child: SeatCard(seat: blockers[0], compact: true)),
+        const SizedBox(height: 8),
+        AspectRatio(aspectRatio: 1.6, child: SeatCard(seat: blockers[1], compact: true)),
+        const SizedBox(height: 8),
+        AspectRatio(aspectRatio: 1.6, child: SeatCard(seat: blockers[2], compact: true)),
+        const SizedBox(height: 8),
+        AspectRatio(aspectRatio: 1.6, child: SeatCard(seat: blockers[3], compact: true)),
+      ],
     );
   }
 }
@@ -643,11 +745,9 @@ BoxDecoration _colorSwatchDecoration(Color color, {bool selected = false}) {
   );
 }
 
-/// Shared back navigation: retains the live engine and returns to role selector.
+/// Shared back navigation: pops back to the role selector on HomeScreen.
 Future<void> _navigateBack(BuildContext context, PenaltyEngine engine) async {
   if (context.mounted) {
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(builder: (_) => HomeScreen(existingEngine: engine)),
-    );
+    Navigator.of(context).pop();
   }
 }

@@ -32,6 +32,7 @@ class _SeatCardState extends State<SeatCard> with SingleTickerProviderStateMixin
   late Animation<double> _pulseAnimation;
   SeatState? _lastState;
   Timer? _doneHapticTimer;
+  bool _preStandWarnGiven = false;
 
   @override
   void initState() {
@@ -141,6 +142,16 @@ class _SeatCardState extends State<SeatCard> with SingleTickerProviderStateMixin
       _lastState = seatState;
     }
 
+    // Pre-warn: light double buzz 1 second before STAND threshold
+    if (seatState == SeatState.running && seat.timeRemaining.inSeconds <= 11 && !_preStandWarnGiven) {
+      _preStandWarnGiven = true;
+      Vibration.vibrate(pattern: [0, 50, 50, 50]);
+    }
+    // Re-arm when time goes back above threshold (e.g. +30s added) or seat cleared
+    if (_preStandWarnGiven && (seatState == SeatState.empty || seat.timeRemaining.inSeconds > 11)) {
+      _preStandWarnGiven = false;
+    }
+
     final accentColor = seat.alertColor(teamColor);
 
     return GestureDetector(
@@ -214,9 +225,13 @@ class _SeatCardState extends State<SeatCard> with SingleTickerProviderStateMixin
             const Spacer(),
             GestureDetector(
               onTap: () => _onNumberTap(state),
-              child: Text(
-                '#${seat.skaterNumber}',
-                style: AppTextStyles.skaterNumber.copyWith(fontSize: compact ? 18 : 22),
+              behavior: HitTestBehavior.opaque,
+              child: Padding(
+                padding: const EdgeInsets.all(8),
+                child: Text(
+                  '#${seat.skaterNumber}',
+                  style: AppTextStyles.skaterNumber.copyWith(fontSize: compact ? 18 : 22),
+                ),
               ),
             ),
           ],
@@ -317,13 +332,12 @@ class _SeatCardState extends State<SeatCard> with SingleTickerProviderStateMixin
         if (isActive)
           Row(
             children: [
-              _PenaltyButton(
-                label: '−30s',
-                color: Colors.white24,
-                onTap: seat.timeRemaining > Duration.zero
-                    ? () => state.removePenaltyFromSeat(seat)
-                    : null,
-              ),
+              if (seat.penaltyCount > 1)
+                _PenaltyButton(
+                  label: '−30s',
+                  color: Colors.white24,
+                  onTap: () => state.removePenaltyFromSeat(seat),
+                ),
               const Spacer(),
               _PenaltyButton(
                 label: '+30s',

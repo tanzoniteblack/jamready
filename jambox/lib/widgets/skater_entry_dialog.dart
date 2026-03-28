@@ -203,7 +203,7 @@ class _SkaterEntryDialogState extends State<_SkaterEntryDialog> {
       controller: _controller,
       autofocus: true,
       style: AppTextStyles.skaterNumber.copyWith(fontSize: 28),
-      keyboardType: TextInputType.text,
+      keyboardType: TextInputType.numberWithOptions(signed: false, decimal: false),
       textCapitalization: TextCapitalization.characters,
       inputFormatters: [
         FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z0-9]')),
@@ -239,9 +239,9 @@ class _SkaterEntryDialogState extends State<_SkaterEntryDialog> {
               number: n,
               onTap: () => _submitNumber(n),
             )),
-        // '?' = anonymous / skip
+        // '?' = open keyboard to type manually
         GestureDetector(
-          onTap: () => Navigator.of(context).pop(),
+          onTap: () => setState(() => _keyboardMode = true),
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
             decoration: BoxDecoration(

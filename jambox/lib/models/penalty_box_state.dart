@@ -9,7 +9,7 @@ class TeamInfo {
   Color color;
 
   TeamInfo({required this.index, this.name = '', Color? color})
-    : color = color ?? (index == 1 ? Colors.blue.shade400 : Colors.red.shade400);
+    : color = color ?? (index == 1 ? Colors.white : Colors.grey);
 }
 
 class PenaltyBoxState extends ChangeNotifier {
@@ -23,9 +23,12 @@ class PenaltyBoxState extends ChangeNotifier {
   int periodNumber = 1;
   int jamNumber = 0;
 
-  // Team info loaded from CRG
-  final TeamInfo team1 = TeamInfo(index: 1, name: 'Team 1');
-  final TeamInfo team2 = TeamInfo(index: 2, name: 'Team 2');
+  // Set to true when CRG sends team names; used to detect remote name updates.
+  bool teamNamesFromRemote = false;
+
+  // Team info loaded from CRG (defaults to Salt/Pepper for local/offline use)
+  final TeamInfo team1 = TeamInfo(index: 1, name: 'Salt', color: Colors.white);
+  final TeamInfo team2 = TeamInfo(index: 2, name: 'Pepper', color: Colors.grey);
 
   // Roster from CRG: skaterNumber -> skaterId (uuid)
   final Map<String, String> _rosterTeam1 = {};
@@ -36,14 +39,19 @@ class PenaltyBoxState extends ChangeNotifier {
   final Set<String> _knownNumbersTeam2 = {};
 
   // Active seats: indexed by seat id
-  // Seat layout: team1Jammer, team1Blocker1, team1Blocker2, team2Jammer, team2Blocker1, team2Blocker2
+  // Seat layout (5 per team): jammer, blocker1–4
+  // Team-1: idx 0–4; Team-2: idx 5–9
   final List<SkaterSeat> seats = [
-    SkaterSeat(id: 't1j', teamIndex: 1, position: SkaterPosition.jammer),
+    SkaterSeat(id: 't1j',  teamIndex: 1, position: SkaterPosition.jammer),
     SkaterSeat(id: 't1b1', teamIndex: 1, position: SkaterPosition.blocker),
     SkaterSeat(id: 't1b2', teamIndex: 1, position: SkaterPosition.blocker),
-    SkaterSeat(id: 't2j', teamIndex: 2, position: SkaterPosition.jammer),
+    SkaterSeat(id: 't1b3', teamIndex: 1, position: SkaterPosition.blocker),
+    SkaterSeat(id: 't1b4', teamIndex: 1, position: SkaterPosition.blocker),
+    SkaterSeat(id: 't2j',  teamIndex: 2, position: SkaterPosition.jammer),
     SkaterSeat(id: 't2b1', teamIndex: 2, position: SkaterPosition.blocker),
     SkaterSeat(id: 't2b2', teamIndex: 2, position: SkaterPosition.blocker),
+    SkaterSeat(id: 't2b3', teamIndex: 2, position: SkaterPosition.blocker),
+    SkaterSeat(id: 't2b4', teamIndex: 2, position: SkaterPosition.blocker),
   ];
 
   // Queue: skaters waiting for a seat to open (3rd+ blocker)
@@ -54,17 +62,22 @@ class PenaltyBoxState extends ChangeNotifier {
 
   TeamInfo teamInfo(int idx) => idx == 1 ? team1 : team2;
 
-  SkaterSeat get team1Jammer => seats[0];
+  SkaterSeat get team1Jammer   => seats[0];
   SkaterSeat get team1Blocker1 => seats[1];
   SkaterSeat get team1Blocker2 => seats[2];
-  SkaterSeat get team2Jammer => seats[3];
-  SkaterSeat get team2Blocker1 => seats[4];
-  SkaterSeat get team2Blocker2 => seats[5];
+  SkaterSeat get team1Blocker3 => seats[3];
+  SkaterSeat get team1Blocker4 => seats[4];
+  SkaterSeat get team2Jammer   => seats[5];
+  SkaterSeat get team2Blocker1 => seats[6];
+  SkaterSeat get team2Blocker2 => seats[7];
+  SkaterSeat get team2Blocker3 => seats[8];
+  SkaterSeat get team2Blocker4 => seats[9];
 
   SkaterSeat jammerSeat(int teamIdx) => teamIdx == 1 ? team1Jammer : team2Jammer;
 
-  List<SkaterSeat> blockerSeats(int teamIdx) =>
-      teamIdx == 1 ? [team1Blocker1, team1Blocker2] : [team2Blocker1, team2Blocker2];
+  List<SkaterSeat> blockerSeats(int teamIdx) => teamIdx == 1
+      ? [team1Blocker1, team1Blocker2, team1Blocker3, team1Blocker4]
+      : [team2Blocker1, team2Blocker2, team2Blocker3, team2Blocker4];
 
   List<SkaterSeat> queueForTeam(int teamIdx) =>
       queue.where((s) => s.teamIndex == teamIdx).toList();
@@ -77,7 +90,10 @@ class PenaltyBoxState extends ChangeNotifier {
 
   void updateTeam(int teamIdx, {String? name, Color? color}) {
     final t = teamInfo(teamIdx);
-    if (name != null) t.name = name.isNotEmpty ? name : 'Team $teamIdx';
+    if (name != null) {
+      t.name = name.isNotEmpty ? name : (teamIdx == 1 ? 'Salt' : 'Pepper');
+      teamNamesFromRemote = true;
+    }
     if (color != null) t.color = color;
     notifyListeners();
   }
