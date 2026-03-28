@@ -208,16 +208,114 @@ class RemotePenaltyEngine extends PenaltyEngine with WidgetsBindingObserver {
     }
   }
 
-  void _parseState(Map<String, dynamic> state) {
-    bool jamWasRunning = _state.jamRunning;
-
-    for (final entry in state.entries) {
+  /// Phase 1: parse a raw WS state map into a typed delta with no side effects.
+  _WsDelta _buildDelta(Map<String, dynamic> stateMap) {
+    final delta = _WsDelta();
+    for (final entry in stateMap.entries) {
       final key = entry.key;
       final value = entry.value;
-      _parsePath(key, value);
+
+      if (key == 'ScoreBoard.CurrentGame.InJam') {
+        delta.jamRunning = value == true || value == 'true';
+        delta.jamRunningIsDefinitive = true;
+        continue;
+      }
+      if (key == 'ScoreBoard.CurrentGame.Clock(Jam).Running') {
+        // Only use as fallback if InJam not present in this message
+        if (!delta.jamRunningIsDefinitive) delta.jamRunning = value == true || value == 'true';
+        continue;
+      }
+      if (key == 'ScoreBoard.CurrentGame.Clock(Jam).Number') {
+        final n = _parseInt(value);
+        if (n != null) delta.jamNumber = n;
+        continue;
+      }
+      if (key == 'ScoreBoard.CurrentGame.Clock(Period).Number') {
+        final n = _parseInt(value);
+        if (n != null) delta.periodNumber = n;
+        continue;
+      }
+
+      final teamNameMatch = _reTeamName.firstMatch(key);
+      if (teamNameMatch != null) {
+        delta.teamNames[int.parse(teamNameMatch.group(1)!)] = value?.toString() ?? '';
+        continue;
+      }
+
+      final teamColorMatch = _reTeamColor.firstMatch(key);
+      if (teamColorMatch != null) {
+        final color = _parseColor(value?.toString());
+        if (color != null) delta.teamColors[int.parse(teamColorMatch.group(1)!)] = color;
+        continue;
+      }
+
+      final skaterMatch = _reSkaterNumber.firstMatch(key);
+      if (skaterMatch != null) {
+        final t = int.parse(skaterMatch.group(1)!);
+        final number = value?.toString() ?? '';
+        if (number.isNotEmpty) (delta.rosterNumbers[t] ??= {})[skaterMatch.group(2)!] = number;
+        continue;
+      }
+
+      final roleMatch = _reSkaterRole.firstMatch(key);
+      if (roleMatch != null) {
+        delta.skaterRoles.add((int.parse(roleMatch.group(1)!), roleMatch.group(2)!, value?.toString() ?? ''));
+        continue;
+      }
+
+      final boxSeatMatch = _reBoxSeat.firstMatch(key);
+      if (boxSeatMatch != null) {
+        delta.boxSeats.add((int.parse(boxSeatMatch.group(1)!), boxSeatMatch.group(2)!, boxSeatMatch.group(3)!, value));
+        continue;
+      }
+
+      final boxClockMatch = _reBoxClock.firstMatch(key);
+      if (boxClockMatch != null) {
+        delta.boxClocks.add((int.parse(boxClockMatch.group(1)!), boxClockMatch.group(2)!, boxClockMatch.group(3)!, value));
+        continue;
+      }
+
+      final legacySkaterMatch = _reLegacySkater.firstMatch(key);
+      if (legacySkaterMatch != null && value is Map) {
+        delta.legacyRosters.add((int.parse(legacySkaterMatch.group(1)!), value));
+        continue;
+      }
+    }
+    return delta;
+  }
+
+  /// Phase 2: apply a parsed delta to state in the correct order.
+  void _applyDelta(_WsDelta delta) {
+    final jamWasRunning = _state.jamRunning;
+
+    if (delta.jamRunning != null) {
+      _state.jamRunning = delta.jamRunning!;
+      _bootstrapping = false;
+    }
+    if (delta.jamNumber != null) _state.jamNumber = delta.jamNumber!;
+    if (delta.periodNumber != null) _state.periodNumber = delta.periodNumber!;
+
+    for (final e in delta.teamNames.entries) _state.updateTeam(e.key, name: e.value);
+    for (final e in delta.teamColors.entries) _state.updateTeam(e.key, color: e.value);
+
+    for (final e in delta.rosterNumbers.entries) {
+      e.value.forEach((uuid, number) => _state.updateRoster(e.key, number, uuid));
+    }
+    for (final (t, data) in delta.legacyRosters) {
+      data.forEach((skaterId, skaterData) {
+        if (skaterData is Map) {
+          final number = skaterData['Number']?.toString() ?? '';
+          if (number.isNotEmpty) _state.updateRoster(t, number, skaterId.toString());
+        }
+      });
     }
 
-    // Trigger jam events if state changed
+    for (final (t, uuid, role) in delta.skaterRoles) _onSkaterRole(t, uuid, role);
+
+    // BoxSeat before BoxClock: seat occupancy must be set before Running is applied.
+    for (final (t, seat, prop, value) in delta.boxSeats) _onBoxSeatUpdate(t, seat, prop, value);
+    for (final (t, seat, prop, value) in delta.boxClocks) _onBoxClockUpdate(t, seat, prop, value);
+
     final jamNowRunning = _state.jamRunning;
     if (!jamWasRunning && jamNowRunning) {
       _state.onJamStart();
@@ -226,98 +324,8 @@ class RemotePenaltyEngine extends PenaltyEngine with WidgetsBindingObserver {
     }
   }
 
-  void _parsePath(String key, dynamic value) {
-    // Jam running: ScoreBoard.CurrentGame.InJam or Clock(Jam).Running
-    if (key == 'ScoreBoard.CurrentGame.InJam') {
-      _state.jamRunning = value == true || value == 'true';
-      _bootstrapping = false;
-      return;
-    }
-    if (key == 'ScoreBoard.CurrentGame.Clock(Jam).Running') {
-      // Only use as fallback if InJam not available
-      _state.jamRunning = value == true || value == 'true';
-      _bootstrapping = false;
-      return;
-    }
-    if (key == 'ScoreBoard.CurrentGame.Clock(Jam).Number') {
-      final n = _parseInt(value);
-      if (n != null) _state.jamNumber = n;
-      return;
-    }
-    if (key == 'ScoreBoard.CurrentGame.Clock(Period).Number') {
-      final n = _parseInt(value);
-      if (n != null) _state.periodNumber = n;
-      return;
-    }
-
-    // Team names
-    final teamNameMatch = _reTeamName.firstMatch(key);
-    if (teamNameMatch != null) {
-      final t = int.parse(teamNameMatch.group(1)!);
-      _state.updateTeam(t, name: value?.toString() ?? '');
-      return;
-    }
-
-    // Team colors (use operator.fg for text/accent)
-    final teamColorMatch = _reTeamColor.firstMatch(key);
-    if (teamColorMatch != null) {
-      final t = int.parse(teamColorMatch.group(1)!);
-      final color = _parseColor(value?.toString());
-      if (color != null) _state.updateTeam(t, color: color);
-      return;
-    }
-
-    // Roster: ScoreBoard.CurrentGame.Team(t).Skater(uuid).Number
-    final skaterMatch = _reSkaterNumber.firstMatch(key);
-    if (skaterMatch != null) {
-      final t = int.parse(skaterMatch.group(1)!);
-      final skaterId = skaterMatch.group(2)!;
-      final number = value?.toString() ?? '';
-      if (number.isNotEmpty) _state.updateRoster(t, number, skaterId);
-      return;
-    }
-
-    // Skater role — used in BoxSeat mode to display jammer number
-    final roleMatch = _reSkaterRole.firstMatch(key);
-    if (roleMatch != null) {
-      final t = int.parse(roleMatch.group(1)!);
-      final uuid = roleMatch.group(2)!;
-      _onSkaterRole(t, uuid, value?.toString() ?? '');
-      return;
-    }
-
-    // BoxClock: ScoreBoard.CurrentGame.BoxClock(Team1Jammer).Time or .Running
-    final boxClockMatch = _reBoxClock.firstMatch(key);
-    if (boxClockMatch != null) {
-      final t = int.parse(boxClockMatch.group(1)!);
-      final seatId = boxClockMatch.group(2)!;
-      final prop = boxClockMatch.group(3)!;
-      _onBoxClockUpdate(t, seatId, prop, value);
-      return;
-    }
-
-    // BoxSeat: ScoreBoard.CurrentGame.Team(N).BoxSeat(SeatId).Started or .BoxSkater
-    final boxSeatMatch = _reBoxSeat.firstMatch(key);
-    if (boxSeatMatch != null) {
-      final t = int.parse(boxSeatMatch.group(1)!);
-      final seatId = boxSeatMatch.group(2)!;
-      final prop = boxSeatMatch.group(3)!;
-      _onBoxSeatUpdate(t, seatId, prop, value);
-      return;
-    }
-
-    // Legacy roster: Game.Team(t).Skater — value is a map
-    final legacySkaterMatch = _reLegacySkater.firstMatch(key);
-    if (legacySkaterMatch != null && value is Map) {
-      final t = int.parse(legacySkaterMatch.group(1)!);
-      value.forEach((skaterId, skaterData) {
-        if (skaterData is Map) {
-          final number = skaterData['Number']?.toString() ?? '';
-          if (number.isNotEmpty) _state.updateRoster(t, number, skaterId.toString());
-        }
-      });
-      return;
-    }
+  void _parseState(Map<String, dynamic> stateMap) {
+    _applyDelta(_buildDelta(stateMap));
   }
 
   int? _parseInt(dynamic value) {
@@ -353,6 +361,13 @@ class RemotePenaltyEngine extends PenaltyEngine with WidgetsBindingObserver {
       't2b2' => (2, 'Blocker2'),
       _ => (null, null),
     };
+  }
+
+  /// Map a SkaterSeat to its BoxClock key string, e.g. 'Team1Jammer'.
+  String? _seatToBoxClockId(SkaterSeat seat) {
+    final (teamIdx, seatId) = _seatToBoxSeatId(seat);
+    if (teamIdx == null || seatId == null) return null;
+    return 'Team$teamIdx$seatId';
   }
 
   /// Map BoxClock ID components to a SkaterSeat (null for Blocker3 → use queue).
@@ -403,6 +418,13 @@ class RemotePenaltyEngine extends PenaltyEngine with WidgetsBindingObserver {
         _wsSet('ScoreBoard.CurrentGame.Team($teamIdx).BoxSeat($seatId).BoxSkater', number);
       }
     };
+    _state.onSeatRunningChanged = (seat, running) {
+      if (!_ownsSet(seat)) return;
+      final clockId = _seatToBoxClockId(seat);
+      if (clockId != null) {
+        _wsSet('ScoreBoard.CurrentGame.BoxClock($clockId).Running', running);
+      }
+    };
 
     _log.i('BoxSeat mode activated — WS commands enabled for owned seats');
   }
@@ -425,10 +447,10 @@ class RemotePenaltyEngine extends PenaltyEngine with WidgetsBindingObserver {
       } else if (prop == 'Running') {
         final running = value == true || value == 'true';
         // Non-owned seats: always follow server.
-        // Owned seats: only apply Running=true as a catch-up (seat occupied but not yet running
-        // locally — e.g. another device started this seat). Never apply Running=false from server;
-        // local onJamEnd() handles stopping owned seats.
-        final applyIt = !_ownsSet(seat) || (running && seat.isOccupied && !seat.isRunning);
+        // Owned seats:
+        //   Running=false → always apply (another controller paused this clock).
+        //   Running=true  → only apply as a catch-up (seat occupied but not yet running locally).
+        final applyIt = !_ownsSet(seat) || !running || (running && seat.isOccupied && !seat.isRunning);
         if (applyIt && seat.isRunning != running) { seat.isRunning = running; changed = true; }
       }
     } else if (seatId == 'Blocker3' && prop == 'Time') {
@@ -635,4 +657,20 @@ class RemotePenaltyEngine extends PenaltyEngine with WidgetsBindingObserver {
     _log.d('Reporting penalty: $message');
     _channel?.sink.add(message);
   }
+}
+
+/// Typed intermediate representation of a single WS state message.
+/// Built in phase 1 (_buildDelta) with no side effects, applied in phase 2 (_applyDelta).
+class _WsDelta {
+  bool? jamRunning;
+  bool jamRunningIsDefinitive = false;
+  int? jamNumber;
+  int? periodNumber;
+  final Map<int, String> teamNames = {};
+  final Map<int, Color> teamColors = {};
+  final Map<int, Map<String, String>> rosterNumbers = {}; // team -> {uuid: number}
+  final List<(int team, String uuid, String role)> skaterRoles = [];
+  final List<(int team, String seat, String prop, dynamic value)> boxSeats = [];
+  final List<(int team, String seat, String prop, dynamic value)> boxClocks = [];
+  final List<(int team, Map<dynamic, dynamic> data)> legacyRosters = [];
 }

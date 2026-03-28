@@ -52,24 +52,25 @@ class _SeatCardState extends State<SeatCard> with SingleTickerProviderStateMixin
     super.dispose();
   }
 
-  void _onTap(PenaltyBoxState state) async {
+  void _onTap(PenaltyBoxState state) {
     final seat = widget.seat;
     switch (seat.state) {
       case SeatState.empty:
-        await _startAnonymousAndGetNumber(state);
+        state.startSeatAnonymously(seat);
       case SeatState.done:
         _hapticLight();
         state.clearSeat(seat);
       case SeatState.running:
       case SeatState.standing:
-        if (seat.skaterNumber == '?') await _getSkaterNumber(state);
       case SeatState.paused:
-        if (seat.position == SkaterPosition.jammer && state.jamRunning) {
-          state.startJammerTimer(seat.teamIndex);
-        } else if (seat.skaterNumber == '?') {
-          await _getSkaterNumber(state);
-        }
+        state.toggleSeatTimer(seat);
     }
+  }
+
+  void _onNumberTap(PenaltyBoxState state) async {
+    final seat = widget.seat;
+    if (seat.isEmpty) return;
+    await _getSkaterNumber(state);
   }
 
   void _onLongPress(PenaltyBoxState state) async {
@@ -77,35 +78,6 @@ class _SeatCardState extends State<SeatCard> with SingleTickerProviderStateMixin
     if (seat.isEmpty) return;
     _hapticMedium();
     await _showAdjustSheet(state);
-  }
-
-  Future<void> _startAnonymousAndGetNumber(PenaltyBoxState state) async {
-    final seat = widget.seat;
-    final isJammer = seat.position == SkaterPosition.jammer;
-
-    if (!isJammer) {
-      final blockers = state.blockerSeats(seat.teamIndex);
-      if (blockers.every((s) => s.isOccupied)) {
-        await _addToQueue(state);
-        return;
-      }
-    }
-
-    state.startSeatAnonymously(seat);
-    if (!mounted) return;
-
-    final result = await showSkaterEntryDialog(
-      context,
-      initialPosition: isJammer ? SkaterPosition.jammer : SkaterPosition.blocker,
-      allowJammer: isJammer,
-      teamName: state.teamInfo(seat.teamIndex).name,
-      barrierDismissible: true,
-      knownNumbers: state.knownNumbers(seat.teamIndex),
-    );
-
-    if (result != null && mounted) {
-      state.setSkaterNumber(seat, result.number, position: result.position);
-    }
   }
 
   Future<void> _getSkaterNumber(PenaltyBoxState state) async {
@@ -123,23 +95,6 @@ class _SeatCardState extends State<SeatCard> with SingleTickerProviderStateMixin
 
     if (result != null && mounted) {
       state.setSkaterNumber(seat, result.number, position: result.position);
-    }
-  }
-
-  Future<void> _addToQueue(PenaltyBoxState state) async {
-    final result = await showSkaterEntryDialog(
-      context,
-      initialPosition: SkaterPosition.blocker,
-      allowJammer: false,
-      teamName: state.teamInfo(widget.seat.teamIndex).name,
-      knownNumbers: state.knownNumbers(widget.seat.teamIndex),
-    );
-    if (result != null && mounted) {
-      state.addToQueue(
-        teamIdx: widget.seat.teamIndex,
-        number: result.number,
-        position: result.position,
-      );
     }
   }
 
@@ -257,9 +212,12 @@ class _SeatCardState extends State<SeatCard> with SingleTickerProviderStateMixin
               ),
             ),
             const Spacer(),
-            Text(
-              '#${seat.skaterNumber}',
-              style: AppTextStyles.skaterNumber.copyWith(fontSize: compact ? 18 : 22),
+            GestureDetector(
+              onTap: () => _onNumberTap(state),
+              child: Text(
+                '#${seat.skaterNumber}',
+                style: AppTextStyles.skaterNumber.copyWith(fontSize: compact ? 18 : 22),
+              ),
             ),
           ],
         ),

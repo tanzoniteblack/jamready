@@ -265,7 +265,7 @@ void main() {
       expect(state.team2Jammer.timeRemaining, const Duration(milliseconds: 24800));
     });
 
-    test('BoxClock.Running=false never applied to owned seat', () async {
+    test('BoxClock.Running=false pauses owned seat (another controller stopped it)', () async {
       final (:engine, :channel, :state) = await setupEngine();
       await enterBoxSeatMode(channel);
       await endBootstrap(channel, inJam: true);
@@ -277,8 +277,8 @@ void main() {
         'ScoreBoard.CurrentGame.BoxClock(Team1Jammer).Running': false,
       });
 
-      // Local timer still running — server cannot stop owned seat
-      expect(state.team1Jammer.isRunning, isTrue);
+      // Running=false from server always applied — another controller paused this clock
+      expect(state.team1Jammer.isRunning, isFalse);
     });
 
     test('BoxClock.Running=true applied as catch-up for occupied-but-stopped owned seat', () async {

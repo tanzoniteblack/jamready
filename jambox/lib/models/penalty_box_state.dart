@@ -120,6 +120,7 @@ class PenaltyBoxState extends ChangeNotifier {
   void Function(SkaterSeat)? onSeatCleared;
   void Function(SkaterSeat, int seconds)? onSeatTimeChanged;
   void Function(SkaterSeat, String number)? onSkaterAssigned;
+  void Function(SkaterSeat, bool running)? onSeatRunningChanged;
 
   /// Called by the remote engine to push UI updates when seat state is mutated directly.
   void notifyFromEngine() => notifyListeners();
@@ -129,6 +130,7 @@ class PenaltyBoxState extends ChangeNotifier {
     onSeatCleared = null;
     onSeatTimeChanged = null;
     onSkaterAssigned = null;
+    onSeatRunningChanged = null;
   }
 
   List<String> knownNumbers(int teamIdx) {
@@ -352,6 +354,13 @@ class PenaltyBoxState extends ChangeNotifier {
 
   void removeFromQueue(SkaterSeat seat) {
     queue.remove(seat);
+    notifyListeners();
+  }
+
+  void toggleSeatTimer(SkaterSeat seat) {
+    if (!seat.isOccupied || seat.timeRemaining <= Duration.zero) return;
+    seat.isRunning = !seat.isRunning;
+    onSeatRunningChanged?.call(seat, seat.isRunning);
     notifyListeners();
   }
 
