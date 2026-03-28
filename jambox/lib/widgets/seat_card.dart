@@ -155,7 +155,7 @@ class _SeatCardState extends State<SeatCard> with SingleTickerProviderStateMixin
           borderRadius: BorderRadius.circular(16),
         ),
         child: Padding(
-          padding: EdgeInsets.all(compact ? 10 : 14),
+          padding: EdgeInsets.all(compact ? 8 : 12),
           child: seatState == SeatState.empty
               ? _buildEmpty(teamColor, compact)
               : _buildOccupied(context, state, seat, seatState, teamColor, compact),
@@ -195,7 +195,7 @@ class _SeatCardState extends State<SeatCard> with SingleTickerProviderStateMixin
     final isPaused = seatState == SeatState.paused;
     final isActive = seatState == SeatState.running || isStanding;
     final timeStr = _formatTime(seat.timeRemaining);
-    final timerFontSize = compact ? 34.0 : 46.0;
+    final timerFontSize = compact ? 30.0 : 42.0;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -225,87 +225,91 @@ class _SeatCardState extends State<SeatCard> with SingleTickerProviderStateMixin
         // Row 2: timer / done / paused display — fills available space
         Expanded(
           child: Center(
-            child: isDone
-                ? ScaleTransition(
-                    scale: _pulseAnimation,
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          'DONE',
-                          textAlign: TextAlign.center,
-                          style: AppTextStyles.alertLabel.copyWith(
-                            color: Colors.red.shade400,
-                            fontSize: compact ? 24 : 32,
-                          ),
-                        ),
-                        Text(
-                          'tap to clear',
-                          textAlign: TextAlign.center,
-                          style: AppTextStyles.clockLabel.copyWith(
-                            color: Colors.red.shade300.withValues(alpha: 0.7),
-                            fontSize: 11,
-                            letterSpacing: 1,
-                          ),
-                        ),
-                      ],
-                    ),
-                  )
-                : isStanding
-                    ? ScaleTransition(
-                        scale: _pulseAnimation,
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              'STAND  ',
-                              style: AppTextStyles.alertLabel.copyWith(
-                                color: Colors.amber.shade400,
-                                fontSize: compact ? 14 : 18,
-                              ),
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: isDone
+                  ? ScaleTransition(
+                      scale: _pulseAnimation,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            'DONE',
+                            textAlign: TextAlign.center,
+                            style: AppTextStyles.alertLabel.copyWith(
+                              color: Colors.red.shade400,
+                              fontSize: compact ? 22 : 28,
                             ),
-                            Text(
-                              timeStr,
-                              style: AppTextStyles.clockTimeSmall.copyWith(
-                                color: Colors.amber.shade300,
-                                fontSize: compact ? 28 : 38,
-                              ),
+                          ),
+                          Text(
+                            'tap to clear',
+                            textAlign: TextAlign.center,
+                            style: AppTextStyles.clockLabel.copyWith(
+                              color: Colors.red.shade300.withValues(alpha: 0.7),
+                              fontSize: 11,
+                              letterSpacing: 1,
                             ),
-                          ],
-                        ),
-                      )
-                    : isPaused
-                        ? Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
+                          ),
+                        ],
+                      ),
+                    )
+                  : isStanding
+                      ? ScaleTransition(
+                          scale: _pulseAnimation,
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
                             children: [
                               Text(
                                 timeStr,
                                 style: AppTextStyles.clockTimeSmall.copyWith(
-                                  color: Colors.white38,
-                                  fontSize: timerFontSize,
+                                  color: Colors.amber.shade300,
+                                  fontSize: compact ? 28 : 36,
                                 ),
                               ),
-                              const SizedBox(width: 8),
+                              const SizedBox(height: 2),
                               Text(
-                                'PAUSED',
-                                style: AppTextStyles.clockLabel.copyWith(
-                                  color: Colors.white24,
-                                  fontSize: 11,
-                                  letterSpacing: 1.5,
+                                'STAND',
+                                style: AppTextStyles.alertLabel.copyWith(
+                                  color: Colors.amber.shade400,
+                                  fontSize: compact ? 11 : 13,
                                 ),
                               ),
                             ],
-                          )
-                        : ScaleTransition(
-                            scale: _pulseAnimation,
-                            child: Text(
-                              timeStr,
-                              style: AppTextStyles.clockTimeSmall.copyWith(
-                                color: Colors.white,
-                                fontSize: timerFontSize,
+                          ),
+                        )
+                      : isPaused
+                          ? Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  timeStr,
+                                  style: AppTextStyles.clockTimeSmall.copyWith(
+                                    color: Colors.white38,
+                                    fontSize: timerFontSize,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  'PAUSED',
+                                  style: AppTextStyles.clockLabel.copyWith(
+                                    color: Colors.white24,
+                                    fontSize: compact ? 10 : 11,
+                                    letterSpacing: 1.5,
+                                  ),
+                                ),
+                              ],
+                            )
+                          : ScaleTransition(
+                              scale: _pulseAnimation,
+                              child: Text(
+                                timeStr,
+                                style: AppTextStyles.clockTimeSmall.copyWith(
+                                  color: Colors.white,
+                                  fontSize: timerFontSize,
+                                ),
                               ),
                             ),
-                          ),
+            ),
           ),
         ),
 
