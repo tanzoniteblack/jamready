@@ -182,14 +182,20 @@ class PenaltyBoxState extends ChangeNotifier {
   /// WFTDA §4.4 — jammer arrival sync.
   /// Called when a jammer is seated while a jam is running and the other
   /// jammer is already serving time. Synchronizes both clocks per the rules.
+  ///
+  /// Uses [unmatchedPenalties] instead of [penaltyCount] so penalties that
+  /// were already paired in a prior swap are never re-matched.
   void _applyJammerArrivalSync(SkaterSeat arriving) {
     const pd = Duration(seconds: 30);
     final sitting = jammerSeat(arriving.teamIndex == 1 ? 2 : 1);
     if (!sitting.isOccupied || !sitting.isRunning) return;
+    // All of sitting's penalties already matched — arriving serves full time
+    if (sitting.unmatchedPenalties == 0) return;
 
-    var sittingMax = pd * sitting.penaltyCount;
+    var sittingMax = pd * sitting.unmatchedPenalties;
     var arrivingMax = pd * arriving.penaltyCount;
-    var sittingTime = sitting.timeRemaining;
+    // Clamp sitting's eligible time to the unmatched portion
+    var sittingTime = sitting.timeRemaining < sittingMax ? sitting.timeRemaining : sittingMax;
     var arrivingTime = arrivingMax;
 
     // Cancel penalty pairs one-for-one (§4.4.2)
@@ -202,20 +208,26 @@ class PenaltyBoxState extends ChangeNotifier {
 
     if (sittingMax == Duration.zero || arrivingMax == Duration.zero) {
       // One side fully cancelled — values already correct after loop
-    } else if (sittingMax == arrivingMax) {
-      // Simple case (§4.4.1): release sitting, arriving serves elapsed
-      final elapsed = sittingMax - sitting.timeRemaining;
-      arrivingTime = elapsed.isNegative ? Duration.zero : elapsed > arrivingMax ? arrivingMax : elapsed;
+      sitting.unmatchedPenalties = sittingMax.inSeconds ~/ 30;
+      arriving.unmatchedPenalties = arrivingMax.inSeconds ~/ 30;
+    } else if (sittingMax <= arrivingMax) {
+      // §4.4.1 (extended): sitting released; arriving serves elapsed + any
+      // extra unmatched penalties beyond what sitting had
+      final elapsed = sittingMax - sittingTime;
+      arrivingTime = elapsed + (arrivingMax - sittingMax);
       sittingTime = Duration.zero;
+      sitting.unmatchedPenalties = 0;
+      arriving.unmatchedPenalties = (arrivingMax - sittingMax).inSeconds ~/ 30;
     } else {
-      // Nightmare scenario (§4.4.3): uneven penalty counts, keep existing times
+      // §4.4.3 nightmare: sitting has more unmatched — keep existing times
       arrivingTime = arrivingMax;
       sittingTime = sitting.timeRemaining;
+      // unmatchedPenalties unchanged for both
     }
 
     arriving.timeRemaining = arrivingTime;
-    sitting.timeRemaining = sittingTime;
-    if (sittingTime <= Duration.zero) sitting.isRunning = false;
+    if (sittingTime < sitting.timeRemaining) sitting.timeRemaining = sittingTime;
+    if (sitting.timeRemaining <= Duration.zero) sitting.isRunning = false;
     if (arrivingTime <= Duration.zero) arriving.isRunning = false;
   }
 
@@ -249,12 +261,17 @@ class PenaltyBoxState extends ChangeNotifier {
     required SkaterSeat seat,
     required String number,
     required SkaterPosition position,
+    int penaltyCount = 1,
   }) {
     seat.setSkater(
       number: number,
       pos: position,
       arrivedBetween: !jamRunning,
     );
+    // Add extra penalties before sync so the sync sees the full count
+    for (var i = 1; i < penaltyCount; i++) {
+      seat.addPenalty();
+    }
     if (jamRunning) {
       seat.isRunning = true;
       if (position == SkaterPosition.jammer) _applyJammerArrivalSync(seat);
@@ -269,6 +286,7 @@ class PenaltyBoxState extends ChangeNotifier {
     seat.skaterNumber = '?';
     seat.timeRemaining = const Duration(seconds: 30);
     seat.penaltyCount = 1;
+    seat.unmatchedPenalties = 1;
     seat.arrivedBetweenJams = !jamRunning;
     seat.isRunning = jamRunning;
     if (jamRunning && seat.position == SkaterPosition.jammer) {

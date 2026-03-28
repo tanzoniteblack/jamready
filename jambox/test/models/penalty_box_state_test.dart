@@ -175,12 +175,13 @@ void main() {
   // ---------------------------------------------------------------------------
 
   group('startSeatAnonymously()', () {
-    test('sets placeholder number, 30s, penaltyCount=1', () {
+    test('sets placeholder number, 30s, penaltyCount=1, unmatchedPenalties=1', () {
       state.startSeatAnonymously(state.team1Blocker1);
 
       expect(state.team1Blocker1.skaterNumber, '?');
       expectTimeRemaining(state.team1Blocker1, const Duration(seconds: 30));
       expect(state.team1Blocker1.penaltyCount, 1);
+      expect(state.team1Blocker1.unmatchedPenalties, 1);
     });
 
     test('isRunning=true when jam is running', () {
@@ -516,6 +517,130 @@ void main() {
 
       // Blocker seat time unchanged by jammer sync
       expectTimeRemaining(state.team1Blocker1, const Duration(seconds: 25));
+    });
+
+    // --- Scenario 6: returning jammer after a swap serves full time ---
+
+    test('returning jammer after swap serves full 30s, committed time unaffected (Scenario 6)', () {
+      // T1 (1 penalty) sits, 10s elapsed → 20s remaining
+      seatJammer(state, 1, '10');
+      state.tick(const Duration(seconds: 10));
+
+      // T2 arrives (1 penalty) → simple swap: T1 released, T2 gets elapsed (10s)
+      // T2.unmatchedPenalties = 0 after being matched
+      seatJammer(state, 2, '20');
+      expect(state.team1Jammer.timeRemaining, Duration.zero);
+      expect(state.team2Jammer.timeRemaining, const Duration(seconds: 10));
+
+      // Clear T1 (done); T2 is still serving
+      state.clearSeat(state.team1Jammer);
+
+      // T1 returns with a new penalty while T2 still serving
+      // T2.unmatchedPenalties == 0 → early return → T1 gets full 30s
+      seatJammer(state, 1, '11');
+      expectJammerTimes(
+        state,
+        team1: const Duration(seconds: 30),
+        team2: const Duration(seconds: 10),
+      );
+    });
+
+    test('returning jammer, sitting jammer almost done — full penalty still applies (Scenario 6b)', () {
+      seatJammer(state, 1, '10');
+      state.tick(const Duration(seconds: 10));
+
+      seatJammer(state, 2, '20'); // T2 gets 10s, unmatch=0
+      state.clearSeat(state.team1Jammer);
+
+      // T2 almost done
+      state.tick(const Duration(seconds: 8)); // T2: 10s - 8s = 2s remaining
+
+      // T1 returns — T2.unmatch==0 → full 30s, T2 time unchanged
+      seatJammer(state, 1, '11');
+      expectJammerTimes(
+        state,
+        team1: const Duration(seconds: 30),
+        team2: const Duration(seconds: 2),
+      );
+    });
+
+    // --- Scenario 7: arriving jammer has more penalties than sitting ---
+
+    test('arriving jammer with 2 penalties: matched pair resolved, extra penalty unaffected (Scenario 7)', () {
+      // T1 (1 penalty) sitting, 10s elapsed → 20s remaining
+      seatJammer(state, 1, '10');
+      state.tick(const Duration(seconds: 10)); // T1: 20s
+
+      // T2 arrives with 2 penalties (60s, unmatch=2)
+      // sittingMax=30, arrivingMax=60, sittingTime=20
+      // §4.4.1 extended: elapsed=10, arrivingTime=10+(60-30)=40s; T1 released
+      seatJammer(state, 2, '20', penalties: 2);
+
+      expectJammerTimes(
+        state,
+        team1: Duration.zero,                  // released
+        team2: const Duration(seconds: 40),    // elapsed(10) + unmatched penalty(30)
+      );
+      expect(state.team1Jammer.isRunning, isFalse);
+      expect(state.team2Jammer.unmatchedPenalties, 1);
+    });
+
+    // --- Scenario 8: second swap matches opponent's remaining unmatched penalty ---
+
+    test('second swap: returning jammer matches opponent\'s unmatched second penalty (Scenario 8)', () {
+      // Blue (T1) seated, 10s elapsed → 20s remaining
+      seatJammer(state, 1, '10');
+      state.tick(const Duration(seconds: 10));
+
+      // Pink (T2) arrives with 2 penalties → first swap
+      // Blue→0s (released, unmatch=0), Pink→40s (unmatch=1)
+      seatJammer(state, 2, '20', penalties: 2);
+      state.clearSeat(state.team1Jammer);
+
+      // Tick 15s: Pink serves 10s credit + 5s of unmatched penalty → 25s remaining
+      state.tick(const Duration(seconds: 15));
+      expect(state.team2Jammer.timeRemaining, const Duration(seconds: 25));
+
+      // Blue returns with 1 new penalty → second swap
+      // Pink's unmatched penalty has 5s elapsed (25s remaining of 30s unmatched)
+      // Pink released (0s), Blue gets elapsed (5s)
+      seatJammer(state, 1, '11');
+      expectJammerTimes(
+        state,
+        team1: const Duration(seconds: 5),
+        team2: Duration.zero,
+      );
+      expect(state.team2Jammer.isRunning, isFalse);
+    });
+
+    // --- Scenario 14: 3-penalty jammer vs sequential 1-penalty arrivals ---
+
+    test('3-penalty jammer vs sequential 1-penalty arrivals (Scenario 14)', () {
+      // T1 seated with 3 penalties (90s), 10s elapsed → 80s remaining
+      seatJammer(state, 1, '10', penalties: 3);
+      state.tick(const Duration(seconds: 10));
+
+      // T2 first arrival (1 penalty): cancel one pair, T2 released, T1 reduced
+      // sittingMax=90, arrivingMax=30, sittingTime=80
+      // Loop: 80>=30 AND 30>=30 → sittingTime=50, arrivingTime=0, sittingMax=60, arrivingMax=0
+      // arrivingMax==0 → T2 released, T1→50s, T1.unmatch=2
+      seatJammer(state, 2, '20');
+      expect(state.team2Jammer.timeRemaining, Duration.zero);
+      expect(state.team2Jammer.isRunning, isFalse);
+      expect(state.team1Jammer.timeRemaining, const Duration(seconds: 50));
+      expect(state.team1Jammer.unmatchedPenalties, 2);
+
+      state.clearSeat(state.team2Jammer);
+      state.tick(const Duration(seconds: 5)); // T1: 45s remaining
+
+      // T2 second arrival (1 penalty): cancel another pair, T2 released again
+      // sittingMax=60, arrivingMax=30, sittingTime=45
+      // Loop: 45>=30 AND 30>=30 → sittingTime=15, arrivingTime=0, sittingMax=30, arrivingMax=0
+      // arrivingMax==0 → T2 released, T1→15s, T1.unmatch=1
+      seatJammer(state, 2, '21');
+      expect(state.team2Jammer.timeRemaining, Duration.zero);
+      expect(state.team1Jammer.timeRemaining, const Duration(seconds: 15));
+      expect(state.team1Jammer.unmatchedPenalties, 1);
     });
   });
 }

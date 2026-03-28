@@ -21,6 +21,11 @@ class SkaterSeat {
   // Total penalties being served in this box trip; used for §4.4 jammer sync math
   int penaltyCount;
 
+  // How many of this jammer's penalties have not yet been paired with the
+  // opposing jammer in a §4.4 swap. Drives sync math instead of penaltyCount
+  // so already-matched penalties are never re-matched.
+  int unmatchedPenalties;
+
   SkaterSeat({
     required this.id,
     this.skaterNumber = '',
@@ -31,6 +36,7 @@ class SkaterSeat {
     this.isInQueue = false,
     this.arrivedBetweenJams = false,
     this.penaltyCount = 0,
+    this.unmatchedPenalties = 0,
   });
 
   SeatState get state {
@@ -62,6 +68,7 @@ class SkaterSeat {
   void addPenalty() {
     timeRemaining += const Duration(seconds: 30);
     penaltyCount++;
+    unmatchedPenalties++;
   }
 
   void removePenalty() {
@@ -75,6 +82,7 @@ class SkaterSeat {
     isInQueue = false;
     arrivedBetweenJams = false;
     penaltyCount = 0;
+    unmatchedPenalties = 0;
   }
 
   void setSkater({
@@ -88,6 +96,7 @@ class SkaterSeat {
     isRunning = false;
     arrivedBetweenJams = arrivedBetween;
     penaltyCount = 1;
+    unmatchedPenalties = 1;
   }
 
   SkaterSeat copyWith({
@@ -99,6 +108,7 @@ class SkaterSeat {
     bool? isInQueue,
     bool? arrivedBetweenJams,
     int? penaltyCount,
+    int? unmatchedPenalties,
   }) {
     return SkaterSeat(
       id: id,
@@ -110,6 +120,7 @@ class SkaterSeat {
       isInQueue: isInQueue ?? this.isInQueue,
       arrivedBetweenJams: arrivedBetweenJams ?? this.arrivedBetweenJams,
       penaltyCount: penaltyCount ?? this.penaltyCount,
+      unmatchedPenalties: unmatchedPenalties ?? this.unmatchedPenalties,
     );
   }
 }

@@ -80,7 +80,8 @@ PenaltyBoxState makeState({AppRole role = AppRole.pbm, int? teamIndex}) =>
     PenaltyBoxState(role: role, teamIndex: teamIndex);
 
 /// Seats a jammer for [team] with [number]. If [penalties] > 1 the extra
-/// penalties are added via addPenaltyToSeat after seating. Returns the seat.
+/// penalties are included at seating time so the sync sees the full count.
+/// Returns the seat.
 SkaterSeat seatJammer(
   PenaltyBoxState state,
   int team,
@@ -88,10 +89,7 @@ SkaterSeat seatJammer(
   int penalties = 1,
 }) {
   final seat = state.jammerSeat(team);
-  state.seatSkater(seat: seat, number: number, position: SkaterPosition.jammer);
-  for (var i = 1; i < penalties; i++) {
-    state.addPenaltyToSeat(seat);
-  }
+  state.seatSkater(seat: seat, number: number, position: SkaterPosition.jammer, penaltyCount: penalties);
   return seat;
 }
 
