@@ -142,23 +142,26 @@ class _SeatCardState extends State<SeatCard> with SingleTickerProviderStateMixin
       _lastState = seatState;
     }
 
-    // Stand warn: double heavy buzz at 12s — tell the player to get ready to stand
+    // Stand warn: triple heavy burst at 12s — tell the player to get ready to stand
     if (seatState == SeatState.running && seat.timeRemaining.inSeconds <= 12 && !_preStandWarnGiven) {
       _preStandWarnGiven = true;
       HapticFeedback.heavyImpact();
-      Future.delayed(const Duration(milliseconds: 120), HapticFeedback.heavyImpact);
+      Future.delayed(const Duration(milliseconds: 100), HapticFeedback.heavyImpact);
+      Future.delayed(const Duration(milliseconds: 200), HapticFeedback.heavyImpact);
     }
     if (_preStandWarnGiven && (seatState == SeatState.empty || seat.timeRemaining.inSeconds > 12)) {
       _preStandWarnGiven = false;
     }
 
-    // Release warn: triple heavy burst each second from 2s down — more intense than stand warn
+    // Release warn: rapid quad heavy burst each second at 2s and 1s — fires during standing state
     final secs = seat.timeRemaining.inSeconds;
-    if (seatState == SeatState.running && secs <= 2 && secs >= 1 && secs != _lastReleaseWarnSecond) {
+    final isRunningOrStanding = seatState == SeatState.running || seatState == SeatState.standing;
+    if (isRunningOrStanding && secs <= 2 && secs >= 1 && secs != _lastReleaseWarnSecond) {
       _lastReleaseWarnSecond = secs;
       HapticFeedback.heavyImpact();
-      Future.delayed(const Duration(milliseconds: 100), HapticFeedback.heavyImpact);
-      Future.delayed(const Duration(milliseconds: 200), HapticFeedback.heavyImpact);
+      Future.delayed(const Duration(milliseconds: 80), HapticFeedback.heavyImpact);
+      Future.delayed(const Duration(milliseconds: 160), HapticFeedback.heavyImpact);
+      Future.delayed(const Duration(milliseconds: 240), HapticFeedback.heavyImpact);
     }
     if (_lastReleaseWarnSecond >= 0 && (seatState == SeatState.empty || secs > 2)) {
       _lastReleaseWarnSecond = -1;
@@ -412,22 +415,61 @@ class _PenaltyButton extends StatelessWidget {
 }
 
 /// Bottom sheet for fine-tuning a seat's timer and clearing the seat.
-class _SeatAdjustSheet extends StatelessWidget {
+///
+/// The timer display is frozen at the value when the sheet opened so the user
+/// can adjust without racing the live countdown. Adjustments accumulate locally
+/// and are applied to the running timer in a single call when Done is tapped.
+class _SeatAdjustSheet extends StatefulWidget {
   final SkaterSeat seat;
   final PenaltyBoxState state;
 
   const _SeatAdjustSheet({required this.seat, required this.state});
 
   @override
-  Widget build(BuildContext context) {
-    // Watch state so timer display updates live
-    context.watch<PenaltyBoxState>();
+  State<_SeatAdjustSheet> createState() => _SeatAdjustSheetState();
+}
 
-    final m = seat.timeRemaining.inMinutes;
-    final s = seat.timeRemaining.inSeconds % 60;
-    final timeStr = seat.timeRemaining <= Duration.zero
-        ? '0:00'
-        : '$m:${s.toString().padLeft(2, '0')}';
+class _SeatAdjustSheetState extends State<_SeatAdjustSheet> {
+  late Duration _displayTime;
+
+  @override
+  void initState() {
+    super.initState();
+    _displayTime = widget.seat.timeRemaining;
+  }
+
+  void _adjust(int seconds) {
+    setState(() {
+      final next = _displayTime + Duration(seconds: seconds);
+      _displayTime = next < Duration.zero ? Duration.zero : next;
+    });
+  }
+
+  void _done(BuildContext context) {
+    final delta = _displayTime - widget.seat.timeRemaining;
+    if (delta != Duration.zero) {
+      widget.state.adjustTime(widget.seat, delta);
+    }
+    Navigator.of(context).pop();
+  }
+
+  String _formatTime(Duration d) {
+    if (d <= Duration.zero) return '0:00';
+    final m = d.inMinutes;
+    final s = d.inSeconds % 60;
+    return '$m:${s.toString().padLeft(2, '0')}';
+  }
+
+  String _posLabel(SkaterPosition pos) => switch (pos) {
+    SkaterPosition.jammer => 'JAMMER',
+    SkaterPosition.pivot => 'PIVOT',
+    SkaterPosition.blocker => 'BLOCKER',
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    final seat = widget.seat;
+    final state = widget.state;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(24, 12, 24, 32),
@@ -465,48 +507,57 @@ class _SeatAdjustSheet extends StatelessWidget {
           ),
           const SizedBox(height: 20),
 
-          // Timer adjustment row
+          // Timer adjustment row (frozen display + local delta)
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              _SheetAdjustButton(
-                label: '−1s',
-                onTap: () => state.adjustTime(seat, const Duration(seconds: -1)),
-              ),
+              _SheetAdjustButton(label: '−1s', onTap: () => _adjust(-1)),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 24),
                 child: Text(
-                  timeStr,
+                  _formatTime(_displayTime),
                   style: AppTextStyles.clockTimeSmall.copyWith(fontSize: 48),
                 ),
               ),
-              _SheetAdjustButton(
-                label: '+1s',
-                onTap: () => state.adjustTime(seat, const Duration(seconds: 1)),
-              ),
+              _SheetAdjustButton(label: '+1s', onTap: () => _adjust(1)),
             ],
           ),
           const SizedBox(height: 28),
 
-          // Clear button
+          // Done button — primary action
           SizedBox(
             width: double.infinity,
             height: 50,
             child: ElevatedButton(
+              onPressed: () => _done(context),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.white.withValues(alpha: 0.1),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              child: Text(
+                'DONE',
+                style: AppTextStyles.buttonText.copyWith(fontSize: 15),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          // Release skater — destructive secondary action
+          SizedBox(
+            width: double.infinity,
+            height: 44,
+            child: TextButton(
               onPressed: () {
                 state.clearSeat(seat);
                 Navigator.of(context).pop();
               },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.red.shade900,
-                foregroundColor: Colors.red.shade300,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              ),
               child: Text(
-                'CLEAR SEAT',
-                style: AppTextStyles.buttonText.copyWith(
-                  color: Colors.red.shade300,
-                  fontSize: 15,
+                'RELEASE SKATER',
+                style: AppTextStyles.clockLabel.copyWith(
+                  color: Colors.red.shade400,
+                  fontSize: 13,
+                  letterSpacing: 1.5,
                 ),
               ),
             ),
@@ -515,12 +566,6 @@ class _SeatAdjustSheet extends StatelessWidget {
       ),
     );
   }
-
-  String _posLabel(SkaterPosition pos) => switch (pos) {
-    SkaterPosition.jammer => 'JAMMER',
-    SkaterPosition.pivot => 'PIVOT',
-    SkaterPosition.blocker => 'BLOCKER',
-  };
 }
 
 class _SheetAdjustButton extends StatelessWidget {
