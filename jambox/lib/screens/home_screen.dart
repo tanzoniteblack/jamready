@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/penalty_box_state.dart';
@@ -12,6 +11,10 @@ import '../services/remote_penalty_engine.dart';
 import '../styles/background.dart';
 import '../styles/text_styles.dart';
 import 'box_timer_screen.dart';
+import 'home/qr_scanner_screen.dart';
+import 'home/role_selector.dart';
+import 'home/shared_helpers.dart';
+import 'home/team_settings.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -224,7 +227,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _scanQRCode() async {
     final result = await Navigator.of(context).push<String>(
-      MaterialPageRoute(builder: (_) => const _QRScannerScreen()),
+      MaterialPageRoute(builder: (_) => const QRScannerScreen()),
     );
     if (result != null && mounted) {
       _parseAddress(result);
@@ -322,7 +325,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
                 const SizedBox(height: 20),
-                _divider('OR ENTER MANUALLY'),
+                divider('OR ENTER MANUALLY'),
                 const SizedBox(height: 20),
 
                 TextFormField(
@@ -361,7 +364,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ),
                   const SizedBox(height: 28),
-                  _divider('OR'),
+                  divider('OR'),
                   const SizedBox(height: 20),
                   Text(
                     'OFFLINE MODE',
@@ -417,7 +420,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                 ),
                               ),
                               const SizedBox(height: 16),
-                              _TeamSettingsSection(state: _previewState!),
+                              TeamSettingsSection(state: _previewState!),
                               const SizedBox(height: 24),
                               Container(height: 1, color: Colors.white.withValues(alpha: 0.1)),
                               const SizedBox(height: 24),
@@ -432,7 +435,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               ),
                             ),
                             const SizedBox(height: 12),
-                            _RoleSelector(
+                            RoleSelector(
                               team1Name: _team1Name,
                               team2Name: _team2Name,
                               team1Color: _previewState?.team1.color ?? Colors.white,
@@ -476,380 +479,6 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       filled: true,
       fillColor: Colors.white.withValues(alpha: 0.05),
-    );
-  }
-}
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-Widget _divider(String text) {
-  return Row(
-    children: [
-      Expanded(child: Divider(color: Colors.white24)),
-      Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        child: Text(text, style: AppTextStyles.clockLabel.copyWith(color: Colors.white38, fontSize: 11)),
-      ),
-      Expanded(child: Divider(color: Colors.white24)),
-    ],
-  );
-}
-
-/// Role selector — each card starts the game immediately on tap.
-class _RoleSelector extends StatelessWidget {
-  final String team1Name;
-  final String team2Name;
-  final Color team1Color;
-  final Color team2Color;
-  final void Function(AppRole) onTap;
-
-  const _RoleSelector({
-    required this.team1Name,
-    required this.team2Name,
-    required this.team1Color,
-    required this.team2Color,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    Widget roleRow(List<({AppRole role, String label, String subtitle, IconData icon, Color color})> options) {
-      return Row(
-        children: options
-            .expand((opt) => [
-                  Expanded(
-                    child: _RoleOption(
-                      role: opt.role,
-                      label: opt.label,
-                      subtitle: opt.subtitle,
-                      icon: opt.icon,
-                      color: opt.color,
-                      onTap: onTap,
-                    ),
-                  ),
-                  if (opt != options.last) const SizedBox(width: 10),
-                ])
-            .toList(),
-      );
-    }
-
-    return Column(
-      children: [
-        roleRow([
-          (role: AppRole.pbm, label: 'PBM', subtitle: 'Both jammers', icon: Icons.swap_horiz, color: Colors.deepOrange.shade400),
-          (role: AppRole.solo, label: 'Solo', subtitle: 'All seats', icon: Icons.grid_view, color: Colors.purple.shade400),
-        ]),
-        const SizedBox(height: 10),
-        roleRow([
-          (role: AppRole.team1BlockersOnly, label: team1Name, subtitle: '3 blockers', icon: Icons.people_outline, color: team1Color),
-          (role: AppRole.team1Full, label: team1Name, subtitle: 'Jammer + blockers', icon: Icons.timer, color: team1Color),
-        ]),
-        const SizedBox(height: 10),
-        roleRow([
-          (role: AppRole.team2BlockersOnly, label: team2Name, subtitle: '3 blockers', icon: Icons.people_outline, color: team2Color),
-          (role: AppRole.team2Full, label: team2Name, subtitle: 'Jammer + blockers', icon: Icons.timer, color: team2Color),
-        ]),
-      ],
-    );
-  }
-}
-
-class _RoleOption extends StatelessWidget {
-  final AppRole role;
-  final String label;
-  final String subtitle;
-  final IconData icon;
-  final Color color;
-  final void Function(AppRole) onTap;
-
-  const _RoleOption({
-    required this.role,
-    required this.label,
-    required this.subtitle,
-    required this.icon,
-    required this.color,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () => onTap(role),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.04),
-          border: Border.all(color: Colors.white24),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(icon, color: color, size: 24),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    label,
-                    style: AppTextStyles.clockLabel.copyWith(
-                      color: color,
-                      fontSize: 20,
-                      letterSpacing: 0.5,
-                      fontWeight: FontWeight.w600,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 6),
-            Text(
-              subtitle,
-              style: AppTextStyles.infoText.copyWith(
-                fontSize: 15,
-                color: Colors.white54,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ─── QR Scanner (reused from jamready) ────────────────────────────────────────
-
-class _QRScannerScreen extends StatefulWidget {
-  const _QRScannerScreen();
-
-  @override
-  State<_QRScannerScreen> createState() => _QRScannerScreenState();
-}
-
-class _QRScannerScreenState extends State<_QRScannerScreen> {
-  final MobileScannerController _controller = MobileScannerController();
-  bool _hasScanned = false;
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  void _onDetect(BarcodeCapture capture) {
-    if (_hasScanned) return;
-    final barcode = capture.barcodes.firstOrNull;
-    if (barcode?.rawValue != null) {
-      _hasScanned = true;
-      Navigator.of(context).pop(barcode!.rawValue);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.black,
-      appBar: AppBar(
-        title: Text('SCAN QR CODE', style: AppTextStyles.appBarTitle),
-        centerTitle: true,
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-      ),
-      body: Stack(
-        children: [
-          MobileScanner(controller: _controller, onDetect: _onDetect),
-          CustomPaint(
-            painter: _ScannerOverlayPainter(),
-            child: const SizedBox.expand(),
-          ),
-          Positioned(
-            bottom: 100,
-            left: 24,
-            right: 24,
-            child: Text(
-              'Point your camera at the QR code\non the scoreboard\'s index page',
-              textAlign: TextAlign.center,
-              style: AppTextStyles.clockLabel.copyWith(color: Colors.white70, fontSize: 16),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ScannerOverlayPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final cutoutSize = size.width * 0.7;
-    final cutoutRect = Rect.fromCenter(
-      center: Offset(size.width / 2, size.height / 2 - 50),
-      width: cutoutSize,
-      height: cutoutSize,
-    );
-    final cutoutRRect = RRect.fromRectAndRadius(cutoutRect, const Radius.circular(16));
-
-    // Dark overlay with cutout
-    canvas.drawPath(
-      Path()
-        ..addRect(Rect.fromLTWH(0, 0, size.width, size.height))
-        ..addRRect(cutoutRRect)
-        ..fillType = PathFillType.evenOdd,
-      Paint()..color = Colors.black.withValues(alpha: 0.5),
-    );
-
-    // White border
-    canvas.drawRRect(
-      cutoutRRect,
-      Paint()
-        ..color = Colors.white
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 3,
-    );
-
-    // Orange corner accents
-    final accentPaint = Paint()
-      ..color = Colors.deepOrange
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 5
-      ..strokeCap = StrokeCap.round;
-
-    const L = 30.0;
-    for (final [from, to] in [
-      [cutoutRect.topLeft, Offset(cutoutRect.left + L, cutoutRect.top)],
-      [cutoutRect.topLeft, Offset(cutoutRect.left, cutoutRect.top + L)],
-      [cutoutRect.topRight, Offset(cutoutRect.right - L, cutoutRect.top)],
-      [cutoutRect.topRight, Offset(cutoutRect.right, cutoutRect.top + L)],
-      [cutoutRect.bottomLeft, Offset(cutoutRect.left + L, cutoutRect.bottom)],
-      [cutoutRect.bottomLeft, Offset(cutoutRect.left, cutoutRect.bottom - L)],
-      [cutoutRect.bottomRight, Offset(cutoutRect.right - L, cutoutRect.bottom)],
-      [cutoutRect.bottomRight, Offset(cutoutRect.right, cutoutRect.bottom - L)],
-    ]) {
-      canvas.drawLine(from, to, accentPaint);
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
-
-// ─── Team Settings Section ────────────────────────────────────────────────────
-
-const _teamColors = [
-  Colors.white,
-  Colors.grey,
-  Colors.red,
-  Colors.deepOrange,
-  Colors.amber,
-  Colors.green,
-  Colors.blue,
-  Colors.purple,
-];
-
-class _TeamSettingsSection extends StatelessWidget {
-  final PenaltyBoxState state;
-
-  const _TeamSettingsSection({required this.state});
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        _TeamRow(teamIndex: 1, state: state),
-        const SizedBox(height: 16),
-        _TeamRow(teamIndex: 2, state: state),
-      ],
-    );
-  }
-}
-
-class _TeamRow extends StatefulWidget {
-  final int teamIndex;
-  final PenaltyBoxState state;
-
-  const _TeamRow({required this.teamIndex, required this.state});
-
-  @override
-  State<_TeamRow> createState() => _TeamRowState();
-}
-
-class _TeamRowState extends State<_TeamRow> {
-  late TextEditingController _controller;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = TextEditingController(text: widget.state.teamInfo(widget.teamIndex).name);
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final teamInfo = widget.state.teamInfo(widget.teamIndex);
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Team ${widget.teamIndex}',
-          style: AppTextStyles.clockLabel.copyWith(
-            color: Colors.white54,
-            fontSize: 12,
-            letterSpacing: 1.2,
-          ),
-        ),
-        const SizedBox(height: 8),
-        TextField(
-          controller: _controller,
-          style: const TextStyle(color: Colors.white),
-          decoration: InputDecoration(
-            hintText: widget.teamIndex == 1 ? 'Salt' : 'Pepper',
-            hintStyle: const TextStyle(color: Colors.white24),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: Colors.white24),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: teamInfo.color, width: 2),
-            ),
-            filled: true,
-            fillColor: Colors.white.withValues(alpha: 0.05),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-          ),
-          onChanged: (value) {
-            widget.state.updateTeam(widget.teamIndex, name: value);
-          },
-        ),
-        const SizedBox(height: 10),
-        Wrap(
-          spacing: 12,
-          children: _teamColors.map((color) {
-            final isSelected = teamInfo.color == color;
-            return GestureDetector(
-              onTap: () => widget.state.setTeamColor(widget.teamIndex, color),
-              child: Container(
-                width: 28,
-                height: 28,
-                decoration: BoxDecoration(
-                  color: color,
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: isSelected ? Colors.white : Colors.transparent,
-                    width: isSelected ? 3 : 0,
-                  ),
-                ),
-              ),
-            );
-          }).toList(),
-        ),
-      ],
     );
   }
 }
