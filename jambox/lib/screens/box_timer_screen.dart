@@ -9,10 +9,24 @@ import '../widgets/seat_card.dart';
 
 /// Single-team box timer view.
 /// Shows one team's jammer (inner) seat and two blocker (outer) seats stacked vertically.
-class BoxTimerScreen extends StatelessWidget {
+class BoxTimerScreen extends StatefulWidget {
   final PenaltyEngine engine;
 
   const BoxTimerScreen({super.key, required this.engine});
+
+  @override
+  State<BoxTimerScreen> createState() => _BoxTimerScreenState();
+}
+
+class _BoxTimerScreenState extends State<BoxTimerScreen> {
+  final ScrollController _scrollController = ScrollController();
+  double _dragStart = 0;
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -28,29 +42,43 @@ class BoxTimerScreen extends StatelessWidget {
     return DynamicBackground(
       accentColor: accentColor,
       child: PopScope(
-        canPop: false,
-        onPopInvoked: (_) => _navigateBack(context, engine),
-        child: Scaffold(
-          backgroundColor: Colors.transparent,
-          resizeToAvoidBottomInset: false,
-          appBar: _buildAppBar(context, state, teamInfo, engine),
-          body: RefreshIndicator(
-            onRefresh: engine.reconnect,
-            child: CustomScrollView(
-              physics: const AlwaysScrollableScrollPhysics(),
-              slivers: [
-                SliverFillRemaining(
-                  hasScrollBody: false,
-                  child: SafeArea(
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: MediaQuery.of(context).orientation == Orientation.landscape
-                          ? _buildLandscape(jammer, blockers, showJammer)
-                          : _buildPortrait(jammer, blockers, state, showJammer),
+        canPop: true,
+        child: GestureDetector(
+          onVerticalDragStart: (details) {
+            _dragStart = details.globalPosition.dy;
+          },
+          onVerticalDragUpdate: (details) {
+            // Only handle swipe when scroll is at the top
+            if (_scrollController.hasClients && _scrollController.offset <= 0) {
+              final delta = details.globalPosition.dy - _dragStart;
+              if (delta > 100) {
+                Navigator.of(context).pop();
+              }
+            }
+          },
+          child: Scaffold(
+            backgroundColor: Colors.transparent,
+            resizeToAvoidBottomInset: false,
+            appBar: _buildAppBar(context, state, teamInfo, widget.engine),
+            body: RefreshIndicator(
+              onRefresh: widget.engine.reconnect,
+              child: CustomScrollView(
+                controller: _scrollController,
+                physics: const AlwaysScrollableScrollPhysics(),
+                slivers: [
+                  SliverFillRemaining(
+                    hasScrollBody: false,
+                    child: SafeArea(
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: MediaQuery.of(context).orientation == Orientation.landscape
+                            ? _buildLandscape(jammer, blockers, showJammer)
+                            : _buildPortrait(jammer, blockers, state, showJammer),
+                      ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
@@ -62,7 +90,7 @@ class BoxTimerScreen extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _JamStatusBar(state: state, engine: engine),
+        _JamStatusBar(state: state, engine: widget.engine),
         const SizedBox(height: 16),
         if (showJammer) ...[
           Expanded(flex: 5, child: SeatCard(seat: jammer)),
@@ -175,7 +203,7 @@ class BoxTimerScreen extends StatelessWidget {
       
       leading: IconButton(
         icon: const Icon(Icons.arrow_back, color: Colors.white70),
-        onPressed: () => _navigateBack(context, engine),
+        onPressed: () => Navigator.of(context).pop(),
       ),
     );
   }
@@ -204,8 +232,7 @@ class PbmScreen extends StatelessWidget {
     return DynamicBackground(
       accentColor: accentColor,
       child: PopScope(
-        canPop: false,
-        onPopInvoked: (_) => _navigateBack(context, engine),
+        canPop: true,
         child: Scaffold(
         backgroundColor: Colors.transparent,
         resizeToAvoidBottomInset: false,
@@ -289,7 +316,7 @@ class PbmScreen extends StatelessWidget {
       
       leading: IconButton(
         icon: const Icon(Icons.arrow_back, color: Colors.white70),
-        onPressed: () => _navigateBack(context, engine),
+        onPressed: () => Navigator.of(context).pop(),
       ),
     );
   }
@@ -354,8 +381,7 @@ class SoloScreen extends StatelessWidget {
     return DynamicBackground(
       accentColor: accentColor,
       child: PopScope(
-        canPop: false,
-        onPopInvoked: (_) => _navigateBack(context, engine),
+        canPop: true,
         child: Scaffold(
           backgroundColor: Colors.transparent,
           resizeToAvoidBottomInset: false,
@@ -458,7 +484,7 @@ class SoloScreen extends StatelessWidget {
       ),
       leading: IconButton(
         icon: const Icon(Icons.arrow_back, color: Colors.white70),
-        onPressed: () => _navigateBack(context, engine),
+        onPressed: () => Navigator.of(context).pop(),
       ),
     );
   }
@@ -736,9 +762,3 @@ BoxDecoration _colorSwatchDecoration(Color color, {bool selected = false}) {
   );
 }
 
-/// Shared back navigation: pops back to the role selector on HomeScreen.
-Future<void> _navigateBack(BuildContext context, PenaltyEngine engine) async {
-  if (context.mounted) {
-    Navigator.of(context).pop();
-  }
-}

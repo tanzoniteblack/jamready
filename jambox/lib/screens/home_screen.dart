@@ -106,15 +106,23 @@ class _HomeScreenState extends State<HomeScreen> {
     _disposePreview();
 
     final state = PenaltyBoxState();
+    final engine = LocalPenaltyEngine(state);
+    await engine.initialize();
+
     _previewState = state;
-    // _previewEngine stays null for offline
+    _previewEngine = engine;
 
     // Listen to state changes to update team names live
     state.addListener(() {
       if (mounted) {
-        setState(() {
-          _team1Name = state.team1.name;
-          _team2Name = state.team2.name;
+        // Schedule setState for after the current frame to avoid calling during notification
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            setState(() {
+              _team1Name = state.team1.name;
+              _team2Name = state.team2.name;
+            });
+          }
         });
       }
     });
@@ -158,25 +166,15 @@ class _HomeScreenState extends State<HomeScreen> {
     PenaltyBoxState state;
     PenaltyEngine engine;
 
-    if (_previewEngine != null) {
-      // Reuse the live engine; update role on the existing state.
-      state = _previewState!;
-      state.role = role;
-      state.teamIndex = teamIdx;
-      engine = _previewEngine!;
-      // Clear references so dispose() doesn't shut it down.
-      _previewEngine = null;
-      _previewState = null;
-    } else {
-      // Fresh offline path.
-      state = _previewState ?? PenaltyBoxState();
-      state.role = role;
-      state.teamIndex = teamIdx;
-      final localEngine = LocalPenaltyEngine(state);
-      await localEngine.initialize();
-      engine = localEngine;
-      _previewState = null;
-    }
+    // Reuse the preview engine/state
+    state = _previewState!;
+    state.role = role;
+    state.teamIndex = teamIdx;
+    engine = _previewEngine!;
+
+    // Clear references so dispose() doesn't shut it down.
+    _previewEngine = null;
+    _previewState = null;
 
     _activeEngine = engine;
 
@@ -215,6 +213,23 @@ class _HomeScreenState extends State<HomeScreen> {
         _team2Name = returned.state.team2.name;
         _showRoleSelector = true;
       });
+
+      // Re-attach listener for offline mode to keep team names in sync
+      if (_previewEngine != null && _previewEngine!.isLocal) {
+        _previewState?.addListener(() {
+          if (mounted) {
+            // Schedule setState for after the current frame to avoid calling during notification
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted) {
+                setState(() {
+                  _team1Name = _previewState!.team1.name;
+                  _team2Name = _previewState!.team2.name;
+                });
+              }
+            });
+          }
+        });
+      }
     }
   }
 
@@ -424,7 +439,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             const SizedBox(height: 24),
 
                             // Team settings (offline mode only)
-                            if (_previewEngine == null && _previewState != null) ...[
+                            if (_previewEngine?.isLocal == true && _previewState != null) ...[
                               Text(
                                 'TEAM SETTINGS',
                                 style: AppTextStyles.clockLabel.copyWith(
