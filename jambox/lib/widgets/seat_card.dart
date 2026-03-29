@@ -178,6 +178,7 @@ class _SeatCardState extends State<SeatCard> with SingleTickerProviderStateMixin
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 300),
         curve: Curves.easeInOut,
+        width: double.infinity,
         decoration: BoxDecoration(
           color: accentColor.withValues(alpha: 0.12),
           border: Border.all(color: accentColor.withValues(alpha: 0.6), width: 1.5),
@@ -185,33 +186,16 @@ class _SeatCardState extends State<SeatCard> with SingleTickerProviderStateMixin
         ),
         child: Padding(
           padding: EdgeInsets.all(compact ? 8 : 12),
-          child: seatState == SeatState.empty
-              ? _buildEmpty(teamColor, compact)
-              : _buildOccupied(context, state, seat, seatState, teamColor, compact),
+          child: _buildContent(context, state, seat, seatState, teamColor, compact),
         ),
       ),
     );
   }
 
-  Widget _buildEmpty(Color teamColor, bool compact) {
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Icon(Icons.add_circle_outline, color: Colors.white24, size: compact ? 26 : 34),
-        const SizedBox(height: 6),
-        Text(
-          _positionLabel(widget.seat.position),
-          style: AppTextStyles.clockLabel.copyWith(
-            color: Colors.white24,
-            fontSize: compact ? 11 : 13,
-            letterSpacing: 1.5,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildOccupied(
+  /// Unified layout: always 3 rows (header, expanded center, penalty row) so card
+  /// height never changes based on state. Content within each row changes, but
+  /// the structure — and therefore the height — stays constant.
+  Widget _buildContent(
     BuildContext context,
     PenaltyBoxState state,
     SkaterSeat seat,
@@ -219,6 +203,7 @@ class _SeatCardState extends State<SeatCard> with SingleTickerProviderStateMixin
     Color teamColor,
     bool compact,
   ) {
+    final isEmpty = seatState == SeatState.empty;
     final isStanding = seatState == SeatState.standing;
     final isDone = seatState == SeatState.done;
     final isPaused = seatState == SeatState.paused;
@@ -229,141 +214,149 @@ class _SeatCardState extends State<SeatCard> with SingleTickerProviderStateMixin
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // Row 1: position label (left) + skater number (right)
+        // Row 1: position label (left) + skater number (right, hidden when empty)
         Row(
           children: [
             Text(
               _positionLabel(seat.position),
               style: AppTextStyles.clockLabel.copyWith(
-                color: teamColor.withValues(alpha: 0.85),
+                color: isEmpty ? Colors.white24 : teamColor.withValues(alpha: 0.85),
                 fontSize: compact ? 10 : 12,
                 letterSpacing: 1.5,
               ),
             ),
             const Spacer(),
-            GestureDetector(
-              onTap: () => _onNumberTap(state),
-              behavior: HitTestBehavior.opaque,
-              child: Padding(
-                padding: const EdgeInsets.all(8),
-                child: Text(
-                  '#${seat.skaterNumber}',
-                  style: AppTextStyles.skaterNumber.copyWith(fontSize: compact ? 18 : 22),
+            if (!isEmpty)
+              GestureDetector(
+                onTap: () => _onNumberTap(state),
+                behavior: HitTestBehavior.opaque,
+                child: Padding(
+                  padding: const EdgeInsets.all(8),
+                  child: Text(
+                    '#${seat.skaterNumber}',
+                    style: AppTextStyles.skaterNumber.copyWith(fontSize: compact ? 18 : 22),
+                  ),
                 ),
               ),
-            ),
           ],
         ),
 
-        // Row 2: timer / done / paused display — fills available space
+        // Row 2: main content — always Expanded so height is stable
         Expanded(
           child: Center(
-            child: FittedBox(
-              fit: BoxFit.scaleDown,
-              child: isDone
-                  ? ScaleTransition(
-                      scale: _pulseAnimation,
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            'DONE',
-                            textAlign: TextAlign.center,
-                            style: AppTextStyles.alertLabel.copyWith(
-                              color: Colors.red.shade400,
-                              fontSize: compact ? 22 : 28,
-                            ),
-                          ),
-                          Text(
-                            'tap to clear',
-                            textAlign: TextAlign.center,
-                            style: AppTextStyles.clockLabel.copyWith(
-                              color: Colors.red.shade300.withValues(alpha: 0.7),
-                              fontSize: 11,
-                              letterSpacing: 1,
-                            ),
-                          ),
-                        ],
-                      ),
-                    )
-                  : isStanding
-                      ? ScaleTransition(
-                          scale: _pulseAnimation,
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                timeStr,
-                                style: AppTextStyles.clockTimeSmall.copyWith(
-                                  color: Colors.amber.shade300,
-                                  fontSize: compact ? 28 : 36,
-                                ),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                'STAND',
-                                style: AppTextStyles.alertLabel.copyWith(
-                                  color: Colors.amber.shade400,
-                                  fontSize: compact ? 11 : 13,
-                                ),
-                              ),
-                            ],
-                          ),
-                        )
-                      : isPaused
-                          ? Column(
+            child: isEmpty
+                ? Icon(Icons.add_circle_outline, color: Colors.white24, size: compact ? 26 : 34)
+                : FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: isDone
+                        ? ScaleTransition(
+                            scale: _pulseAnimation,
+                            child: Column(
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 Text(
-                                  timeStr,
-                                  style: AppTextStyles.clockTimeSmall.copyWith(
-                                    color: Colors.white38,
-                                    fontSize: timerFontSize,
+                                  'DONE',
+                                  textAlign: TextAlign.center,
+                                  style: AppTextStyles.alertLabel.copyWith(
+                                    color: Colors.red.shade400,
+                                    fontSize: compact ? 22 : 28,
                                   ),
                                 ),
-                                const SizedBox(height: 2),
                                 Text(
-                                  'PAUSED',
+                                  'tap to clear',
+                                  textAlign: TextAlign.center,
                                   style: AppTextStyles.clockLabel.copyWith(
-                                    color: Colors.white24,
-                                    fontSize: compact ? 10 : 11,
-                                    letterSpacing: 1.5,
+                                    color: Colors.red.shade300.withValues(alpha: 0.7),
+                                    fontSize: 11,
+                                    letterSpacing: 1,
                                   ),
                                 ),
                               ],
-                            )
-                          : ScaleTransition(
-                              scale: _pulseAnimation,
-                              child: Text(
-                                timeStr,
-                                style: AppTextStyles.clockTimeSmall.copyWith(
-                                  color: Colors.white,
-                                  fontSize: timerFontSize,
-                                ),
-                              ),
                             ),
-            ),
+                          )
+                        : isStanding
+                            ? ScaleTransition(
+                                scale: _pulseAnimation,
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      timeStr,
+                                      style: AppTextStyles.clockTimeSmall.copyWith(
+                                        color: Colors.amber.shade300,
+                                        fontSize: compact ? 28 : 36,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      'STAND',
+                                      style: AppTextStyles.alertLabel.copyWith(
+                                        color: Colors.amber.shade400,
+                                        fontSize: compact ? 11 : 13,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              )
+                            : isPaused
+                                ? Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Text(
+                                        timeStr,
+                                        style: AppTextStyles.clockTimeSmall.copyWith(
+                                          color: Colors.white38,
+                                          fontSize: timerFontSize,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        'PAUSED',
+                                        style: AppTextStyles.clockLabel.copyWith(
+                                          color: Colors.white24,
+                                          fontSize: compact ? 10 : 11,
+                                          letterSpacing: 1.5,
+                                        ),
+                                      ),
+                                    ],
+                                  )
+                                : ScaleTransition(
+                                    scale: _pulseAnimation,
+                                    child: Text(
+                                      timeStr,
+                                      style: AppTextStyles.clockTimeSmall.copyWith(
+                                        color: Colors.white,
+                                        fontSize: timerFontSize,
+                                      ),
+                                    ),
+                                  ),
+                  ),
           ),
         ),
 
-        // Row 3: penalty buttons (running or standing only)
-        if (isActive)
-          Row(
-            children: [
-              if (seat.penaltyCount > 1)
+        // Row 3: penalty buttons — always rendered to keep height stable
+        Opacity(
+          opacity: isActive ? 1.0 : 0.0,
+          child: IgnorePointer(
+            ignoring: !isActive,
+            child: Row(
+              children: [
+                if (seat.penaltyCount > 1)
+                  _PenaltyButton(
+                    label: '−30s',
+                    color: Colors.white24,
+                    onTap: () => state.removePenaltyFromSeat(seat),
+                  ),
+                const Spacer(),
                 _PenaltyButton(
-                  label: '−30s',
+                  label: '+30s',
                   color: Colors.white24,
-                  onTap: () => state.removePenaltyFromSeat(seat),
+                  onTap: () => state.addPenaltyToSeat(seat),
                 ),
-              const Spacer(),
-              _PenaltyButton(
-                label: '+30s',
-                color: Colors.white24,
-                onTap: () => state.addPenaltyToSeat(seat),
-              ),
-            ],
+              ],
+            ),
           ),
+        ),
       ],
     );
   }
