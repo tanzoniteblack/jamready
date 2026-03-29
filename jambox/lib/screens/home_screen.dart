@@ -71,17 +71,17 @@ class _HomeScreenState extends State<HomeScreen> {
     final url = 'http://${_hostController.text.trim()}:${_portController.text.trim()}';
     engine.connect(url);
 
-    // Listen for team names to arrive, with a 3-second timeout fallback.
+    // Listen for team names to arrive, with a 3-second timeout fallback
     _teamNameListener = () {
       if (state.teamNamesFromRemote) {
         _advanceToRoleSelector(state.team1.name, state.team2.name);
       }
     };
     state.addListener(_teamNameListener!);
-
-    _teamNameTimer = Timer(const Duration(seconds: 3), () {
-      _advanceToRoleSelector(_previewState?.team1.name ?? 'Salt', _previewState?.team2.name ?? 'Pepper');
-    });
+    _teamNameTimer = Timer(
+      const Duration(seconds: 3),
+      () => _advanceToRoleSelector(_previewState?.team1.name ?? 'Salt', _previewState?.team2.name ?? 'Pepper'),
+    );
 
     if (mounted) setState(() => _isLoading = false);
   }
@@ -111,11 +111,19 @@ class _HomeScreenState extends State<HomeScreen> {
 
     _previewState = state;
     _previewEngine = engine;
+    _attachTeamNameListener(state);
 
-    // Listen to state changes to update team names live
+    if (!mounted) return;
+    setState(() {
+      _team1Name = 'Salt';
+      _team2Name = 'Pepper';
+      _showRoleSelector = true;
+    });
+  }
+
+  void _attachTeamNameListener(PenaltyBoxState state) {
     state.addListener(() {
       if (mounted) {
-        // Schedule setState for after the current frame to avoid calling during notification
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted) {
             setState(() {
@@ -125,13 +133,6 @@ class _HomeScreenState extends State<HomeScreen> {
           }
         });
       }
-    });
-
-    if (!mounted) return;
-    setState(() {
-      _team1Name = 'Salt';
-      _team2Name = 'Pepper';
-      _showRoleSelector = true;
     });
   }
 
@@ -215,20 +216,8 @@ class _HomeScreenState extends State<HomeScreen> {
       });
 
       // Re-attach listener for offline mode to keep team names in sync
-      if (_previewEngine != null && _previewEngine!.isLocal) {
-        _previewState?.addListener(() {
-          if (mounted) {
-            // Schedule setState for after the current frame to avoid calling during notification
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (mounted) {
-                setState(() {
-                  _team1Name = _previewState!.team1.name;
-                  _team2Name = _previewState!.team2.name;
-                });
-              }
-            });
-          }
-        });
+      if (_previewEngine?.isLocal == true && _previewState != null) {
+        _attachTeamNameListener(_previewState!);
       }
     }
   }
@@ -333,19 +322,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
                 const SizedBox(height: 20),
-                Row(
-                  children: [
-                    Expanded(child: Divider(color: Colors.white24)),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: Text(
-                        'OR ENTER MANUALLY',
-                        style: AppTextStyles.clockLabel.copyWith(color: Colors.white38, fontSize: 11),
-                      ),
-                    ),
-                    Expanded(child: Divider(color: Colors.white24)),
-                  ],
-                ),
+                _divider('OR ENTER MANUALLY'),
                 const SizedBox(height: 20),
 
                 TextFormField(
@@ -384,16 +361,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ),
                   const SizedBox(height: 28),
-                  Row(
-                    children: [
-                      Expanded(child: Divider(color: Colors.white24)),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        child: Text('OR', style: AppTextStyles.clockLabel.copyWith(color: Colors.white38, fontSize: 11)),
-                      ),
-                      Expanded(child: Divider(color: Colors.white24)),
-                    ],
-                  ),
+                  _divider('OR'),
                   const SizedBox(height: 20),
                   Text(
                     'OFFLINE MODE',
@@ -512,6 +480,21 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+Widget _divider(String text) {
+  return Row(
+    children: [
+      Expanded(child: Divider(color: Colors.white24)),
+      Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: Text(text, style: AppTextStyles.clockLabel.copyWith(color: Colors.white38, fontSize: 11)),
+      ),
+      Expanded(child: Divider(color: Colors.white24)),
+    ],
+  );
+}
+
 /// Role selector — each card starts the game immediately on tap.
 class _RoleSelector extends StatelessWidget {
   final String team1Name;
@@ -530,73 +513,42 @@ class _RoleSelector extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Widget roleRow(List<({AppRole role, String label, String subtitle, IconData icon, Color color})> options) {
+      return Row(
+        children: options
+            .expand((opt) => [
+                  Expanded(
+                    child: _RoleOption(
+                      role: opt.role,
+                      label: opt.label,
+                      subtitle: opt.subtitle,
+                      icon: opt.icon,
+                      color: opt.color,
+                      onTap: onTap,
+                    ),
+                  ),
+                  if (opt != options.last) const SizedBox(width: 10),
+                ])
+            .toList(),
+      );
+    }
+
     return Column(
       children: [
-        Row(
-          children: [
-            Expanded(child: _RoleOption(
-              role: AppRole.pbm,
-              label: 'PBM',
-              subtitle: 'Both jammers',
-              icon: Icons.swap_horiz,
-              color: Colors.deepOrange.shade400,
-              onTap: onTap,
-            )),
-            const SizedBox(width: 10),
-            Expanded(child: _RoleOption(
-              role: AppRole.solo,
-              label: 'Solo',
-              subtitle: 'All seats',
-              icon: Icons.grid_view,
-              color: Colors.purple.shade400,
-              onTap: onTap,
-            )),
-          ],
-        ),
+        roleRow([
+          (role: AppRole.pbm, label: 'PBM', subtitle: 'Both jammers', icon: Icons.swap_horiz, color: Colors.deepOrange.shade400),
+          (role: AppRole.solo, label: 'Solo', subtitle: 'All seats', icon: Icons.grid_view, color: Colors.purple.shade400),
+        ]),
         const SizedBox(height: 10),
-        Row(
-          children: [
-            Expanded(child: _RoleOption(
-              role: AppRole.team1BlockersOnly,
-              label: team1Name,
-              subtitle: '3 blockers',
-              icon: Icons.people_outline,
-              color: team1Color,
-              onTap: onTap,
-            )),
-            const SizedBox(width: 10),
-            Expanded(child: _RoleOption(
-              role: AppRole.team1Full,
-              label: team1Name,
-              subtitle: 'Jammer + blockers',
-              icon: Icons.timer,
-              color: team1Color,
-              onTap: onTap,
-            )),
-          ],
-        ),
+        roleRow([
+          (role: AppRole.team1BlockersOnly, label: team1Name, subtitle: '3 blockers', icon: Icons.people_outline, color: team1Color),
+          (role: AppRole.team1Full, label: team1Name, subtitle: 'Jammer + blockers', icon: Icons.timer, color: team1Color),
+        ]),
         const SizedBox(height: 10),
-        Row(
-          children: [
-            Expanded(child: _RoleOption(
-              role: AppRole.team2BlockersOnly,
-              label: team2Name,
-              subtitle: '3 blockers',
-              icon: Icons.people_outline,
-              color: team2Color,
-              onTap: onTap,
-            )),
-            const SizedBox(width: 10),
-            Expanded(child: _RoleOption(
-              role: AppRole.team2Full,
-              label: team2Name,
-              subtitle: 'Jammer + blockers',
-              icon: Icons.timer,
-              color: team2Color,
-              onTap: onTap,
-            )),
-          ],
-        ),
+        roleRow([
+          (role: AppRole.team2BlockersOnly, label: team2Name, subtitle: '3 blockers', icon: Icons.people_outline, color: team2Color),
+          (role: AppRole.team2Full, label: team2Name, subtitle: 'Jammer + blockers', icon: Icons.timer, color: team2Color),
+        ]),
       ],
     );
   }
@@ -730,48 +682,51 @@ class _QRScannerScreenState extends State<_QRScannerScreen> {
 class _ScannerOverlayPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = Colors.black.withValues(alpha: 0.5)
-      ..style = PaintingStyle.fill;
-
     final cutoutSize = size.width * 0.7;
     final cutoutRect = Rect.fromCenter(
       center: Offset(size.width / 2, size.height / 2 - 50),
       width: cutoutSize,
       height: cutoutSize,
     );
+    final cutoutRRect = RRect.fromRectAndRadius(cutoutRect, const Radius.circular(16));
 
-    final path = Path()
-      ..addRect(Rect.fromLTWH(0, 0, size.width, size.height))
-      ..addRRect(RRect.fromRectAndRadius(cutoutRect, const Radius.circular(16)))
-      ..fillType = PathFillType.evenOdd;
-    canvas.drawPath(path, paint);
+    // Dark overlay with cutout
+    canvas.drawPath(
+      Path()
+        ..addRect(Rect.fromLTWH(0, 0, size.width, size.height))
+        ..addRRect(cutoutRRect)
+        ..fillType = PathFillType.evenOdd,
+      Paint()..color = Colors.black.withValues(alpha: 0.5),
+    );
 
-    final borderPaint = Paint()
-      ..color = Colors.white
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 3;
-    canvas.drawRRect(RRect.fromRectAndRadius(cutoutRect, const Radius.circular(16)), borderPaint);
+    // White border
+    canvas.drawRRect(
+      cutoutRRect,
+      Paint()
+        ..color = Colors.white
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 3,
+    );
 
+    // Orange corner accents
     final accentPaint = Paint()
       ..color = Colors.deepOrange
       ..style = PaintingStyle.stroke
       ..strokeWidth = 5
       ..strokeCap = StrokeCap.round;
 
-    const cornerLength = 30.0;
-    final corners = [
-      [cutoutRect.topLeft, Offset(cutoutRect.left + cornerLength, cutoutRect.top)],
-      [cutoutRect.topLeft, Offset(cutoutRect.left, cutoutRect.top + cornerLength)],
-      [cutoutRect.topRight, Offset(cutoutRect.right - cornerLength, cutoutRect.top)],
-      [cutoutRect.topRight, Offset(cutoutRect.right, cutoutRect.top + cornerLength)],
-      [cutoutRect.bottomLeft, Offset(cutoutRect.left + cornerLength, cutoutRect.bottom)],
-      [cutoutRect.bottomLeft, Offset(cutoutRect.left, cutoutRect.bottom - cornerLength)],
-      [cutoutRect.bottomRight, Offset(cutoutRect.right - cornerLength, cutoutRect.bottom)],
-      [cutoutRect.bottomRight, Offset(cutoutRect.right, cutoutRect.bottom - cornerLength)],
-    ];
-    for (final corner in corners) {
-      canvas.drawLine(corner[0], corner[1], accentPaint);
+    const L = 30.0;
+    for (final [from, to] in [
+      [cutoutRect.topLeft, Offset(cutoutRect.left + L, cutoutRect.top)],
+      [cutoutRect.topLeft, Offset(cutoutRect.left, cutoutRect.top + L)],
+      [cutoutRect.topRight, Offset(cutoutRect.right - L, cutoutRect.top)],
+      [cutoutRect.topRight, Offset(cutoutRect.right, cutoutRect.top + L)],
+      [cutoutRect.bottomLeft, Offset(cutoutRect.left + L, cutoutRect.bottom)],
+      [cutoutRect.bottomLeft, Offset(cutoutRect.left, cutoutRect.bottom - L)],
+      [cutoutRect.bottomRight, Offset(cutoutRect.right - L, cutoutRect.bottom)],
+      [cutoutRect.bottomRight, Offset(cutoutRect.right, cutoutRect.bottom - L)],
+    ]) {
+      canvas.drawLine(from, to, accentPaint);
     }
   }
 

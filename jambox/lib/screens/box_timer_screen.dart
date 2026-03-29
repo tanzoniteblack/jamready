@@ -7,6 +7,76 @@ import '../styles/background.dart';
 import '../styles/text_styles.dart';
 import '../widgets/seat_card.dart';
 
+// ─── Shared Helpers ───────────────────────────────────────────────────────────
+
+AppBar _standardAppBar({
+  required BuildContext context,
+  required Widget leading,
+  required Widget title,
+}) {
+  return AppBar(
+    toolbarHeight: 60,
+    titleSpacing: 16,
+    backgroundColor: Colors.transparent,
+    elevation: 0,
+    scrolledUnderElevation: 0,
+    title: title,
+    leading: IconButton(
+      icon: leading,
+      onPressed: () => Navigator.of(context).pop(),
+    ),
+    flexibleSpace: Align(
+      alignment: Alignment.bottomCenter,
+      child: Container(height: 1, color: Colors.white.withValues(alpha: 0.1)),
+    ),
+  );
+}
+
+Widget _buildBlockerStack(List<SkaterSeat> blockers, {bool compact = true}) {
+  return Column(
+    children: [
+      Expanded(child: SeatCard(seat: blockers[0], compact: compact)),
+      const SizedBox(height: 8),
+      Expanded(child: SeatCard(seat: blockers[1], compact: compact)),
+      const SizedBox(height: 8),
+      Expanded(child: SeatCard(seat: blockers[2], compact: compact)),
+    ],
+  );
+}
+
+Color? _computeAccentFromSeats(Iterable<SkaterSeat> seats, [Color? teamColor]) {
+  if (seats.any((s) => s.state == SeatState.done)) return Colors.red.shade700;
+  if (seats.any((s) => s.state == SeatState.standing)) return Colors.amber.shade600;
+  if (teamColor != null && seats.any((s) => s.state == SeatState.running)) return teamColor;
+  return null;
+}
+
+Widget _buildTeamHeader(String name, Color color) {
+  return Row(
+    children: [
+      Container(
+        width: 8,
+        height: 8,
+        decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+      ),
+      const SizedBox(width: 6),
+      Expanded(
+        child: Text(
+          name,
+          style: AppTextStyles.clockLabel.copyWith(
+            color: color,
+            fontSize: 13,
+            letterSpacing: 1.2,
+          ),
+          overflow: TextOverflow.ellipsis,
+        ),
+      ),
+    ],
+  );
+}
+
+// ─── Screens ──────────────────────────────────────────────────────────────────
+
 /// Single-team box timer view.
 /// Shows one team's jammer (inner) seat and two blocker (outer) seats stacked vertically.
 class BoxTimerScreen extends StatefulWidget {
@@ -96,30 +166,13 @@ class _BoxTimerScreenState extends State<BoxTimerScreen> {
           Expanded(flex: 5, child: SeatCard(seat: jammer)),
           const SizedBox(height: 10),
         ],
-        Expanded(flex: 3, child: SeatCard(seat: blockers[0], compact: true)),
-        const SizedBox(height: 8),
-        Expanded(flex: 3, child: SeatCard(seat: blockers[1], compact: true)),
-        const SizedBox(height: 8),
-        Expanded(flex: 3, child: SeatCard(seat: blockers[2], compact: true)),
-        const SizedBox(height: 8),
+        Expanded(flex: 9, child: _buildBlockerStack(blockers)),
       ],
     );
   }
 
   Widget _buildLandscape(SkaterSeat jammer, List<SkaterSeat> blockers, bool showJammer) {
-    if (!showJammer) {
-      // Blockers-only: 3 blockers stacked vertically
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Expanded(child: SeatCard(seat: blockers[0], compact: true)),
-          const SizedBox(height: 8),
-          Expanded(child: SeatCard(seat: blockers[1], compact: true)),
-          const SizedBox(height: 8),
-          Expanded(child: SeatCard(seat: blockers[2], compact: true)),
-        ],
-      );
-    }
+    if (!showJammer) return _buildBlockerStack(blockers);
 
     // Full layout: jammer + blockers in 2x2 grid
     return Row(
@@ -150,11 +203,7 @@ class _BoxTimerScreenState extends State<BoxTimerScreen> {
 
   Color? _computeAccent(PenaltyBoxState state, int teamIdx) {
     final seats = [state.jammerSeat(teamIdx), ...state.blockerSeats(teamIdx)];
-    final teamColor = state.teamInfo(teamIdx).color;
-    if (seats.any((s) => s.state == SeatState.done)) return Colors.red.shade700;
-    if (seats.any((s) => s.state == SeatState.standing)) return Colors.amber.shade600;
-    if (seats.any((s) => s.state == SeatState.running)) return teamColor;
-    return null;
+    return _computeAccentFromSeats(seats, state.teamInfo(teamIdx).color);
   }
 
   AppBar _buildAppBar(
@@ -163,15 +212,11 @@ class _BoxTimerScreenState extends State<BoxTimerScreen> {
     TeamInfo teamInfo,
     PenaltyEngine engine,
   ) {
-    return AppBar(
-      toolbarHeight: 60,
-      titleSpacing: 16,
-      backgroundColor: Colors.transparent,
-      elevation: 0,
-      scrolledUnderElevation: 0,
+    return _standardAppBar(
+      context: context,
+      leading: const Icon(Icons.arrow_back, color: Colors.white70),
       title: Row(
         children: [
-          
           GestureDetector(
             onTap: engine.isLocal ? () => _showColorPicker(context, state, teamInfo.index) : null,
             child: Container(
@@ -186,7 +231,6 @@ class _BoxTimerScreenState extends State<BoxTimerScreen> {
             style: AppTextStyles.appBarTitle.copyWith(color: teamInfo.color),
           ),
           const Spacer(),
-          
           if (!engine.isLocal)
             Text(
               'P${state.periodNumber}  J${state.jamNumber}',
@@ -195,15 +239,6 @@ class _BoxTimerScreenState extends State<BoxTimerScreen> {
           const SizedBox(width: 8),
           _ConnectionDot(state: state),
         ],
-      ),
-      flexibleSpace: Align(
-        alignment: Alignment.bottomCenter,
-        child: Container(height: 1, color: Colors.white.withValues(alpha: 0.1)),
-      ),
-      
-      leading: IconButton(
-        icon: const Icon(Icons.arrow_back, color: Colors.white70),
-        onPressed: () => Navigator.of(context).pop(),
       ),
     );
   }
@@ -282,24 +317,17 @@ class PbmScreen extends StatelessWidget {
   }
 
   Color? _computeAccent(PenaltyBoxState state) {
-    final allSeats = state.seats;
-    if (allSeats.any((s) => s.state == SeatState.done)) return Colors.red.shade700;
-    if (allSeats.any((s) => s.state == SeatState.standing)) return Colors.amber.shade600;
-    return null;
+    return _computeAccentFromSeats(state.seats);
   }
 
   AppBar _buildAppBar(BuildContext context, PenaltyBoxState state, PenaltyEngine engine) {
-    return AppBar(
-      toolbarHeight: 60,
-      titleSpacing: 16,
-      backgroundColor: Colors.transparent,
-      elevation: 0,
-      scrolledUnderElevation: 0,
+    return _standardAppBar(
+      context: context,
+      leading: const Icon(Icons.arrow_back, color: Colors.white70),
       title: Row(
         children: [
           Text('JAMBOX', style: AppTextStyles.appBarTitle),
           const Spacer(),
-          
           if (!engine.isLocal)
             Text(
               'P${state.periodNumber}  J${state.jamNumber}',
@@ -308,15 +336,6 @@ class PbmScreen extends StatelessWidget {
           const SizedBox(width: 8),
           _ConnectionDot(state: state),
         ],
-      ),
-      flexibleSpace: Align(
-        alignment: Alignment.bottomCenter,
-        child: Container(height: 1, color: Colors.white.withValues(alpha: 0.1)),
-      ),
-      
-      leading: IconButton(
-        icon: const Icon(Icons.arrow_back, color: Colors.white70),
-        onPressed: () => Navigator.of(context).pop(),
       ),
     );
   }
@@ -336,31 +355,8 @@ class _PbmTeamColumn extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // Team header
-        Row(
-          children: [
-            Container(
-              width: 8,
-              height: 8,
-              decoration: _colorSwatchDecoration(teamInfo.color),
-            ),
-            const SizedBox(width: 6),
-            Expanded(
-              child: Text(
-                teamInfo.name,
-                style: AppTextStyles.clockLabel.copyWith(
-                  color: teamInfo.color,
-                  fontSize: 13,
-                  letterSpacing: 1.2,
-                ),
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-          ],
-        ),
+        _buildTeamHeader(teamInfo.name, teamInfo.color),
         const SizedBox(height: 10),
-
-        // Jammer seat only — PBM does not manage blockers
         Expanded(child: SeatCard(seat: jammer)),
       ],
     );
@@ -453,18 +449,13 @@ class SoloScreen extends StatelessWidget {
   }
 
   Color? _computeAccent(PenaltyBoxState state) {
-    if (state.seats.any((s) => s.state == SeatState.done)) return Colors.red.shade700;
-    if (state.seats.any((s) => s.state == SeatState.standing)) return Colors.amber.shade600;
-    return null;
+    return _computeAccentFromSeats(state.seats);
   }
 
   AppBar _buildAppBar(BuildContext context, PenaltyBoxState state, PenaltyEngine engine) {
-    return AppBar(
-      toolbarHeight: 60,
-      titleSpacing: 16,
-      backgroundColor: Colors.transparent,
-      elevation: 0,
-      scrolledUnderElevation: 0,
+    return _standardAppBar(
+      context: context,
+      leading: const Icon(Icons.arrow_back, color: Colors.white70),
       title: Row(
         children: [
           Text('JAMBOX', style: AppTextStyles.appBarTitle),
@@ -477,14 +468,6 @@ class SoloScreen extends StatelessWidget {
           const SizedBox(width: 8),
           _ConnectionDot(state: state),
         ],
-      ),
-      flexibleSpace: Align(
-        alignment: Alignment.bottomCenter,
-        child: Container(height: 1, color: Colors.white.withValues(alpha: 0.1)),
-      ),
-      leading: IconButton(
-        icon: const Icon(Icons.arrow_back, color: Colors.white70),
-        onPressed: () => Navigator.of(context).pop(),
       ),
     );
   }
@@ -502,28 +485,7 @@ class _SoloTeamColumn extends StatelessWidget {
     final jammer = state.jammerSeat(teamIndex);
     final blockers = state.blockerSeats(teamIndex);
     final teamInfo = state.teamInfo(teamIndex);
-
-    final header = Row(
-      children: [
-        Container(
-          width: 8,
-          height: 8,
-          decoration: BoxDecoration(color: teamInfo.color, shape: BoxShape.circle),
-        ),
-        const SizedBox(width: 6),
-        Expanded(
-          child: Text(
-            teamInfo.name,
-            style: AppTextStyles.clockLabel.copyWith(
-              color: teamInfo.color,
-              fontSize: 12,
-              letterSpacing: 1.2,
-            ),
-            overflow: TextOverflow.ellipsis,
-          ),
-        ),
-      ],
-    );
+    final header = _buildTeamHeader(teamInfo.name, teamInfo.color);
 
     if (landscape) {
       return Column(
