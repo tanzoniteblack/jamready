@@ -127,7 +127,8 @@ class _SeatCardState extends State<SeatCard> with SingleTickerProviderStateMixin
     // State transition side-effects
     if (_lastState != seatState) {
       if (seatState == SeatState.standing && _lastState == SeatState.running) {
-        Vibration.vibrate(pattern: [0, 100, 80, 100]);
+        HapticFeedback.mediumImpact();
+        Future.delayed(const Duration(milliseconds: 180), HapticFeedback.mediumImpact);
       } else if (seatState == SeatState.done) {
         Vibration.vibrate(duration: 600);
         _doneHapticTimer?.cancel();
@@ -145,7 +146,8 @@ class _SeatCardState extends State<SeatCard> with SingleTickerProviderStateMixin
     // Pre-warn: light double buzz 1 second before STAND threshold
     if (seatState == SeatState.running && seat.timeRemaining.inSeconds <= 11 && !_preStandWarnGiven) {
       _preStandWarnGiven = true;
-      Vibration.vibrate(pattern: [0, 50, 50, 50]);
+      HapticFeedback.lightImpact();
+      Future.delayed(const Duration(milliseconds: 100), HapticFeedback.lightImpact);
     }
     // Re-arm when time goes back above threshold (e.g. +30s added) or seat cleared
     if (_preStandWarnGiven && (seatState == SeatState.empty || seat.timeRemaining.inSeconds > 11)) {
