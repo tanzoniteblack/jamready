@@ -201,7 +201,7 @@ void main() {
 
     test('bootstrap: non-owned seat time always applied', () async {
       final (:engine, :channel, :state) = await setupEngine(
-        role: AppRole.boxTimerTeam1,
+        role: AppRole.team1Full,
         teamIndex: 1,
       );
       await enterBoxSeatMode(channel);
@@ -248,7 +248,7 @@ void main() {
 
     test('after bootstrap: non-owned seat, any delta → always applied', () async {
       final (:engine, :channel, :state) = await setupEngine(
-        role: AppRole.boxTimerTeam1,
+        role: AppRole.team1Full,
         teamIndex: 1,
       );
       await enterBoxSeatMode(channel);
@@ -298,7 +298,7 @@ void main() {
 
     test('BoxClock.Running=false applied to non-owned seat', () async {
       final (:engine, :channel, :state) = await setupEngine(
-        role: AppRole.boxTimerTeam1,
+        role: AppRole.team1Full,
         teamIndex: 1,
       );
       await enterBoxSeatMode(channel);
@@ -515,7 +515,7 @@ void main() {
 
     setUp(() async {
       // boxTimerTeam1 owns only team 1 seats
-      fixture = await setupEngine(role: AppRole.boxTimerTeam1, teamIndex: 1);
+      fixture = await setupEngine(role: AppRole.team1Full, teamIndex: 1);
       await enterBoxSeatMode(fixture.channel);
       fixture.channel.sent.clear();
     });

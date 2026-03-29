@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 enum SkaterPosition { jammer, pivot, blocker }
 
-enum AppRole { pbm, boxTimerTeam1, boxTimerTeam2, solo }
+enum AppRole { pbm, solo, team1BlockersOnly, team1Full, team2Full, team2BlockersOnly }
 
 enum SeatState { empty, running, paused, standing, done }
 

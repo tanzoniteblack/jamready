@@ -21,6 +21,7 @@ class BoxTimerScreen extends StatelessWidget {
     final teamInfo = state.teamInfo(teamIdx);
     final blockers = state.blockerSeats(teamIdx);
     final jammer = state.jammerSeat(teamIdx);
+    final showJammer = state.role == AppRole.team1Full || state.role == AppRole.team2Full;
 
     final accentColor = _computeAccent(state, teamIdx);
 
@@ -44,8 +45,8 @@ class BoxTimerScreen extends StatelessWidget {
                     child: Padding(
                       padding: const EdgeInsets.all(16),
                       child: MediaQuery.of(context).orientation == Orientation.landscape
-                          ? _buildLandscape(jammer, blockers)
-                          : _buildPortrait(jammer, blockers, state),
+                          ? _buildLandscape(jammer, blockers, showJammer)
+                          : _buildPortrait(jammer, blockers, state, showJammer),
                     ),
                   ),
                 ),
@@ -57,27 +58,42 @@ class BoxTimerScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildPortrait(SkaterSeat jammer, List<SkaterSeat> blockers, PenaltyBoxState state) {
+  Widget _buildPortrait(SkaterSeat jammer, List<SkaterSeat> blockers, PenaltyBoxState state, bool showJammer) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _JamStatusBar(state: state, engine: engine),
         const SizedBox(height: 16),
-        Expanded(flex: 5, child: SeatCard(seat: jammer)),
-        const SizedBox(height: 10),
+        if (showJammer) ...[
+          Expanded(flex: 5, child: SeatCard(seat: jammer)),
+          const SizedBox(height: 10),
+        ],
         Expanded(flex: 3, child: SeatCard(seat: blockers[0], compact: true)),
         const SizedBox(height: 8),
         Expanded(flex: 3, child: SeatCard(seat: blockers[1], compact: true)),
         const SizedBox(height: 8),
         Expanded(flex: 3, child: SeatCard(seat: blockers[2], compact: true)),
         const SizedBox(height: 8),
-        Expanded(flex: 3, child: SeatCard(seat: blockers[3], compact: true)),
-        const SizedBox(height: 8),
       ],
     );
   }
 
-  Widget _buildLandscape(SkaterSeat jammer, List<SkaterSeat> blockers) {
+  Widget _buildLandscape(SkaterSeat jammer, List<SkaterSeat> blockers, bool showJammer) {
+    if (!showJammer) {
+      // Blockers-only: 3 blockers stacked vertically
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Expanded(child: SeatCard(seat: blockers[0], compact: true)),
+          const SizedBox(height: 8),
+          Expanded(child: SeatCard(seat: blockers[1], compact: true)),
+          const SizedBox(height: 8),
+          Expanded(child: SeatCard(seat: blockers[2], compact: true)),
+        ],
+      );
+    }
+
+    // Full layout: jammer + blockers in 2x2 grid
     return Row(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -96,15 +112,7 @@ class BoxTimerScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 8),
-              Expanded(
-                child: Row(
-                  children: [
-                    Expanded(child: SeatCard(seat: blockers[2], compact: true)),
-                    const SizedBox(width: 8),
-                    Expanded(child: SeatCard(seat: blockers[3], compact: true)),
-                  ],
-                ),
-              ),
+              Expanded(child: SeatCard(seat: blockers[2], compact: true)),
             ],
           ),
         ),
@@ -509,15 +517,7 @@ class _SoloTeamColumn extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 8),
-          Expanded(
-            child: Row(
-              children: [
-                Expanded(child: SeatCard(seat: blockers[2], compact: true)),
-                const SizedBox(width: 8),
-                Expanded(child: SeatCard(seat: blockers[3], compact: true)),
-              ],
-            ),
-          ),
+          Expanded(child: SeatCard(seat: blockers[2], compact: true)),
         ],
       );
     }
@@ -535,8 +535,6 @@ class _SoloTeamColumn extends StatelessWidget {
         AspectRatio(aspectRatio: 1.6, child: SeatCard(seat: blockers[1], compact: true)),
         const SizedBox(height: 8),
         AspectRatio(aspectRatio: 1.6, child: SeatCard(seat: blockers[2], compact: true)),
-        const SizedBox(height: 8),
-        AspectRatio(aspectRatio: 1.6, child: SeatCard(seat: blockers[3], compact: true)),
       ],
     );
   }

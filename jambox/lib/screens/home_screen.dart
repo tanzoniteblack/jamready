@@ -109,6 +109,16 @@ class _HomeScreenState extends State<HomeScreen> {
     _previewState = state;
     // _previewEngine stays null for offline
 
+    // Listen to state changes to update team names live
+    state.addListener(() {
+      if (mounted) {
+        setState(() {
+          _team1Name = state.team1.name;
+          _team2Name = state.team2.name;
+        });
+      }
+    });
+
     if (!mounted) return;
     setState(() {
       _team1Name = 'Salt';
@@ -139,11 +149,11 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _startGame(AppRole role) async {
-    final teamIdx = role == AppRole.boxTimerTeam1
-        ? 1
-        : role == AppRole.boxTimerTeam2
-            ? 2
-            : null;
+    final teamIdx = switch (role) {
+      AppRole.team1BlockersOnly || AppRole.team1Full => 1,
+      AppRole.team2Full || AppRole.team2BlockersOnly => 2,
+      _ => null,
+    };
 
     PenaltyBoxState state;
     PenaltyEngine engine;
@@ -176,8 +186,10 @@ class _HomeScreenState extends State<HomeScreen> {
     switch (role) {
       case AppRole.pbm:
         screen = PbmScreen(engine: engine);
-      case AppRole.boxTimerTeam1:
-      case AppRole.boxTimerTeam2:
+      case AppRole.team1BlockersOnly:
+      case AppRole.team1Full:
+      case AppRole.team2Full:
+      case AppRole.team2BlockersOnly:
         screen = BoxTimerScreen(engine: engine);
       case AppRole.solo:
         screen = SoloScreen(engine: engine);
@@ -410,6 +422,24 @@ class _HomeScreenState extends State<HomeScreen> {
                             const SizedBox(height: 8),
                             Container(height: 1, color: Colors.white.withValues(alpha: 0.1)),
                             const SizedBox(height: 24),
+
+                            // Team settings (offline mode only)
+                            if (_previewEngine == null && _previewState != null) ...[
+                              Text(
+                                'TEAM SETTINGS',
+                                style: AppTextStyles.clockLabel.copyWith(
+                                  color: Colors.white70,
+                                  fontSize: 13,
+                                  letterSpacing: 1.5,
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+                              _TeamSettingsSection(state: _previewState!),
+                              const SizedBox(height: 24),
+                              Container(height: 1, color: Colors.white.withValues(alpha: 0.1)),
+                              const SizedBox(height: 24),
+                            ],
+
                             Text(
                               'YOUR ROLE',
                               style: AppTextStyles.clockLabel.copyWith(
@@ -422,6 +452,8 @@ class _HomeScreenState extends State<HomeScreen> {
                             _RoleSelector(
                               team1Name: _team1Name,
                               team2Name: _team2Name,
+                              team1Color: _previewState?.team1.color ?? Colors.white,
+                              team2Color: _previewState?.team2.color ?? Colors.grey,
                               onTap: _startGame,
                             ),
                             const SizedBox(height: 24),
@@ -469,11 +501,15 @@ class _HomeScreenState extends State<HomeScreen> {
 class _RoleSelector extends StatelessWidget {
   final String team1Name;
   final String team2Name;
+  final Color team1Color;
+  final Color team2Color;
   final void Function(AppRole) onTap;
 
   const _RoleSelector({
     required this.team1Name,
     required this.team2Name,
+    required this.team1Color,
+    required this.team2Color,
     required this.onTap,
   });
 
@@ -506,20 +542,42 @@ class _RoleSelector extends StatelessWidget {
         Row(
           children: [
             Expanded(child: _RoleOption(
-              role: AppRole.boxTimerTeam1,
+              role: AppRole.team1BlockersOnly,
               label: team1Name,
-              subtitle: 'Box Timer',
-              icon: Icons.timer,
-              color: Colors.blue.shade400,
+              subtitle: '3 blockers',
+              icon: Icons.people_outline,
+              color: team1Color,
               onTap: onTap,
             )),
             const SizedBox(width: 10),
             Expanded(child: _RoleOption(
-              role: AppRole.boxTimerTeam2,
-              label: team2Name,
-              subtitle: 'Box Timer',
+              role: AppRole.team1Full,
+              label: team1Name,
+              subtitle: 'Jammer + blockers',
               icon: Icons.timer,
-              color: Colors.red.shade400,
+              color: team1Color,
+              onTap: onTap,
+            )),
+          ],
+        ),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            Expanded(child: _RoleOption(
+              role: AppRole.team2BlockersOnly,
+              label: team2Name,
+              subtitle: '3 blockers',
+              icon: Icons.people_outline,
+              color: team2Color,
+              onTap: onTap,
+            )),
+            const SizedBox(width: 10),
+            Expanded(child: _RoleOption(
+              role: AppRole.team2Full,
+              label: team2Name,
+              subtitle: 'Jammer + blockers',
+              icon: Icons.timer,
+              color: team2Color,
               onTap: onTap,
             )),
           ],
@@ -551,32 +609,40 @@ class _RoleOption extends StatelessWidget {
     return GestureDetector(
       onTap: () => onTap(role),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 22),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
         decoration: BoxDecoration(
           color: Colors.white.withValues(alpha: 0.04),
           border: Border.all(color: Colors.white24),
           borderRadius: BorderRadius.circular(12),
         ),
-        child: Row(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(icon, color: color, size: 20),
-            const SizedBox(width: 10),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            Row(
               children: [
-                Text(
-                  label,
-                  style: AppTextStyles.clockLabel.copyWith(
-                    color: Colors.white70,
-                    fontSize: 14,
-                    letterSpacing: 0.5,
+                Icon(icon, color: color, size: 24),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    label,
+                    style: AppTextStyles.clockLabel.copyWith(
+                      color: color,
+                      fontSize: 20,
+                      letterSpacing: 0.5,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
-                Text(
-                  subtitle,
-                  style: AppTextStyles.infoText.copyWith(fontSize: 11, color: Colors.white38),
-                ),
               ],
+            ),
+            const SizedBox(height: 6),
+            Text(
+              subtitle,
+              style: AppTextStyles.infoText.copyWith(
+                fontSize: 15,
+                color: Colors.white54,
+              ),
             ),
           ],
         ),
@@ -696,4 +762,124 @@ class _ScannerOverlayPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+// ─── Team Settings Section ────────────────────────────────────────────────────
+
+const _teamColors = [
+  Colors.white,
+  Colors.grey,
+  Colors.red,
+  Colors.deepOrange,
+  Colors.amber,
+  Colors.green,
+  Colors.blue,
+  Colors.purple,
+];
+
+class _TeamSettingsSection extends StatelessWidget {
+  final PenaltyBoxState state;
+
+  const _TeamSettingsSection({required this.state});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        _TeamRow(teamIndex: 1, state: state),
+        const SizedBox(height: 16),
+        _TeamRow(teamIndex: 2, state: state),
+      ],
+    );
+  }
+}
+
+class _TeamRow extends StatefulWidget {
+  final int teamIndex;
+  final PenaltyBoxState state;
+
+  const _TeamRow({required this.teamIndex, required this.state});
+
+  @override
+  State<_TeamRow> createState() => _TeamRowState();
+}
+
+class _TeamRowState extends State<_TeamRow> {
+  late TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.state.teamInfo(widget.teamIndex).name);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final teamInfo = widget.state.teamInfo(widget.teamIndex);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Team ${widget.teamIndex}',
+          style: AppTextStyles.clockLabel.copyWith(
+            color: Colors.white54,
+            fontSize: 12,
+            letterSpacing: 1.2,
+          ),
+        ),
+        const SizedBox(height: 8),
+        TextField(
+          controller: _controller,
+          style: const TextStyle(color: Colors.white),
+          decoration: InputDecoration(
+            hintText: widget.teamIndex == 1 ? 'Salt' : 'Pepper',
+            hintStyle: const TextStyle(color: Colors.white24),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: const BorderSide(color: Colors.white24),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: teamInfo.color, width: 2),
+            ),
+            filled: true,
+            fillColor: Colors.white.withValues(alpha: 0.05),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          ),
+          onChanged: (value) {
+            widget.state.updateTeam(widget.teamIndex, name: value);
+          },
+        ),
+        const SizedBox(height: 10),
+        Wrap(
+          spacing: 12,
+          children: _teamColors.map((color) {
+            final isSelected = teamInfo.color == color;
+            return GestureDetector(
+              onTap: () => widget.state.setTeamColor(widget.teamIndex, color),
+              child: Container(
+                width: 28,
+                height: 28,
+                decoration: BoxDecoration(
+                  color: color,
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: isSelected ? Colors.white : Colors.transparent,
+                    width: isSelected ? 3 : 0,
+                  ),
+                ),
+              ),
+            );
+          }).toList(),
+        ),
+      ],
+    );
+  }
 }

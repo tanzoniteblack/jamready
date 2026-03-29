@@ -355,12 +355,10 @@ class RemotePenaltyEngine extends PenaltyEngine with WidgetsBindingObserver {
       't1b1' => (1, 'Blocker1'),
       't1b2' => (1, 'Blocker2'),
       't1b3' => (1, 'Blocker3'),
-      't1b4' => (1, 'Blocker4'),
       't2j'  => (2, 'Jammer'),
       't2b1' => (2, 'Blocker1'),
       't2b2' => (2, 'Blocker2'),
       't2b3' => (2, 'Blocker3'),
-      't2b4' => (2, 'Blocker4'),
       _ => (null, null),
     };
   }
@@ -375,10 +373,10 @@ class RemotePenaltyEngine extends PenaltyEngine with WidgetsBindingObserver {
   /// Map BoxClock/BoxSeat ID components to a SkaterSeat.
   SkaterSeat? _boxClockToSeat(int teamIdx, String seatId) {
     if (seatId == 'Jammer') return _state.jammerSeat(teamIdx);
-    final idxChar = seatId[seatId.length - 1]; // '1'–'4'
+    final idxChar = seatId[seatId.length - 1]; // '1'–'3'
     final idx = int.tryParse(idxChar);
-    if (idx == null || idx < 1 || idx > 4) return null;
-    return _state.blockerSeats(teamIdx)[idx - 1]; // 'Blocker1'→0 … 'Blocker4'→3
+    if (idx == null || idx < 1 || idx > 3) return null;
+    return _state.blockerSeats(teamIdx)[idx - 1]; // 'Blocker1'→0 … 'Blocker3'→2
   }
 
   /// Whether this device owns the given seat (and should send WS commands for it).

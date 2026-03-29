@@ -39,19 +39,17 @@ class PenaltyBoxState extends ChangeNotifier {
   final Set<String> _knownNumbersTeam2 = {};
 
   // Active seats: indexed by seat id
-  // Seat layout (5 per team): jammer, blocker1–4
-  // Team-1: idx 0–4; Team-2: idx 5–9
+  // Seat layout (4 per team): jammer, blocker1–3
+  // Team-1: idx 0–3; Team-2: idx 4–7
   final List<SkaterSeat> seats = [
     SkaterSeat(id: 't1j',  teamIndex: 1, position: SkaterPosition.jammer),
     SkaterSeat(id: 't1b1', teamIndex: 1, position: SkaterPosition.blocker),
     SkaterSeat(id: 't1b2', teamIndex: 1, position: SkaterPosition.blocker),
     SkaterSeat(id: 't1b3', teamIndex: 1, position: SkaterPosition.blocker),
-    SkaterSeat(id: 't1b4', teamIndex: 1, position: SkaterPosition.blocker),
     SkaterSeat(id: 't2j',  teamIndex: 2, position: SkaterPosition.jammer),
     SkaterSeat(id: 't2b1', teamIndex: 2, position: SkaterPosition.blocker),
     SkaterSeat(id: 't2b2', teamIndex: 2, position: SkaterPosition.blocker),
     SkaterSeat(id: 't2b3', teamIndex: 2, position: SkaterPosition.blocker),
-    SkaterSeat(id: 't2b4', teamIndex: 2, position: SkaterPosition.blocker),
   ];
 
   // Queue: skaters waiting for a seat to open (3rd+ blocker)
@@ -62,22 +60,26 @@ class PenaltyBoxState extends ChangeNotifier {
 
   TeamInfo teamInfo(int idx) => idx == 1 ? team1 : team2;
 
+  int? get teamIndexFromRole => switch (role) {
+    AppRole.team1BlockersOnly || AppRole.team1Full => 1,
+    AppRole.team2Full || AppRole.team2BlockersOnly => 2,
+    _ => null,
+  };
+
   SkaterSeat get team1Jammer   => seats[0];
   SkaterSeat get team1Blocker1 => seats[1];
   SkaterSeat get team1Blocker2 => seats[2];
   SkaterSeat get team1Blocker3 => seats[3];
-  SkaterSeat get team1Blocker4 => seats[4];
-  SkaterSeat get team2Jammer   => seats[5];
-  SkaterSeat get team2Blocker1 => seats[6];
-  SkaterSeat get team2Blocker2 => seats[7];
-  SkaterSeat get team2Blocker3 => seats[8];
-  SkaterSeat get team2Blocker4 => seats[9];
+  SkaterSeat get team2Jammer   => seats[4];
+  SkaterSeat get team2Blocker1 => seats[5];
+  SkaterSeat get team2Blocker2 => seats[6];
+  SkaterSeat get team2Blocker3 => seats[7];
 
   SkaterSeat jammerSeat(int teamIdx) => teamIdx == 1 ? team1Jammer : team2Jammer;
 
   List<SkaterSeat> blockerSeats(int teamIdx) => teamIdx == 1
-      ? [team1Blocker1, team1Blocker2, team1Blocker3, team1Blocker4]
-      : [team2Blocker1, team2Blocker2, team2Blocker3, team2Blocker4];
+      ? [team1Blocker1, team1Blocker2, team1Blocker3]
+      : [team2Blocker1, team2Blocker2, team2Blocker3];
 
   List<SkaterSeat> queueForTeam(int teamIdx) =>
       queue.where((s) => s.teamIndex == teamIdx).toList();
