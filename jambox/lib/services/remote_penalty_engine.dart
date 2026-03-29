@@ -92,7 +92,7 @@ class RemotePenaltyEngine extends PenaltyEngine with WidgetsBindingObserver {
       final wsUrl = uri.replace(
         scheme: uri.scheme == 'https' ? 'wss' : 'ws',
         path: '/WS/',
-        queryParameters: {'source': 'pbm', 'platform': 'mobile'},
+        queryParameters: {'source': 'jambox', 'platform': 'mobile'},
       );
 
       final factory = _channelFactoryOverride ?? WebSocketChannel.connect;

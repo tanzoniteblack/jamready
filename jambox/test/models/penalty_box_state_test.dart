@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pbm_ready/models/penalty_box_state.dart';
-import 'package:pbm_ready/models/skater_seat.dart';
+import 'package:jam_box/models/penalty_box_state.dart';
+import 'package:jam_box/models/skater_seat.dart';
 
 import '../test_helpers.dart';
 

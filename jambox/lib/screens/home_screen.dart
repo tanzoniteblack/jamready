@@ -45,15 +45,15 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _loadSettings() async {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
-      _hostController.text = prefs.getString('pbm_host') ?? '10.0.2.2';
-      _portController.text = prefs.getString('pbm_port') ?? '8000';
+      _hostController.text = prefs.getString('jambox_host') ?? '10.0.2.2';
+      _portController.text = prefs.getString('jambox_port') ?? '8000';
     });
   }
 
   Future<void> _saveSettings() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('pbm_host', _hostController.text.trim());
-    await prefs.setString('pbm_port', _portController.text.trim());
+    await prefs.setString('jambox_host', _hostController.text.trim());
+    await prefs.setString('jambox_port', _portController.text.trim());
   }
 
   Future<void> _connectAndFetchTeams() async {

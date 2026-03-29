@@ -1,9 +1,9 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'package:pbm_ready/models/penalty_box_state.dart';
-import 'package:pbm_ready/models/skater_seat.dart';
-import 'package:pbm_ready/services/remote_penalty_engine.dart';
+import 'package:jam_box/models/penalty_box_state.dart';
+import 'package:jam_box/models/skater_seat.dart';
+import 'package:jam_box/services/remote_penalty_engine.dart';
 
 import '../test_helpers.dart';
 

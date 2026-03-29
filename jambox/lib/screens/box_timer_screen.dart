@@ -43,11 +43,9 @@ class BoxTimerScreen extends StatelessWidget {
                   child: SafeArea(
                     child: Padding(
                       padding: const EdgeInsets.all(16),
-                      child: OrientationBuilder(
-                        builder: (ctx, orientation) => orientation == Orientation.landscape
-                            ? _buildLandscape(jammer, blockers)
-                            : _buildPortrait(jammer, blockers, state),
-                      ),
+                      child: MediaQuery.of(context).orientation == Orientation.landscape
+                          ? _buildLandscape(jammer, blockers)
+                          : _buildPortrait(jammer, blockers, state),
                     ),
                   ),
                 ),
@@ -137,7 +135,7 @@ class BoxTimerScreen extends StatelessWidget {
       scrolledUnderElevation: 0,
       title: Row(
         children: [
-          // Bug 11: tappable color dot in local mode
+          
           GestureDetector(
             onTap: engine.isLocal ? () => _showColorPicker(context, state, teamInfo.index) : null,
             child: Container(
@@ -152,7 +150,7 @@ class BoxTimerScreen extends StatelessWidget {
             style: AppTextStyles.appBarTitle.copyWith(color: teamInfo.color),
           ),
           const Spacer(),
-          // Bug 6: hide P/J counter in local mode
+          
           if (!engine.isLocal)
             Text(
               'P${state.periodNumber}  J${state.jamNumber}',
@@ -166,7 +164,7 @@ class BoxTimerScreen extends StatelessWidget {
         alignment: Alignment.bottomCenter,
         child: Container(height: 1, color: Colors.white.withValues(alpha: 0.1)),
       ),
-      // Bug 1: back button disposes engine and replaces with HomeScreen
+      
       leading: IconButton(
         icon: const Icon(Icons.arrow_back, color: Colors.white70),
         onPressed: () => _navigateBack(context, engine),
@@ -184,7 +182,7 @@ class BoxTimerScreen extends StatelessWidget {
   }
 }
 
-/// PBM center view — two jammers side by side.
+/// PBM center view — both teams' jammers side by side.
 class PbmScreen extends StatelessWidget {
   final PenaltyEngine engine;
 
@@ -219,27 +217,22 @@ class PbmScreen extends StatelessWidget {
                         _JamStatusBar(state: state, engine: engine),
                         const SizedBox(height: 16),
                         Expanded(
-                          child: OrientationBuilder(
-                    builder: (ctx, orientation) {
-                      final isPortrait = orientation == Orientation.portrait;
-                      return isPortrait
-                          ? Column(
-                              children: [
-                                Expanded(child: _PbmTeamColumn(teamIndex: 1, state: state)),
-                                const SizedBox(height: 12),
-                                Expanded(child: _PbmTeamColumn(teamIndex: 2, state: state)),
-                              ],
-                            )
-                          : Row(
-                              children: [
-                                Expanded(child: _PbmTeamColumn(teamIndex: 1, state: state)),
-                                const SizedBox(width: 16),
-                                Expanded(child: _PbmTeamColumn(teamIndex: 2, state: state)),
-                              ],
-                            );
-                    },
-                  ),
-                ),
+                          child: MediaQuery.of(context).orientation == Orientation.portrait
+                              ? Column(
+                                  children: [
+                                    Expanded(child: _PbmTeamColumn(teamIndex: 1, state: state)),
+                                    const SizedBox(height: 12),
+                                    Expanded(child: _PbmTeamColumn(teamIndex: 2, state: state)),
+                                  ],
+                                )
+                              : Row(
+                                  children: [
+                                    Expanded(child: _PbmTeamColumn(teamIndex: 1, state: state)),
+                                    const SizedBox(width: 16),
+                                    Expanded(child: _PbmTeamColumn(teamIndex: 2, state: state)),
+                                  ],
+                                ),
+                        ),
               ],
             ),
           ),
@@ -271,7 +264,7 @@ class PbmScreen extends StatelessWidget {
         children: [
           Text('JAMBOX', style: AppTextStyles.appBarTitle),
           const Spacer(),
-          // Bug 6: hide P/J counter in local mode
+          
           if (!engine.isLocal)
             Text(
               'P${state.periodNumber}  J${state.jamNumber}',
@@ -285,7 +278,7 @@ class PbmScreen extends StatelessWidget {
         alignment: Alignment.bottomCenter,
         child: Container(height: 1, color: Colors.white.withValues(alpha: 0.1)),
       ),
-      // Bug 1: back button disposes engine and replaces with HomeScreen
+      
       leading: IconButton(
         icon: const Icon(Icons.arrow_back, color: Colors.white70),
         onPressed: () => _navigateBack(context, engine),
@@ -332,7 +325,7 @@ class _PbmTeamColumn extends StatelessWidget {
         ),
         const SizedBox(height: 10),
 
-        // Jammer seat only — PBM does not manage blockers or queue
+        // Jammer seat only — PBM does not manage blockers
         Expanded(child: SeatCard(seat: jammer)),
       ],
     );
