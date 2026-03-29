@@ -46,8 +46,8 @@ class RemotePenaltyEngine extends PenaltyEngine with WidgetsBindingObserver {
 
   // Cached regex patterns for _parsePath (compiled once, not per message)
   static final _reTeamName = RegExp(r'ScoreBoard\.CurrentGame\.Team\((\d)\)\.Name$');
-  static final _reTeamColor = RegExp(r'ScoreBoard\.CurrentGame\.Team\((\d)\)\.Color\(operator\.fg\)$');
-  static final _reSkaterNumber = RegExp(r'ScoreBoard\.CurrentGame\.Team\((\d)\)\.Skater\(([^)]+)\)\.Number$');
+  static final _reTeamColor = RegExp(r'ScoreBoard\.CurrentGame\.Team\((\d)\)\.Color\((operator|penalty)\.(fg|bg|glow)\)$');
+  static final _reSkaterNumber = RegExp(r'ScoreBoard\.CurrentGame\.Team\((\d)\)\.Skater\(([^)]+)\)\.RosterNumber$');
   static final _reSkaterRole = RegExp(r'ScoreBoard\.CurrentGame\.Team\((\d)\)\.Skater\(([^)]+)\)\.Role$');
   static final _reBoxClock = RegExp(r'ScoreBoard\.CurrentGame\.BoxClock\(Team(\d)(Jammer|Blocker[1234])\)\.(Time|Running)$');
   static final _reBoxSeat = RegExp(r'ScoreBoard\.CurrentGame\.Team\((\d)\)\.BoxSeat\((Jammer|Blocker[1234])\)\.(Started|BoxSkater)$');
@@ -149,16 +149,24 @@ class RemotePenaltyEngine extends PenaltyEngine with WidgetsBindingObserver {
       'ScoreBoard.CurrentGame.Team(1).Name',
       'ScoreBoard.CurrentGame.Team(1).Color(operator.fg)',
       'ScoreBoard.CurrentGame.Team(1).Color(operator.bg)',
+      'ScoreBoard.CurrentGame.Team(1).Color(operator.glow)',
+      'ScoreBoard.CurrentGame.Team(1).Color(penalty.fg)',
+      'ScoreBoard.CurrentGame.Team(1).Color(penalty.bg)',
+      'ScoreBoard.CurrentGame.Team(1).Color(penalty.glow)',
       'ScoreBoard.CurrentGame.Team(2).Name',
       'ScoreBoard.CurrentGame.Team(2).Color(operator.fg)',
       'ScoreBoard.CurrentGame.Team(2).Color(operator.bg)',
+      'ScoreBoard.CurrentGame.Team(2).Color(operator.glow)',
+      'ScoreBoard.CurrentGame.Team(2).Color(penalty.fg)',
+      'ScoreBoard.CurrentGame.Team(2).Color(penalty.bg)',
+      'ScoreBoard.CurrentGame.Team(2).Color(penalty.glow)',
       // Roster (mainline CRG path)
       'Game.Team(1).Skater',
       'Game.Team(2).Skater',
       // Roster (alternate path used in some versions)
-      'ScoreBoard.CurrentGame.Team(1).Skater(*).Number',
+      'ScoreBoard.CurrentGame.Team(1).Skater(*).RosterNumber',
       'ScoreBoard.CurrentGame.Team(1).Skater(*).Name',
-      'ScoreBoard.CurrentGame.Team(2).Skater(*).Number',
+      'ScoreBoard.CurrentGame.Team(2).Skater(*).RosterNumber',
       'ScoreBoard.CurrentGame.Team(2).Skater(*).Name',
       // Skater role (for jammer number display in BoxSeat mode)
       'ScoreBoard.CurrentGame.Team(1).Skater(*).Role',
@@ -243,7 +251,12 @@ class RemotePenaltyEngine extends PenaltyEngine with WidgetsBindingObserver {
       final teamColorMatch = _reTeamColor.firstMatch(key);
       if (teamColorMatch != null) {
         final color = _parseColor(value?.toString());
-        if (color != null) delta.teamColors[int.parse(teamColorMatch.group(1)!)] = color;
+        if (color != null) {
+          final t = int.parse(teamColorMatch.group(1)!);
+          final source = teamColorMatch.group(2)!;
+          final channel = teamColorMatch.group(3)!;
+          (delta.teamColors[t] ??= {})[(source, channel)] = color;
+        }
         continue;
       }
 
@@ -294,7 +307,9 @@ class RemotePenaltyEngine extends PenaltyEngine with WidgetsBindingObserver {
     if (delta.periodNumber != null) _state.periodNumber = delta.periodNumber!;
 
     for (final e in delta.teamNames.entries) _state.updateTeam(e.key, name: e.value);
-    for (final e in delta.teamColors.entries) _state.updateTeam(e.key, color: e.value);
+    for (final e in delta.teamColors.entries) {
+      e.value.forEach((key, color) => _state.updateTeamColor(e.key, key.$1, key.$2, color));
+    }
 
     for (final e in delta.rosterNumbers.entries) {
       e.value.forEach((uuid, number) => _state.updateRoster(e.key, number, uuid));
@@ -302,7 +317,7 @@ class RemotePenaltyEngine extends PenaltyEngine with WidgetsBindingObserver {
     for (final (t, data) in delta.legacyRosters) {
       data.forEach((skaterId, skaterData) {
         if (skaterData is Map) {
-          final number = skaterData['Number']?.toString() ?? '';
+          final number = skaterData['RosterNumber']?.toString() ?? '';
           if (number.isNotEmpty) _state.updateRoster(t, number, skaterId.toString());
         }
       });
@@ -636,7 +651,8 @@ class _WsDelta {
   int? jamNumber;
   int? periodNumber;
   final Map<int, String> teamNames = {};
-  final Map<int, Color> teamColors = {};
+  // team -> {(source, channel): color}, e.g. {1: {('operator','fg'): Color(...)}}
+  final Map<int, Map<(String, String), Color>> teamColors = {};
   final Map<int, Map<String, String>> rosterNumbers = {}; // team -> {uuid: number}
   final List<(int team, String uuid, String role)> skaterRoles = [];
   final List<(int team, String seat, String prop, dynamic value)> boxSeats = [];

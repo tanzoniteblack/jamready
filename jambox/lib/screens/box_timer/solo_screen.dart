@@ -131,7 +131,7 @@ class _SoloTeamColumn extends StatelessWidget {
     final jammer = state.jammerSeat(teamIndex);
     final blockers = state.blockerSeats(teamIndex);
     final teamInfo = state.teamInfo(teamIndex);
-    final header = buildTeamHeader(teamInfo.name, teamInfo.color);
+    final header = buildTeamHeader(teamInfo.name, teamInfo.fgColor, teamInfo.bgColor, teamInfo.glowColor);
 
     if (landscape) {
       return Column(

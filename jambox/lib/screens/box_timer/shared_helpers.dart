@@ -49,22 +49,25 @@ Color? computeAccentFromSeats(Iterable<SkaterSeat> seats, [Color? teamColor]) {
 }
 
 /// Builds a team header with color swatch and name.
-Widget buildTeamHeader(String name, Color color) {
+/// [fgColor] is the text color, [bgColor] is the swatch fill, [glowColor] the glow/shadow.
+Widget buildTeamHeader(String name, Color fgColor, Color bgColor, Color glowColor) {
+  final shadow = Shadow(color: glowColor.withValues(alpha: 0.8), blurRadius: 8);
   return Row(
     children: [
       Container(
         width: 8,
         height: 8,
-        decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+        decoration: colorSwatchDecoration(bgColor, glowColor: glowColor),
       ),
       const SizedBox(width: 6),
       Expanded(
         child: Text(
           name,
           style: AppTextStyles.clockLabel.copyWith(
-            color: color,
+            color: fgColor,
             fontSize: 13,
             letterSpacing: 1.2,
+            shadows: [shadow],
           ),
           overflow: TextOverflow.ellipsis,
         ),
@@ -74,9 +77,10 @@ Widget buildTeamHeader(String name, Color color) {
 }
 
 /// BoxDecoration for a color swatch circle.
+/// [glowColor] overrides the auto-computed shadow (used when CRG provides an explicit glow).
 /// Black gets a persistent white glow so it's visible on the dark background.
 /// White gets a subtle grey border. Others glow with their own color when selected.
-BoxDecoration colorSwatchDecoration(Color color, {bool selected = false}) {
+BoxDecoration colorSwatchDecoration(Color color, {bool selected = false, Color? glowColor}) {
   final isBlack = color == Colors.black;
   final isWhite = color == Colors.white;
 
@@ -89,11 +93,13 @@ BoxDecoration colorSwatchDecoration(Color color, {bool selected = false}) {
     width: selected ? 3 : 1.5,
   );
 
-  final List<BoxShadow> shadows = isBlack
-      ? [BoxShadow(color: Colors.white.withValues(alpha: selected ? 0.7 : 0.35), blurRadius: 10, spreadRadius: 1)]
-      : selected
-          ? [BoxShadow(color: color.withValues(alpha: 0.6), blurRadius: 8)]
-          : [];
+  final List<BoxShadow> shadows = glowColor != null
+      ? [BoxShadow(color: glowColor.withValues(alpha: selected ? 0.9 : 0.6), blurRadius: 12, spreadRadius: 2)]
+      : isBlack
+          ? [BoxShadow(color: Colors.white.withValues(alpha: selected ? 0.7 : 0.35), blurRadius: 10, spreadRadius: 1)]
+          : selected
+              ? [BoxShadow(color: color.withValues(alpha: 0.6), blurRadius: 8)]
+              : [];
 
   return BoxDecoration(
     color: color,

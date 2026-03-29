@@ -6,10 +6,42 @@ enum ConnectionStatus { disconnected, connecting, connected }
 class TeamInfo {
   final int index;
   String name;
-  Color color;
 
-  TeamInfo({required this.index, this.name = '', Color? color})
-    : color = color ?? (index == 1 ? Colors.white : Colors.grey);
+  Color? _operatorFg;
+  Color? _operatorBg;
+  Color? _operatorGlow;
+  Color? _penaltyFg;
+  Color? _penaltyBg;
+  Color? _penaltyGlow;
+  Color? _localColor;
+
+  TeamInfo({required this.index, this.name = '', Color? color}) : _localColor = color;
+
+  Color get _default => index == 1 ? Colors.white : Colors.grey;
+
+  /// Foreground color: penalty > operator > local/default.
+  Color get fgColor => _penaltyFg ?? _operatorFg ?? _localColor ?? _default;
+
+  /// Background color: penalty > operator > local/default.
+  Color get bgColor => _penaltyBg ?? _operatorBg ?? _localColor ?? _default;
+
+  /// Glow/accent color: penalty > operator > local/default.
+  Color get glowColor => _penaltyGlow ?? _operatorGlow ?? _localColor ?? _default;
+
+  /// Primary team color (fg). Kept for backward compat with UI.
+  Color get color => fgColor;
+  set color(Color c) => _localColor = c;
+
+  void setRemoteColor(String source, String channel, Color color) {
+    switch ((source, channel)) {
+      case ('operator', 'fg'): _operatorFg = color;
+      case ('operator', 'bg'): _operatorBg = color;
+      case ('operator', 'glow'): _operatorGlow = color;
+      case ('penalty', 'fg'): _penaltyFg = color;
+      case ('penalty', 'bg'): _penaltyBg = color;
+      case ('penalty', 'glow'): _penaltyGlow = color;
+    }
+  }
 }
 
 class PenaltyBoxState extends ChangeNotifier {
@@ -101,6 +133,11 @@ class PenaltyBoxState extends ChangeNotifier {
   }
 
   void setTeamColor(int teamIdx, Color color) => updateTeam(teamIdx, color: color);
+
+  void updateTeamColor(int teamIdx, String source, String channel, Color color) {
+    teamInfo(teamIdx).setRemoteColor(source, channel, color);
+    notifyListeners();
+  }
 
   void updateRoster(int teamIdx, String skaterNumber, String skaterId) {
     if (teamIdx == 1) {

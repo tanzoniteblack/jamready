@@ -111,7 +111,7 @@ class _PbmTeamColumn extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        buildTeamHeader(teamInfo.name, teamInfo.color),
+        buildTeamHeader(teamInfo.name, teamInfo.fgColor, teamInfo.bgColor, teamInfo.glowColor),
         const SizedBox(height: 10),
         Expanded(child: SeatCard(seat: jammer)),
       ],

@@ -160,13 +160,16 @@ class _BoxTimerScreenState extends State<BoxTimerScreen> {
             child: Container(
               width: 10,
               height: 10,
-              decoration: colorSwatchDecoration(teamInfo.color),
+              decoration: colorSwatchDecoration(teamInfo.bgColor, glowColor: teamInfo.glowColor),
             ),
           ),
           const SizedBox(width: 10),
           Text(
             teamInfo.name.toUpperCase(),
-            style: AppTextStyles.appBarTitle.copyWith(color: teamInfo.color),
+            style: AppTextStyles.appBarTitle.copyWith(
+              color: teamInfo.fgColor,
+              shadows: [Shadow(color: teamInfo.glowColor.withValues(alpha: 0.8), blurRadius: 8)],
+            ),
           ),
           const Spacer(),
           if (!engine.isLocal)
