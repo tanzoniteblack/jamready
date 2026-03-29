@@ -128,7 +128,10 @@ class _SeatCardState extends State<SeatCard> with SingleTickerProviderStateMixin
 
     // State transition side-effects
     if (_lastState != seatState) {
-      if (seatState == SeatState.done) {
+      if (seatState == SeatState.standing && _lastState == SeatState.running) {
+        HapticFeedback.mediumImpact();
+        Future.delayed(const Duration(milliseconds: 150), HapticFeedback.mediumImpact);
+      } else if (seatState == SeatState.done) {
         Vibration.vibrate(duration: 600);
         _doneHapticTimer?.cancel();
         _doneHapticTimer = Timer.periodic(
