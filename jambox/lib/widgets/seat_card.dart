@@ -34,6 +34,7 @@ class _SeatCardState extends State<SeatCard> with SingleTickerProviderStateMixin
   SeatState? _lastState;
   Timer? _doneHapticTimer;
   bool _preStandWarnGiven = false;
+  int _lastReleaseWarnSecond = -1;
 
   @override
   void initState() {
@@ -127,10 +128,7 @@ class _SeatCardState extends State<SeatCard> with SingleTickerProviderStateMixin
 
     // State transition side-effects
     if (_lastState != seatState) {
-      if (seatState == SeatState.standing && _lastState == SeatState.running) {
-        HapticFeedback.mediumImpact();
-        Future.delayed(const Duration(milliseconds: 180), HapticFeedback.mediumImpact);
-      } else if (seatState == SeatState.done) {
+      if (seatState == SeatState.done) {
         Vibration.vibrate(duration: 600);
         _doneHapticTimer?.cancel();
         _doneHapticTimer = Timer.periodic(
@@ -144,15 +142,26 @@ class _SeatCardState extends State<SeatCard> with SingleTickerProviderStateMixin
       _lastState = seatState;
     }
 
-    // Pre-warn: light double buzz 1 second before STAND threshold
-    if (seatState == SeatState.running && seat.timeRemaining.inSeconds <= 11 && !_preStandWarnGiven) {
+    // Stand warn: double heavy buzz at 12s — tell the player to get ready to stand
+    if (seatState == SeatState.running && seat.timeRemaining.inSeconds <= 12 && !_preStandWarnGiven) {
       _preStandWarnGiven = true;
-      HapticFeedback.lightImpact();
-      Future.delayed(const Duration(milliseconds: 100), HapticFeedback.lightImpact);
+      HapticFeedback.heavyImpact();
+      Future.delayed(const Duration(milliseconds: 120), HapticFeedback.heavyImpact);
     }
-    // Re-arm when time goes back above threshold (e.g. +30s added) or seat cleared
-    if (_preStandWarnGiven && (seatState == SeatState.empty || seat.timeRemaining.inSeconds > 11)) {
+    if (_preStandWarnGiven && (seatState == SeatState.empty || seat.timeRemaining.inSeconds > 12)) {
       _preStandWarnGiven = false;
+    }
+
+    // Release warn: triple heavy burst each second from 2s down — more intense than stand warn
+    final secs = seat.timeRemaining.inSeconds;
+    if (seatState == SeatState.running && secs <= 2 && secs >= 1 && secs != _lastReleaseWarnSecond) {
+      _lastReleaseWarnSecond = secs;
+      HapticFeedback.heavyImpact();
+      Future.delayed(const Duration(milliseconds: 100), HapticFeedback.heavyImpact);
+      Future.delayed(const Duration(milliseconds: 200), HapticFeedback.heavyImpact);
+    }
+    if (_lastReleaseWarnSecond >= 0 && (seatState == SeatState.empty || secs > 2)) {
+      _lastReleaseWarnSecond = -1;
     }
 
     final accentColor = seat.alertColor(teamColor);
