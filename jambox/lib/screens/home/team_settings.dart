@@ -65,32 +65,28 @@ class _TeamRowState extends State<_TeamRow> {
                 ),
               ),
             ),
-            TextButton(
-              onPressed: () => _showColorPicker(context),
-              style: TextButton.styleFrom(
-                backgroundColor: Colors.white.withValues(alpha: 0.08),
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    width: 18,
-                    height: 18,
-                    decoration: BoxDecoration(
-                      color: teamInfo.color,
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white24),
-                    ),
+            Wrap(
+              spacing: 8,
+              children: [
+                _ColorButton(
+                  label: 'Jersey',
+                  color: teamInfo.fgColor,
+                  onTap: () => _showColorPicker(
+                    context,
+                    currentColor: teamInfo.fgColor,
+                    onPicked: (color) => widget.state.updateTeam(widget.teamIndex, fgColor: color),
                   ),
-                  const SizedBox(width: 8),
-                  const Text(
-                    'Color',
-                    style: TextStyle(color: Colors.white),
+                ),
+                _ColorButton(
+                  label: 'Background',
+                  color: teamInfo.bgColor,
+                  onTap: () => _showColorPicker(
+                    context,
+                    currentColor: teamInfo.bgColor,
+                    onPicked: (color) => widget.state.updateTeam(widget.teamIndex, bgColor: color),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ],
         ),
@@ -107,7 +103,7 @@ class _TeamRowState extends State<_TeamRow> {
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: teamInfo.color, width: 2),
+              borderSide: BorderSide(color: teamInfo.fgColor, width: 2),
             ),
             filled: true,
             fillColor: Colors.white.withValues(alpha: 0.05),
@@ -121,14 +117,57 @@ class _TeamRowState extends State<_TeamRow> {
     );
   }
 
-  void _showColorPicker(BuildContext context) {
+  void _showColorPicker(
+    BuildContext context, {
+    required Color currentColor,
+    required ValueChanged<Color> onPicked,
+  }) {
     showDialog<Color>(
       context: context,
       builder: (_) => TeamColorPickerDialog(
-        currentColor: widget.state.teamInfo(widget.teamIndex).color,
+        currentColor: currentColor,
       ),
     ).then((color) {
-      if (color != null) widget.state.setTeamColor(widget.teamIndex, color);
+      if (color != null) onPicked(color);
     });
+  }
+}
+
+class _ColorButton extends StatelessWidget {
+  final String label;
+  final Color color;
+  final VoidCallback onTap;
+
+  const _ColorButton({required this.label, required this.color, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return TextButton(
+      onPressed: onTap,
+      style: TextButton.styleFrom(
+        backgroundColor: Colors.white.withValues(alpha: 0.08),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 18,
+            height: 18,
+            decoration: BoxDecoration(
+              color: color,
+              shape: BoxShape.circle,
+              border: Border.all(color: Colors.white24),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            label,
+            style: const TextStyle(color: Colors.white),
+          ),
+        ],
+      ),
+    );
   }
 }

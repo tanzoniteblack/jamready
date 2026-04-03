@@ -266,40 +266,52 @@ class _SeatCardState extends State<SeatCard> with SingleTickerProviderStateMixin
     final header = Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        Row(
-          children: [
-            Text(
-              posLabel,
-              style: AppTextStyles.clockLabel.copyWith(
-                color: isEmpty ? Colors.white54 : Colors.white,
-                fontSize: posLabelSize,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 1.5,
-                shadows: [
-                  Shadow(
-                    color: Colors.black.withValues(alpha: 0.75),
-                    blurRadius: 6,
-                    offset: const Offset(0, 1),
-                  ),
-                ],
-              ),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          decoration: BoxDecoration(
+            color: teamInfo.bgColor.withValues(alpha: isEmpty ? 0.12 : 1.0),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: teamInfo.fgColor.withValues(alpha: isEmpty ? 0.3 : 0.6),
+              width: 1.2,
             ),
-            if (isJammer) ...[
-              const SizedBox(width: 6),
-              Icon(
-                Icons.star_rounded,
-                size: posLabelSize + 6,
-                color: isEmpty ? Colors.white54 : Colors.white,
-                shadows: [
-                  Shadow(
-                    color: Colors.black.withValues(alpha: 0.75),
-                    blurRadius: 6,
-                    offset: const Offset(0, 1),
-                  ),
-                ],
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                posLabel,
+                style: AppTextStyles.clockLabel.copyWith(
+                  color: isEmpty ? teamInfo.fgColor.withValues(alpha: 0.6) : teamInfo.fgColor,
+                  fontSize: posLabelSize,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 1.5,
+                  shadows: [
+                    Shadow(
+                      color: Colors.black.withValues(alpha: 0.75),
+                      blurRadius: 6,
+                      offset: const Offset(0, 1),
+                    ),
+                  ],
+                ),
               ),
+              if (isJammer) ...[
+                const SizedBox(width: 6),
+                Icon(
+                  Icons.star_rounded,
+                  size: posLabelSize + 6,
+                  color: isEmpty ? teamInfo.fgColor.withValues(alpha: 0.6) : teamInfo.fgColor,
+                  shadows: [
+                    Shadow(
+                      color: Colors.black.withValues(alpha: 0.75),
+                      blurRadius: 6,
+                      offset: const Offset(0, 1),
+                    ),
+                  ],
+                ),
+              ],
             ],
-          ],
+          ),
         ),
         const Spacer(),
         // Always rendered (height stability) — hidden via Opacity when empty

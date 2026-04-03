@@ -14,23 +14,37 @@ class TeamInfo {
   Color? _penaltyBg;
   Color? _penaltyGlow;
   Color? _localColor;
+  Color? _localFg;
+  Color? _localBg;
+  Color? _localGlow;
 
   TeamInfo({required this.index, this.name = '', Color? color}) : _localColor = color;
 
   Color get _default => index == 1 ? Colors.white : Colors.grey;
 
   /// Foreground color: penalty > operator > local/default.
-  Color get fgColor => _penaltyFg ?? _operatorFg ?? _localColor ?? _default;
+  Color get fgColor => _penaltyFg ?? _operatorFg ?? _localFg ?? _localColor ?? _default;
 
   /// Background color: penalty > operator > local/default.
-  Color get bgColor => _penaltyBg ?? _operatorBg ?? _localColor ?? _default;
+  Color get bgColor => _penaltyBg ?? _operatorBg ?? _localBg ?? _localColor ?? _default;
 
   /// Glow/accent color: penalty > operator > local/default.
-  Color get glowColor => _penaltyGlow ?? _operatorGlow ?? _localColor ?? _default;
+  Color get glowColor => _penaltyGlow ?? _operatorGlow ?? _localGlow ?? _localFg ?? _localColor ?? _default;
 
   /// Primary team color (fg). Kept for backward compat with UI.
   Color get color => fgColor;
-  set color(Color c) => _localColor = c;
+  set color(Color c) {
+    _localColor = c;
+    _localFg = c;
+    _localBg = c;
+    _localGlow = c;
+  }
+
+  void setLocalColors({Color? fg, Color? bg, Color? glow}) {
+    if (fg != null) _localFg = fg;
+    if (bg != null) _localBg = bg;
+    if (glow != null) _localGlow = glow;
+  }
 
   void setRemoteColor(String source, String channel, Color color) {
     switch ((source, channel)) {
@@ -122,13 +136,16 @@ class PenaltyBoxState extends ChangeNotifier {
     notifyListeners();
   }
 
-  void updateTeam(int teamIdx, {String? name, Color? color}) {
+  void updateTeam(int teamIdx, {String? name, Color? color, Color? fgColor, Color? bgColor}) {
     final t = teamInfo(teamIdx);
     if (name != null) {
       t.name = name.isNotEmpty ? name : (teamIdx == 1 ? 'Salt' : 'Pepper');
       teamNamesFromRemote = true;
     }
     if (color != null) t.color = color;
+    if (fgColor != null || bgColor != null) {
+      t.setLocalColors(fg: fgColor, bg: bgColor, glow: fgColor ?? bgColor);
+    }
     notifyListeners();
   }
 
