@@ -1,17 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../models/penalty_box_state.dart';
 import '../../styles/text_styles.dart';
-
-const teamColors = [
-  Colors.white,
-  Colors.grey,
-  Colors.red,
-  Colors.deepOrange,
-  Colors.amber,
-  Colors.green,
-  Colors.blue,
-  Colors.purple,
-];
+import '../box_timer/team_color_picker.dart';
 
 /// Team settings section for offline mode.
 class TeamSettingsSection extends StatelessWidget {
@@ -63,13 +53,46 @@ class _TeamRowState extends State<_TeamRow> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Team ${widget.teamIndex}',
-          style: AppTextStyles.clockLabel.copyWith(
-            color: Colors.white54,
-            fontSize: 12,
-            letterSpacing: 1.2,
-          ),
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                'Team ${widget.teamIndex}',
+                style: AppTextStyles.clockLabel.copyWith(
+                  color: Colors.white54,
+                  fontSize: 12,
+                  letterSpacing: 1.2,
+                ),
+              ),
+            ),
+            TextButton(
+              onPressed: () => _showColorPicker(context),
+              style: TextButton.styleFrom(
+                backgroundColor: Colors.white.withValues(alpha: 0.08),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 18,
+                    height: 18,
+                    decoration: BoxDecoration(
+                      color: teamInfo.color,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white24),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  const Text(
+                    'Color',
+                    style: TextStyle(color: Colors.white),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
         const SizedBox(height: 8),
         TextField(
@@ -94,29 +117,18 @@ class _TeamRowState extends State<_TeamRow> {
             widget.state.updateTeam(widget.teamIndex, name: value);
           },
         ),
-        const SizedBox(height: 10),
-        Wrap(
-          spacing: 12,
-          children: teamColors.map((color) {
-            final isSelected = teamInfo.color == color;
-            return GestureDetector(
-              onTap: () => widget.state.setTeamColor(widget.teamIndex, color),
-              child: Container(
-                width: 28,
-                height: 28,
-                decoration: BoxDecoration(
-                  color: color,
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: isSelected ? Colors.white : Colors.transparent,
-                    width: isSelected ? 3 : 0,
-                  ),
-                ),
-              ),
-            );
-          }).toList(),
-        ),
       ],
     );
+  }
+
+  void _showColorPicker(BuildContext context) {
+    showDialog<Color>(
+      context: context,
+      builder: (_) => TeamColorPickerDialog(
+        currentColor: widget.state.teamInfo(widget.teamIndex).color,
+      ),
+    ).then((color) {
+      if (color != null) widget.state.setTeamColor(widget.teamIndex, color);
+    });
   }
 }
