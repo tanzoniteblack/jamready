@@ -66,7 +66,6 @@ class QueuePanel extends StatelessWidget {
     final result = await showSkaterEntryDialog(
       context,
       initialPosition: SkaterPosition.blocker,
-      allowJammer: false,
       teamName: state.teamInfo(teamIndex).name,
     );
     if (result != null) {

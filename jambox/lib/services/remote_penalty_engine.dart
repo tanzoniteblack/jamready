@@ -306,7 +306,7 @@ class RemotePenaltyEngine extends PenaltyEngine with WidgetsBindingObserver {
     if (delta.jamNumber != null) _state.jamNumber = delta.jamNumber!;
     if (delta.periodNumber != null) _state.periodNumber = delta.periodNumber!;
 
-    for (final e in delta.teamNames.entries) _state.updateTeam(e.key, name: e.value);
+    for (final e in delta.teamNames.entries) { _state.updateTeam(e.key, name: e.value); }
     for (final e in delta.teamColors.entries) {
       e.value.forEach((key, color) => _state.updateTeamColor(e.key, key.$1, key.$2, color));
     }
@@ -323,11 +323,11 @@ class RemotePenaltyEngine extends PenaltyEngine with WidgetsBindingObserver {
       });
     }
 
-    for (final (t, uuid, role) in delta.skaterRoles) _onSkaterRole(t, uuid, role);
+    for (final (t, uuid, role) in delta.skaterRoles) { _onSkaterRole(t, uuid, role); }
 
     // BoxSeat before BoxClock: seat occupancy must be set before Running is applied.
-    for (final (t, seat, prop, value) in delta.boxSeats) _onBoxSeatUpdate(t, seat, prop, value);
-    for (final (t, seat, prop, value) in delta.boxClocks) _onBoxClockUpdate(t, seat, prop, value);
+    for (final (t, seat, prop, value) in delta.boxSeats) { _onBoxSeatUpdate(t, seat, prop, value); }
+    for (final (t, seat, prop, value) in delta.boxClocks) { _onBoxClockUpdate(t, seat, prop, value); }
 
     final jamNowRunning = _state.jamRunning;
     if (!jamWasRunning && jamNowRunning) {

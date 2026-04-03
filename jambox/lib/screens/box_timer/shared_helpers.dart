@@ -28,14 +28,14 @@ AppBar standardAppBar({
 }
 
 /// Builds a vertical stack of blocker seat cards.
-Widget buildBlockerStack(List<SkaterSeat> blockers, {bool compact = true}) {
+Widget buildBlockerStack(List<SkaterSeat> blockers) {
   return Column(
     children: [
-      Expanded(child: SeatCard(seat: blockers[0], compact: compact)),
+      Expanded(child: SeatCard(seat: blockers[0])),
       const SizedBox(height: 8),
-      Expanded(child: SeatCard(seat: blockers[1], compact: compact)),
+      Expanded(child: SeatCard(seat: blockers[1])),
       const SizedBox(height: 8),
-      Expanded(child: SeatCard(seat: blockers[2], compact: compact)),
+      Expanded(child: SeatCard(seat: blockers[2])),
     ],
   );
 }

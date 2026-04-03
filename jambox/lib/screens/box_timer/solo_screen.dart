@@ -18,10 +18,9 @@ class SoloScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final state = context.watch<PenaltyBoxState>();
-    final accentColor = _computeAccent(state);
 
     return DynamicBackground(
-      accentColor: accentColor,
+      accentColor: null,
       child: PopScope(
         canPop: true,
         child: Scaffold(
@@ -34,11 +33,11 @@ class SoloScreen extends StatelessWidget {
               builder: (ctx, orientation) {
                 final isLandscape = orientation == Orientation.landscape;
                 if (isLandscape) {
-                  return CustomScrollView(
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    slivers: [
-                      SliverFillRemaining(
-                        hasScrollBody: false,
+                  return LayoutBuilder(
+                    builder: (ctx2, constraints) => SingleChildScrollView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      child: SizedBox(
+                        height: constraints.maxHeight,
                         child: SafeArea(
                           child: Padding(
                             padding: const EdgeInsets.all(12),
@@ -60,7 +59,7 @@ class SoloScreen extends StatelessWidget {
                           ),
                         ),
                       ),
-                    ],
+                    ),
                   );
                 }
                 // Portrait: single outer scroll, AspectRatio cards keep columns equal height
@@ -92,10 +91,6 @@ class SoloScreen extends StatelessWidget {
         ),
       ),
     );
-  }
-
-  Color? _computeAccent(PenaltyBoxState state) {
-    return computeAccentFromSeats(state.seats);
   }
 
   AppBar _buildAppBar(BuildContext context, PenaltyBoxState state, PenaltyEngine engine) {
@@ -133,25 +128,29 @@ class _SoloTeamColumn extends StatelessWidget {
     final teamInfo = state.teamInfo(teamIndex);
     final header = buildTeamHeader(teamInfo.name, teamInfo.fgColor, teamInfo.bgColor, teamInfo.glowColor);
 
+    // Team 1 is always the left column: penalty button goes on the right (inside edge).
+    // Team 2 is always the right column: penalty button goes on the left (inside edge).
+    final penaltyOnLeft = teamIndex == 2;
+
     if (landscape) {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           header,
           const SizedBox(height: 8),
-          Expanded(child: SeatCard(seat: jammer)),
+          Expanded(child: SeatCard(seat: jammer, penaltyOnLeft: penaltyOnLeft)),
           const SizedBox(height: 8),
           Expanded(
             child: Row(
               children: [
-                Expanded(child: SeatCard(seat: blockers[0], compact: true)),
+                Expanded(child: SeatCard(seat: blockers[0], penaltyOnLeft: penaltyOnLeft)),
                 const SizedBox(width: 8),
-                Expanded(child: SeatCard(seat: blockers[1], compact: true)),
+                Expanded(child: SeatCard(seat: blockers[1], penaltyOnLeft: penaltyOnLeft)),
               ],
             ),
           ),
           const SizedBox(height: 8),
-          Expanded(child: SeatCard(seat: blockers[2], compact: true)),
+          Expanded(child: SeatCard(seat: blockers[2], penaltyOnLeft: penaltyOnLeft)),
         ],
       );
     }
@@ -162,13 +161,13 @@ class _SoloTeamColumn extends StatelessWidget {
       children: [
         header,
         const SizedBox(height: 8),
-        AspectRatio(aspectRatio: 1.0, child: SeatCard(seat: jammer)),
+        AspectRatio(aspectRatio: 1.0, child: SeatCard(seat: jammer, penaltyOnLeft: penaltyOnLeft)),
         const SizedBox(height: 8),
-        AspectRatio(aspectRatio: 1.6, child: SeatCard(seat: blockers[0], compact: true)),
+        AspectRatio(aspectRatio: 1.6, child: SeatCard(seat: blockers[0], penaltyOnLeft: penaltyOnLeft)),
         const SizedBox(height: 8),
-        AspectRatio(aspectRatio: 1.6, child: SeatCard(seat: blockers[1], compact: true)),
+        AspectRatio(aspectRatio: 1.6, child: SeatCard(seat: blockers[1], penaltyOnLeft: penaltyOnLeft)),
         const SizedBox(height: 8),
-        AspectRatio(aspectRatio: 1.6, child: SeatCard(seat: blockers[2], compact: true)),
+        AspectRatio(aspectRatio: 1.6, child: SeatCard(seat: blockers[2], penaltyOnLeft: penaltyOnLeft)),
       ],
     );
   }

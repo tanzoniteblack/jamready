@@ -16,7 +16,6 @@ class SkaterEntryResult {
 Future<SkaterEntryResult?> showSkaterEntryDialog(
   BuildContext context, {
   SkaterPosition initialPosition = SkaterPosition.blocker,
-  bool allowJammer = true,
   String? teamName,
   bool barrierDismissible = false,
   List<String> knownNumbers = const [],
@@ -26,7 +25,6 @@ Future<SkaterEntryResult?> showSkaterEntryDialog(
     barrierDismissible: barrierDismissible,
     builder: (ctx) => _SkaterEntryDialog(
       initialPosition: initialPosition,
-      allowJammer: allowJammer,
       teamName: teamName,
       knownNumbers: knownNumbers,
     ),
@@ -35,13 +33,11 @@ Future<SkaterEntryResult?> showSkaterEntryDialog(
 
 class _SkaterEntryDialog extends StatefulWidget {
   final SkaterPosition initialPosition;
-  final bool allowJammer;
   final String? teamName;
   final List<String> knownNumbers;
 
   const _SkaterEntryDialog({
     required this.initialPosition,
-    required this.allowJammer,
     this.teamName,
     required this.knownNumbers,
   });
@@ -52,13 +48,12 @@ class _SkaterEntryDialog extends StatefulWidget {
 
 class _SkaterEntryDialogState extends State<_SkaterEntryDialog> {
   final _controller = TextEditingController();
-  late SkaterPosition _position;
   late bool _keyboardMode;
+  String? _selectedNumber;
 
   @override
   void initState() {
     super.initState();
-    _position = widget.initialPosition;
     _keyboardMode = widget.knownNumbers.isEmpty;
   }
 
@@ -70,10 +65,19 @@ class _SkaterEntryDialogState extends State<_SkaterEntryDialog> {
 
   void _submitNumber(String number) {
     if (number.isEmpty) return;
-    Navigator.of(context).pop(SkaterEntryResult(number: number, position: _position));
+    Navigator.of(context).pop(SkaterEntryResult(number: number, position: widget.initialPosition));
   }
 
   void _submitFromField() => _submitNumber(_controller.text.trim());
+
+  void _onChipTap(String number) {
+    // Second tap on the same chip confirms immediately (fast-operator shortcut).
+    if (_selectedNumber == number) {
+      _submitNumber(number);
+    } else {
+      setState(() => _selectedNumber = number);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -101,7 +105,10 @@ class _SkaterEntryDialogState extends State<_SkaterEntryDialog> {
                 ),
                 if (widget.knownNumbers.isNotEmpty)
                   GestureDetector(
-                    onTap: () => setState(() => _keyboardMode = !_keyboardMode),
+                    onTap: () => setState(() {
+                      _keyboardMode = !_keyboardMode;
+                      _selectedNumber = null;
+                    }),
                     child: Icon(
                       _keyboardMode ? Icons.grid_view_rounded : Icons.keyboard,
                       color: Colors.white38,
@@ -115,83 +122,77 @@ class _SkaterEntryDialogState extends State<_SkaterEntryDialog> {
             // Number input — grid or keyboard
             _keyboardMode ? _buildKeyboard() : _buildGrid(),
 
+
             const SizedBox(height: 16),
 
-            // Position chips
-            Text(
-              'POSITION',
-              style: AppTextStyles.clockLabel.copyWith(
-                color: Colors.white38,
-                fontSize: 11,
-                letterSpacing: 1.5,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                if (widget.allowJammer) ...[
-                  _PositionChip(
-                    label: 'J',
-                    selected: _position == SkaterPosition.jammer,
-                    color: Colors.purple.shade400,
-                    onTap: () => setState(() => _position = SkaterPosition.jammer),
-                  ),
-                  const SizedBox(width: 8),
-                ],
-                _PositionChip(
-                  label: 'P',
-                  selected: _position == SkaterPosition.pivot,
-                  color: Colors.teal.shade400,
-                  onTap: () => setState(() => _position = SkaterPosition.pivot),
-                ),
-                const SizedBox(width: 8),
-                _PositionChip(
-                  label: 'B',
-                  selected: _position == SkaterPosition.blocker,
-                  color: Colors.blue.shade400,
-                  onTap: () => setState(() => _position = SkaterPosition.blocker),
-                ),
-              ],
-            ),
-
-            if (_keyboardMode) ...[
-              const SizedBox(height: 20),
+            if (_keyboardMode)
               Row(
                 children: [
                   Expanded(
-                    child: TextButton(
-                      onPressed: () => Navigator.of(context).pop(),
-                      child: Text(
-                        'CANCEL',
-                        style: AppTextStyles.buttonText.copyWith(color: Colors.white38, fontSize: 14),
+                    child: SizedBox(
+                      height: 48,
+                      child: TextButton(
+                        onPressed: () => Navigator.of(context).pop(),
+                        child: Text(
+                          'CANCEL',
+                          style: AppTextStyles.buttonText.copyWith(color: Colors.white38, fontSize: 16),
+                        ),
                       ),
                     ),
                   ),
                   const SizedBox(width: 10),
                   Expanded(
                     flex: 2,
-                    child: ElevatedButton(
-                      onPressed: _submitFromField,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.blue.shade700,
-                        padding: const EdgeInsets.symmetric(vertical: 13),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    child: SizedBox(
+                      height: 48,
+                      child: ElevatedButton(
+                        onPressed: _submitFromField,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.blue.shade700,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        child: Text('SEAT SKATER', style: AppTextStyles.buttonText.copyWith(fontSize: 15)),
                       ),
-                      child: Text('SEAT SKATER', style: AppTextStyles.buttonText.copyWith(fontSize: 14)),
+                    ),
+                  ),
+                ],
+              )
+            else
+              Row(
+                children: [
+                  Expanded(
+                    child: SizedBox(
+                      height: 48,
+                      child: TextButton(
+                        onPressed: () => Navigator.of(context).pop(),
+                        child: Text(
+                          'CANCEL',
+                          style: AppTextStyles.buttonText.copyWith(color: Colors.white38, fontSize: 16),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    flex: 2,
+                    child: SizedBox(
+                      height: 48,
+                      child: ElevatedButton(
+                        onPressed: _selectedNumber != null ? () => _submitNumber(_selectedNumber!) : null,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.blue.shade700,
+                          disabledBackgroundColor: Colors.white.withValues(alpha: 0.08),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        child: Text(
+                          _selectedNumber != null ? 'CONFIRM #$_selectedNumber' : 'SELECT NUMBER',
+                          style: AppTextStyles.buttonText.copyWith(fontSize: 15),
+                        ),
+                      ),
                     ),
                   ),
                 ],
               ),
-            ] else ...[
-              const SizedBox(height: 12),
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: Text(
-                  'CANCEL',
-                  style: AppTextStyles.buttonText.copyWith(color: Colors.white38, fontSize: 13),
-                ),
-              ),
-            ],
           ],
         ),
       ),
@@ -228,22 +229,25 @@ class _SkaterEntryDialogState extends State<_SkaterEntryDialog> {
   }
 
   Widget _buildGrid() {
-    // Alphabetically sorted, '?' always last
     final numbers = [...widget.knownNumbers]..sort();
 
     return Wrap(
-      spacing: 8,
-      runSpacing: 8,
+      spacing: 12,
+      runSpacing: 12,
       children: [
         ...numbers.map((n) => _NumberChip(
               number: n,
-              onTap: () => _submitNumber(n),
+              selected: _selectedNumber == n,
+              onTap: () => _onChipTap(n),
             )),
         // '?' = open keyboard to type manually
         GestureDetector(
-          onTap: () => setState(() => _keyboardMode = true),
+          onTap: () => setState(() {
+            _keyboardMode = true;
+            _selectedNumber = null;
+          }),
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
             decoration: BoxDecoration(
               color: Colors.white.withValues(alpha: 0.06),
               border: Border.all(color: Colors.white24),
@@ -252,7 +256,7 @@ class _SkaterEntryDialogState extends State<_SkaterEntryDialog> {
             child: Text(
               '?',
               style: AppTextStyles.skaterNumber.copyWith(
-                fontSize: 20,
+                fontSize: 22,
                 color: Colors.white38,
               ),
             ),
@@ -265,67 +269,35 @@ class _SkaterEntryDialogState extends State<_SkaterEntryDialog> {
 
 class _NumberChip extends StatelessWidget {
   final String number;
-  final VoidCallback onTap;
-
-  const _NumberChip({required this.number, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-        decoration: BoxDecoration(
-          color: Colors.blue.withValues(alpha: 0.15),
-          border: Border.all(color: Colors.blue.shade700),
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Text(
-          '#$number',
-          style: AppTextStyles.skaterNumber.copyWith(
-            fontSize: 20,
-            color: Colors.white,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _PositionChip extends StatelessWidget {
-  final String label;
   final bool selected;
-  final Color color;
   final VoidCallback onTap;
 
-  const _PositionChip({
-    required this.label,
-    required this.selected,
-    required this.color,
-    required this.onTap,
-  });
+  const _NumberChip({required this.number, required this.selected, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        duration: const Duration(milliseconds: 120),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
         decoration: BoxDecoration(
-          color: selected ? color.withValues(alpha: 0.25) : Colors.transparent,
-          border: Border.all(color: selected ? color : Colors.white24, width: selected ? 2 : 1),
-          borderRadius: BorderRadius.circular(8),
+          color: selected ? Colors.blue.withValues(alpha: 0.35) : Colors.blue.withValues(alpha: 0.12),
+          border: Border.all(
+            color: selected ? Colors.blue.shade300 : Colors.blue.shade700,
+            width: selected ? 2 : 1,
+          ),
+          borderRadius: BorderRadius.circular(10),
         ),
         child: Text(
-          label,
-          style: AppTextStyles.clockLabel.copyWith(
-            color: selected ? color : Colors.white54,
-            fontSize: 14,
-            letterSpacing: 0.5,
+          '#$number',
+          style: AppTextStyles.skaterNumber.copyWith(
+            fontSize: 22,
+            color: selected ? Colors.white : Colors.white.withValues(alpha: 0.85),
           ),
         ),
       ),
     );
   }
 }
+

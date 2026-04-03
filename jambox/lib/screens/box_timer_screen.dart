@@ -45,10 +45,8 @@ class _BoxTimerScreenState extends State<BoxTimerScreen> {
     final jammer = state.jammerSeat(teamIdx);
     final showJammer = state.role == AppRole.team1Full || state.role == AppRole.team2Full;
 
-    final accentColor = _computeAccent(state, teamIdx);
-
     return DynamicBackground(
-      accentColor: accentColor,
+      accentColor: null,
       child: PopScope(
         canPop: true,
         child: GestureDetector(
@@ -70,12 +68,12 @@ class _BoxTimerScreenState extends State<BoxTimerScreen> {
             appBar: _buildAppBar(context, state, teamInfo, widget.engine),
             body: RefreshIndicator(
               onRefresh: widget.engine.reconnect,
-              child: CustomScrollView(
-                controller: _scrollController,
-                physics: const AlwaysScrollableScrollPhysics(),
-                slivers: [
-                  SliverFillRemaining(
-                    hasScrollBody: false,
+              child: LayoutBuilder(
+                builder: (context, constraints) => SingleChildScrollView(
+                  controller: _scrollController,
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  child: SizedBox(
+                    height: constraints.maxHeight,
                     child: SafeArea(
                       child: Padding(
                         padding: const EdgeInsets.all(16),
@@ -85,7 +83,7 @@ class _BoxTimerScreenState extends State<BoxTimerScreen> {
                       ),
                     ),
                   ),
-                ],
+                ),
               ),
             ),
           ),
@@ -124,24 +122,19 @@ class _BoxTimerScreenState extends State<BoxTimerScreen> {
               Expanded(
                 child: Row(
                   children: [
-                    Expanded(child: SeatCard(seat: blockers[0], compact: true)),
+                    Expanded(child: SeatCard(seat: blockers[0])),
                     const SizedBox(width: 8),
-                    Expanded(child: SeatCard(seat: blockers[1], compact: true)),
+                    Expanded(child: SeatCard(seat: blockers[1])),
                   ],
                 ),
               ),
               const SizedBox(height: 8),
-              Expanded(child: SeatCard(seat: blockers[2], compact: true)),
+              Expanded(child: SeatCard(seat: blockers[2])),
             ],
           ),
         ),
       ],
     );
-  }
-
-  Color? _computeAccent(PenaltyBoxState state, int teamIdx) {
-    final seats = [state.jammerSeat(teamIdx), ...state.blockerSeats(teamIdx)];
-    return computeAccentFromSeats(seats, state.teamInfo(teamIdx).color);
   }
 
   AppBar _buildAppBar(
