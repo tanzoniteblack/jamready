@@ -260,19 +260,46 @@ class _SeatCardState extends State<SeatCard> with SingleTickerProviderStateMixin
     final badgeFontSize = isInline ? 14.0 : 20.0;
     final badgePadH = isInline ? 10.0 : 18.0;
     final badgePadV = isInline ? 6.0 : 10.0;
-    final posLabelSize = isInline ? 11.0 : 13.0;
+    final posLabelSize = isInline ? 16.0 : 22.0;
+    final isJammer = seat.position == SkaterPosition.jammer;
 
     final header = Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        Text(
-          posLabel,
-          style: AppTextStyles.clockLabel.copyWith(
-            color: isEmpty ? Colors.white24 : teamInfo.fgColor.withValues(alpha: 0.65),
-            fontSize: posLabelSize,
-            fontWeight: FontWeight.w700,
-            letterSpacing: 2,
-          ),
+        Row(
+          children: [
+            Text(
+              posLabel,
+              style: AppTextStyles.clockLabel.copyWith(
+                color: isEmpty ? Colors.white54 : Colors.white,
+                fontSize: posLabelSize,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 1.5,
+                shadows: [
+                  Shadow(
+                    color: Colors.black.withValues(alpha: 0.75),
+                    blurRadius: 6,
+                    offset: const Offset(0, 1),
+                  ),
+                ],
+              ),
+            ),
+            if (isJammer) ...[
+              const SizedBox(width: 6),
+              Icon(
+                Icons.star_rounded,
+                size: posLabelSize + 6,
+                color: isEmpty ? Colors.white54 : Colors.white,
+                shadows: [
+                  Shadow(
+                    color: Colors.black.withValues(alpha: 0.75),
+                    blurRadius: 6,
+                    offset: const Offset(0, 1),
+                  ),
+                ],
+              ),
+            ],
+          ],
         ),
         const Spacer(),
         // Always rendered (height stability) — hidden via Opacity when empty

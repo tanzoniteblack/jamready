@@ -99,10 +99,15 @@ class _BoxTimerScreenState extends State<BoxTimerScreen> {
         JamStatusBar(state: state, engine: widget.engine),
         const SizedBox(height: 16),
         if (showJammer) ...[
-          Expanded(flex: 5, child: SeatCard(seat: jammer)),
-          const SizedBox(height: 10),
-        ],
-        Expanded(flex: 9, child: buildBlockerStack(blockers)),
+          Expanded(child: SeatCard(seat: jammer)),
+          const SizedBox(height: 8),
+          Expanded(child: SeatCard(seat: blockers[0])),
+          const SizedBox(height: 8),
+          Expanded(child: SeatCard(seat: blockers[1])),
+          const SizedBox(height: 8),
+          Expanded(child: SeatCard(seat: blockers[2])),
+        ] else
+          Expanded(child: buildBlockerStack(blockers)),
       ],
     );
   }
@@ -110,25 +115,25 @@ class _BoxTimerScreenState extends State<BoxTimerScreen> {
   Widget _buildLandscape(SkaterSeat jammer, List<SkaterSeat> blockers, bool showJammer) {
     if (!showJammer) return buildBlockerStack(blockers);
 
-    // Full layout: jammer + blockers in 2x2 grid
-    return Row(
+    // Full layout: jammer + blockers in uniform 2x2 grid
+    return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Expanded(child: SeatCard(seat: jammer)),
-        const SizedBox(width: 12),
         Expanded(
-          child: Column(
+          child: Row(
             children: [
-              Expanded(
-                child: Row(
-                  children: [
-                    Expanded(child: SeatCard(seat: blockers[0])),
-                    const SizedBox(width: 8),
-                    Expanded(child: SeatCard(seat: blockers[1])),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 8),
+              Expanded(child: SeatCard(seat: jammer)),
+              const SizedBox(width: 8),
+              Expanded(child: SeatCard(seat: blockers[0])),
+            ],
+          ),
+        ),
+        const SizedBox(height: 8),
+        Expanded(
+          child: Row(
+            children: [
+              Expanded(child: SeatCard(seat: blockers[1])),
+              const SizedBox(width: 8),
               Expanded(child: SeatCard(seat: blockers[2])),
             ],
           ),

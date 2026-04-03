@@ -156,18 +156,19 @@ class _SoloTeamColumn extends StatelessWidget {
     }
 
     // Portrait: AspectRatio cards so both columns have equal natural height
+    const cardAspectRatio = 1.6;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         header,
         const SizedBox(height: 8),
-        AspectRatio(aspectRatio: 1.0, child: SeatCard(seat: jammer, penaltyOnLeft: penaltyOnLeft)),
+        AspectRatio(aspectRatio: cardAspectRatio, child: SeatCard(seat: jammer, penaltyOnLeft: penaltyOnLeft)),
         const SizedBox(height: 8),
-        AspectRatio(aspectRatio: 1.6, child: SeatCard(seat: blockers[0], penaltyOnLeft: penaltyOnLeft)),
+        AspectRatio(aspectRatio: cardAspectRatio, child: SeatCard(seat: blockers[0], penaltyOnLeft: penaltyOnLeft)),
         const SizedBox(height: 8),
-        AspectRatio(aspectRatio: 1.6, child: SeatCard(seat: blockers[1], penaltyOnLeft: penaltyOnLeft)),
+        AspectRatio(aspectRatio: cardAspectRatio, child: SeatCard(seat: blockers[1], penaltyOnLeft: penaltyOnLeft)),
         const SizedBox(height: 8),
-        AspectRatio(aspectRatio: 1.6, child: SeatCard(seat: blockers[2], penaltyOnLeft: penaltyOnLeft)),
+        AspectRatio(aspectRatio: cardAspectRatio, child: SeatCard(seat: blockers[2], penaltyOnLeft: penaltyOnLeft)),
       ],
     );
   }
