@@ -7,6 +7,7 @@ import 'package:vibration/vibration.dart';
 
 import '../models/scoreboard_state.dart';
 import '../services/game_engine.dart';
+import '../services/live_activity_service.dart';
 import '../services/remote_game_engine.dart';
 import '../widgets/clock_display.dart';
 import '../widgets/jam_controls.dart';
@@ -33,6 +34,8 @@ class JamTimerScreen extends StatefulWidget {
 class _JamTimerScreenState extends State<JamTimerScreen>
     with WidgetsBindingObserver {
   GameEngine? _engine;
+  final _liveActivity = LiveActivityService();
+  ScoreboardState? _scoreboardState;
 
   // "Healthy" color used when clock is in normal state (no alerts)
   static final Color _healthyColor = Colors.green.shade400;
@@ -61,6 +64,18 @@ class _JamTimerScreenState extends State<JamTimerScreen>
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _connectToServer();
       });
+    }
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _scoreboardState = Provider.of<ScoreboardState>(context, listen: false);
+      _liveActivity.startActivity(_scoreboardState!);
+      _scoreboardState!.addListener(_onStateChangedForLiveActivity);
+    });
+  }
+
+  void _onStateChangedForLiveActivity() {
+    if (_scoreboardState != null) {
+      _liveActivity.updateActivity(_scoreboardState!);
     }
   }
 
@@ -104,6 +119,8 @@ class _JamTimerScreenState extends State<JamTimerScreen>
 
   @override
   void dispose() {
+    _scoreboardState?.removeListener(_onStateChangedForLiveActivity);
+    _liveActivity.endActivity();
     WidgetsBinding.instance.removeObserver(this);
     _engine?.dispose();
     super.dispose();

@@ -60,5 +60,9 @@
     <key>NSCameraUsageDescription</key>
     <string>This app needs camera access to scan QR codes to fetch server addresses.</string>
     <key>ITSAppUsesNonExemptEncryption</key><false/>
+	<key>NSSupportsLiveActivities</key>
+	<true/>
+	<key>NSSupportsLiveActivitiesFrequentUpdates</key>
+<true/>
 </dict>
 </plist>
