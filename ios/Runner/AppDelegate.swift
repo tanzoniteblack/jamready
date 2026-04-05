@@ -5,13 +5,47 @@ import ActivityKit
 @main
 @objc class AppDelegate: FlutterAppDelegate, FlutterImplicitEngineDelegate {
 
-    private var liveActivityID: String?
+    /// Persisted across launches so a dirty-shutdown activity can be cleaned up on next start.
+    private static let liveActivityIDKey = "com.jamready.liveActivityID"
+
+    private var liveActivityID: String? {
+        get { UserDefaults.standard.string(forKey: Self.liveActivityIDKey) }
+        set {
+            if let id = newValue {
+                UserDefaults.standard.set(id, forKey: Self.liveActivityIDKey)
+            } else {
+                UserDefaults.standard.removeObject(forKey: Self.liveActivityIDKey)
+            }
+        }
+    }
+
+    /// How long after the last update before the activity is shown as stale.
+    /// Acts as a soft TTL; the OS enforces a hard 8-hour maximum.
+    private static let activityStaleDuration: TimeInterval = 10 * 60  // 10 minutes
 
     override func application(
         _ application: UIApplication,
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
     ) -> Bool {
+        // Clean up an activity left over from a previous session (crash, power-off, etc.).
+        // Uses the persisted ID so we only touch our own activity, and passes nil for content
+        // to avoid deserialising a potentially stale ContentState schema.
+        if #available(iOS 16.2, *), let storedID = liveActivityID {
+            Task {
+                if let activity = Activity<JamReadyAttributes>.activities.first(where: { $0.id == storedID }) {
+                    await activity.end(nil, dismissalPolicy: .immediate)
+                }
+                liveActivityID = nil
+            }
+        }
         return super.application(application, didFinishLaunchingWithOptions: launchOptions)
+    }
+
+    override func applicationWillTerminate(_ application: UIApplication) {
+        // Force-close from the app switcher. activity.end() is a local write and
+        // completes fast enough that the OS won't kill the process before the Task fires.
+        endLiveActivity()
+        super.applicationWillTerminate(application)
     }
 
     func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
@@ -60,7 +94,7 @@ import ActivityKit
         )
         let content = ActivityContent(
             state: contentState(from: args),
-            staleDate: nil
+            staleDate: Date(timeIntervalSinceNow: Self.activityStaleDuration)
         )
 
         do {
@@ -88,7 +122,7 @@ import ActivityKit
 
         let content = ActivityContent(
             state: contentState(from: args),
-            staleDate: nil
+            staleDate: Date(timeIntervalSinceNow: Self.activityStaleDuration)
         )
         Task { await activity.update(content) }
     }
@@ -96,10 +130,10 @@ import ActivityKit
     private func endLiveActivity() {
         guard #available(iOS 16.2, *) else { return }
         guard let id = liveActivityID else { return }
+        liveActivityID = nil  // clear before async end so re-entrant calls are no-ops
         if let activity = Activity<JamReadyAttributes>.activities.first(where: { $0.id == id }) {
-            Task { await activity.end(ActivityContent(state: activity.content.state, staleDate: nil), dismissalPolicy: .immediate) }
+            Task { await activity.end(nil, dismissalPolicy: .immediate) }
         }
-        liveActivityID = nil
     }
 
     @available(iOS 16.2, *)
