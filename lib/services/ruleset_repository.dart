@@ -18,10 +18,7 @@ class RulesetRepository {
 
   /// Get built-in rulesets
   List<Ruleset> getBuiltInRulesets() {
-    return [
-      Ruleset.wftda(),
-      Ruleset.rdcl(),
-    ];
+    return [Ruleset.wftda(), Ruleset.rdcl()];
   }
 
   /// Get custom rulesets from storage

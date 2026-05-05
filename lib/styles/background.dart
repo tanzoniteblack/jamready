@@ -5,11 +5,7 @@ class DynamicBackground extends StatelessWidget {
   final Widget child;
   final Color? accentColor;
 
-  const DynamicBackground({
-    super.key,
-    required this.child,
-    this.accentColor,
-  });
+  const DynamicBackground({super.key, required this.child, this.accentColor});
 
   @override
   Widget build(BuildContext context) {
@@ -20,11 +16,7 @@ class DynamicBackground extends StatelessWidget {
       children: [
         // Layer 1: Solid dark base - the foundational background color
         // Slightly darker than typical dark themes for depth
-        Positioned.fill(
-          child: Container(
-            color: const Color(0xFF0E0F12),
-          ),
-        ),
+        Positioned.fill(child: Container(color: const Color(0xFF0E0F12))),
 
         // Layer 2: Accent glow - radial gradient that provides subtle color
         // wash behind the clock area, animated when alert color changes

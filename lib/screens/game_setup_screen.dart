@@ -101,9 +101,7 @@ class _GameSetupScreenState extends State<GameSetupScreen> {
     final engine = LocalGameEngine(state, config);
 
     Navigator.of(context).pushReplacement(
-      MaterialPageRoute(
-        builder: (context) => JamTimerScreen(engine: engine),
-      ),
+      MaterialPageRoute(builder: (context) => JamTimerScreen(engine: engine)),
     );
   }
 
@@ -218,8 +216,9 @@ class _GameSetupScreenState extends State<GameSetupScreen> {
                     entry.value.name,
                     style: AppTextStyles.buttonText.copyWith(
                       color: isSelected ? Colors.orange : Colors.white70,
-                      fontWeight:
-                          isSelected ? FontWeight.bold : FontWeight.normal,
+                      fontWeight: isSelected
+                          ? FontWeight.bold
+                          : FontWeight.normal,
                     ),
                   ),
                 ),
@@ -301,11 +300,7 @@ class _GameSetupScreenState extends State<GameSetupScreen> {
           height: 24,
           color: Colors.white.withValues(alpha: 0.1),
         ),
-        _buildSummaryChip(
-          "${ruleset.timeoutsPerPeriod}",
-          "timeouts",
-          false,
-        ),
+        _buildSummaryChip("${ruleset.timeoutsPerPeriod}", "timeouts", false),
       ],
     );
   }
@@ -322,13 +317,7 @@ class _GameSetupScreenState extends State<GameSetupScreen> {
             fontWeight: isModified ? FontWeight.bold : FontWeight.normal,
           ),
         ),
-        Text(
-          label,
-          style: TextStyle(
-            color: Colors.white38,
-            fontSize: 10,
-          ),
-        ),
+        Text(label, style: TextStyle(color: Colors.white38, fontSize: 10)),
       ],
     );
   }
@@ -383,7 +372,11 @@ class _GameSetupScreenState extends State<GameSetupScreen> {
   }
 
   Widget _buildEditableFields(
-      Ruleset base, Ruleset ruleset, int periodMinutes, int jamSeconds) {
+    Ruleset base,
+    Ruleset ruleset,
+    int periodMinutes,
+    int jamSeconds,
+  ) {
     return Column(
       children: [
         // Period count
@@ -392,13 +385,11 @@ class _GameSetupScreenState extends State<GameSetupScreen> {
           value: "${ruleset.periodCount}",
           isModified: _customPeriodCount != null,
           onDecrement: () => setState(() {
-            _customPeriodCount =
-                (_customPeriodCount ?? base.periodCount) - 1;
+            _customPeriodCount = (_customPeriodCount ?? base.periodCount) - 1;
             if (_customPeriodCount! < 1) _customPeriodCount = 1;
           }),
           onIncrement: () => setState(() {
-            _customPeriodCount =
-                (_customPeriodCount ?? base.periodCount) + 1;
+            _customPeriodCount = (_customPeriodCount ?? base.periodCount) + 1;
             if (_customPeriodCount! > 10) _customPeriodCount = 10;
           }),
         ),
@@ -409,7 +400,8 @@ class _GameSetupScreenState extends State<GameSetupScreen> {
           value: "$periodMinutes min",
           isModified: _customPeriodDurationMinutes != null,
           onDecrement: () => setState(() {
-            _customPeriodDurationMinutes = (_customPeriodDurationMinutes ??
+            _customPeriodDurationMinutes =
+                (_customPeriodDurationMinutes ??
                     base.periodDurationMs ~/ 60000) -
                 5;
             if (_customPeriodDurationMinutes! < 5) {
@@ -417,7 +409,8 @@ class _GameSetupScreenState extends State<GameSetupScreen> {
             }
           }),
           onIncrement: () => setState(() {
-            _customPeriodDurationMinutes = (_customPeriodDurationMinutes ??
+            _customPeriodDurationMinutes =
+                (_customPeriodDurationMinutes ??
                     base.periodDurationMs ~/ 60000) +
                 5;
             if (_customPeriodDurationMinutes! > 60) {
@@ -497,9 +490,7 @@ class _GameSetupScreenState extends State<GameSetupScreen> {
         padding: EdgeInsets.zero,
         style: IconButton.styleFrom(
           backgroundColor: Colors.white.withValues(alpha: 0.1),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(6),
-          ),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
         ),
       ),
     );
@@ -516,10 +507,7 @@ class _GameSetupScreenState extends State<GameSetupScreen> {
           const SizedBox(width: 4),
           Text(
             "Reset to ${_baseRuleset.name} defaults",
-            style: TextStyle(
-              color: Colors.orange,
-              fontSize: 11,
-            ),
+            style: TextStyle(color: Colors.orange, fontSize: 11),
           ),
         ],
       ),
@@ -527,7 +515,10 @@ class _GameSetupScreenState extends State<GameSetupScreen> {
   }
 
   Widget _buildTeamInput(
-      TextEditingController controller, String label, String hint) {
+    TextEditingController controller,
+    String label,
+    String hint,
+  ) {
     return TextFormField(
       controller: controller,
       style: const TextStyle(color: Colors.white, fontSize: 18),
@@ -547,8 +538,10 @@ class _GameSetupScreenState extends State<GameSetupScreen> {
         ),
         filled: true,
         fillColor: Colors.white.withValues(alpha: 0.05),
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 16,
+        ),
       ),
     );
   }

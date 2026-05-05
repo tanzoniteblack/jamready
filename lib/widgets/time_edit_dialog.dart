@@ -7,6 +7,7 @@ class TimeEditDialog extends StatefulWidget {
   final String title;
   final int currentTimeMs;
   final int? maxTimeMs;
+
   /// Callback to get the live current time (for confirmation check)
   final int Function()? getCurrentTimeMs;
 
@@ -57,8 +58,12 @@ class _TimeEditDialogState extends State<TimeEditDialog> {
     _selectedMinutes = totalSeconds ~/ 60;
     _selectedSeconds = totalSeconds % 60;
 
-    _minutesController = FixedExtentScrollController(initialItem: _selectedMinutes);
-    _secondsController = FixedExtentScrollController(initialItem: _selectedSeconds);
+    _minutesController = FixedExtentScrollController(
+      initialItem: _selectedMinutes,
+    );
+    _secondsController = FixedExtentScrollController(
+      initialItem: _selectedSeconds,
+    );
   }
 
   @override
@@ -132,9 +137,7 @@ class _TimeEditDialogState extends State<TimeEditDialog> {
 
     return AlertDialog(
       backgroundColor: const Color(0xFF1E1E1E),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       contentPadding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
       title: Text(
         widget.title,
@@ -242,7 +245,10 @@ class _TimeEditDialogState extends State<TimeEditDialog> {
             Padding(
               padding: const EdgeInsets.only(top: 8),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
                 decoration: BoxDecoration(
                   color: _awaitingConfirmation
                       ? Colors.red.withValues(alpha: 0.15)
@@ -271,7 +277,9 @@ class _TimeEditDialogState extends State<TimeEditDialog> {
                           ? 'Tap again to confirm'
                           : 'This $_formattedDifference',
                       style: TextStyle(
-                        color: _awaitingConfirmation ? Colors.red : Colors.orange,
+                        color: _awaitingConfirmation
+                            ? Colors.red
+                            : Colors.orange,
                         fontSize: 12,
                         fontWeight: _awaitingConfirmation
                             ? FontWeight.bold
@@ -287,10 +295,7 @@ class _TimeEditDialogState extends State<TimeEditDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: Text(
-            'CANCEL',
-            style: TextStyle(color: Colors.white54),
-          ),
+          child: Text('CANCEL', style: TextStyle(color: Colors.white54)),
         ),
         TextButton(
           onPressed: _handleSubmitTap,
@@ -301,12 +306,14 @@ class _TimeEditDialogState extends State<TimeEditDialog> {
             backgroundColor: _awaitingConfirmation
                 ? Colors.red
                 : (_needsConfirmation
-                    ? Colors.orange.withValues(alpha: 0.15)
-                    : null),
+                      ? Colors.orange.withValues(alpha: 0.15)
+                      : null),
           ),
-          child: Text(_awaitingConfirmation
-              ? 'CONFIRM'
-              : (_needsConfirmation ? 'CHANGE TIME' : 'SET TIME')),
+          child: Text(
+            _awaitingConfirmation
+                ? 'CONFIRM'
+                : (_needsConfirmation ? 'CHANGE TIME' : 'SET TIME'),
+          ),
         ),
       ],
     );

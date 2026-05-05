@@ -44,9 +44,7 @@ extension _JamTimerLogic on _JamTimerScreenState {
     int seconds = (milliseconds / 1000).ceil();
     int minutes = (seconds / 60).floor();
     int remainingSeconds = (seconds % 60);
-    return "${minutes.toString().padLeft(1, '0')}:${remainingSeconds
-        .toString()
-        .padLeft(2, '0')}";
+    return "${minutes.toString().padLeft(1, '0')}:${remainingSeconds.toString().padLeft(2, '0')}";
   }
 
   bool _isReadyToStart(ScoreboardState state) {
@@ -60,7 +58,8 @@ extension _JamTimerLogic on _JamTimerScreenState {
     // When the period count is known and there are still periods to play
     // (intermission number < total periods), noMoreJam is a transient flag
     // set at the end of each period, not a game-over signal.
-    final isBetweenPeriods = state.periodCount > 0 &&
+    final isBetweenPeriods =
+        state.periodCount > 0 &&
         !state.officialScore &&
         (intermission?.number ?? 0) < state.periodCount;
     if (state.noMoreJam && !isBetweenPeriods) return false;

@@ -6,14 +6,18 @@ import '../styles/text_styles.dart';
 import 'game_setup_screen.dart';
 import 'jam_timer_screen.dart';
 
-class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+class JamTimerHomeScreen extends StatefulWidget {
+  const JamTimerHomeScreen({super.key});
 
   @override
-  State<HomeScreen> createState() => _HomeScreenState();
+  State<JamTimerHomeScreen> createState() => _JamTimerHomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class HomeScreen extends JamTimerHomeScreen {
+  const HomeScreen({super.key});
+}
+
+class _JamTimerHomeScreenState extends State<JamTimerHomeScreen> {
   final _formKey = GlobalKey<FormState>();
   final _hostController = TextEditingController();
   final _portController = TextEditingController();
@@ -53,9 +57,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _scanQRCode() async {
     final result = await Navigator.of(context).push<String>(
-      MaterialPageRoute(
-        builder: (context) => const _QRScannerScreen(),
-      ),
+      MaterialPageRoute(builder: (context) => const _QRScannerScreen()),
     );
 
     if (result != null && mounted) {
@@ -388,10 +390,7 @@ class _QRScannerScreenState extends State<_QRScannerScreen> {
       ),
       body: Stack(
         children: [
-          MobileScanner(
-            controller: _controller,
-            onDetect: _onDetect,
-          ),
+          MobileScanner(controller: _controller, onDetect: _onDetect),
           // Overlay with cutout
           CustomPaint(
             painter: _ScannerOverlayPainter(),
@@ -460,17 +459,41 @@ class _ScannerOverlayPainter extends CustomPainter {
     const cornerLength = 30.0;
     final corners = [
       // Top-left
-      [cutoutRect.topLeft, Offset(cutoutRect.left + cornerLength, cutoutRect.top)],
-      [cutoutRect.topLeft, Offset(cutoutRect.left, cutoutRect.top + cornerLength)],
+      [
+        cutoutRect.topLeft,
+        Offset(cutoutRect.left + cornerLength, cutoutRect.top),
+      ],
+      [
+        cutoutRect.topLeft,
+        Offset(cutoutRect.left, cutoutRect.top + cornerLength),
+      ],
       // Top-right
-      [cutoutRect.topRight, Offset(cutoutRect.right - cornerLength, cutoutRect.top)],
-      [cutoutRect.topRight, Offset(cutoutRect.right, cutoutRect.top + cornerLength)],
+      [
+        cutoutRect.topRight,
+        Offset(cutoutRect.right - cornerLength, cutoutRect.top),
+      ],
+      [
+        cutoutRect.topRight,
+        Offset(cutoutRect.right, cutoutRect.top + cornerLength),
+      ],
       // Bottom-left
-      [cutoutRect.bottomLeft, Offset(cutoutRect.left + cornerLength, cutoutRect.bottom)],
-      [cutoutRect.bottomLeft, Offset(cutoutRect.left, cutoutRect.bottom - cornerLength)],
+      [
+        cutoutRect.bottomLeft,
+        Offset(cutoutRect.left + cornerLength, cutoutRect.bottom),
+      ],
+      [
+        cutoutRect.bottomLeft,
+        Offset(cutoutRect.left, cutoutRect.bottom - cornerLength),
+      ],
       // Bottom-right
-      [cutoutRect.bottomRight, Offset(cutoutRect.right - cornerLength, cutoutRect.bottom)],
-      [cutoutRect.bottomRight, Offset(cutoutRect.right, cutoutRect.bottom - cornerLength)],
+      [
+        cutoutRect.bottomRight,
+        Offset(cutoutRect.right - cornerLength, cutoutRect.bottom),
+      ],
+      [
+        cutoutRect.bottomRight,
+        Offset(cutoutRect.right, cutoutRect.bottom - cornerLength),
+      ],
     ];
 
     for (final corner in corners) {

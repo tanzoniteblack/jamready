@@ -120,7 +120,8 @@ class ScoreboardState extends ChangeNotifier {
           lineupDuration = _parseTimeRuleMs(value) ?? lineupDuration;
           break;
         case 'ScoreBoard.CurrentGame.Rule(Lineup.OvertimeDuration)':
-          lineupOvertimeDuration = _parseTimeRuleMs(value) ?? lineupOvertimeDuration;
+          lineupOvertimeDuration =
+              _parseTimeRuleMs(value) ?? lineupOvertimeDuration;
           break;
         case 'ScoreBoard.CurrentGame.Rule(Period.Number)':
           periodCount = value is int

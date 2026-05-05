@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'models/scoreboard_state.dart';
-import 'screens/home_screen.dart';
+import 'screens/app_home_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -28,7 +28,7 @@ class MyApp extends StatelessWidget {
         scaffoldBackgroundColor: const Color(0xFF0E0F12),
         useMaterial3: true,
       ),
-      home: const HomeScreen(),
+      home: const AppHomeScreen(),
     );
   }
 }

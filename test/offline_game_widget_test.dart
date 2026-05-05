@@ -62,6 +62,13 @@ Future<void> _launchOfflineGame(
 
   await pumpUntil(
     tester,
+    () => find.text('Jam Timer Operator').evaluate().isNotEmpty,
+    timeout: const Duration(seconds: 10),
+  );
+  await tester.tap(find.text('Jam Timer Operator'));
+
+  await pumpUntil(
+    tester,
     () => find.text('START LOCAL GAME').evaluate().isNotEmpty,
     timeout: const Duration(seconds: 10),
   );
@@ -264,15 +271,17 @@ void main() {
   // ---------------------------------------------------------------------------
 
   group('navigation', () {
-    testWidgets('app starts on settings screen', (tester) async {
+    testWidgets('app starts on role picker', (tester) async {
       SharedPreferences.setMockInitialValues({});
       app.main();
       await tester.pump(const Duration(milliseconds: 500));
 
-      expect(find.text('START LOCAL GAME'), findsOneWidget);
+      expect(find.text('CHOOSE YOUR ROLE'), findsOneWidget);
+      expect(find.text('Jam Timer Operator'), findsOneWidget);
+      expect(find.text('Penalty Box'), findsOneWidget);
     });
 
-    testWidgets('START LOCAL GAME navigates to game setup', (tester) async {
+    testWidgets('jam timer role navigates to game setup', (tester) async {
       tester.view.physicalSize = const Size(800, 1600);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
@@ -280,6 +289,12 @@ void main() {
 
       SharedPreferences.setMockInitialValues({});
       app.main();
+
+      await pumpUntil(
+        tester,
+        () => find.text('Jam Timer Operator').evaluate().isNotEmpty,
+      );
+      await tester.tap(find.text('Jam Timer Operator'));
 
       await pumpUntil(
         tester,
@@ -625,7 +640,10 @@ void main() {
         await tester.pump();
 
         expect(state.team1.timeouts, initialTO); // timeout count restored
-        expect(state.team1.officialReviews, initialOR - 1); // review count decremented
+        expect(
+          state.team1.officialReviews,
+          initialOR - 1,
+        ); // review count decremented
       },
     );
 
@@ -647,49 +665,47 @@ void main() {
       expect(state.clocks['Lineup']!.running, isFalse);
     });
 
-    testWidgets(
-      'startTimeout when already in timeout resets clock and owner',
-      (tester) async {
-        final (state, engine) = await _setupGame(tester);
-        addTearDown(engine.dispose);
+    testWidgets('startTimeout when already in timeout resets clock and owner', (
+      tester,
+    ) async {
+      final (state, engine) = await _setupGame(tester);
+      addTearDown(engine.dispose);
 
-        engine.startTimeout();
-        engine.setTimeoutOwner('1'); // assign team 1, decrement their count
-        engine.adjustClock('Timeout', 30000); // advance clock 30s
-        await tester.pump();
-        expect(state.clocks['Timeout']!.time, greaterThan(0));
+      engine.startTimeout();
+      engine.setTimeoutOwner('1'); // assign team 1, decrement their count
+      engine.adjustClock('Timeout', 30000); // advance clock 30s
+      await tester.pump();
+      expect(state.clocks['Timeout']!.time, greaterThan(0));
 
-        engine.startTimeout(); // re-timeout resets clock and owner to O
-        await tester.pump();
+      engine.startTimeout(); // re-timeout resets clock and owner to O
+      await tester.pump();
 
-        expect(engine.phase, GamePhase.timeout);
-        expect(state.clocks['Timeout']!.time, 0);
-        expect(state.timeoutOwner, 'O');
-      },
-    );
+      expect(engine.phase, GamePhase.timeout);
+      expect(state.clocks['Timeout']!.time, 0);
+      expect(state.timeoutOwner, 'O');
+    });
 
-    testWidgets(
-      'undo while in team timeout restores the team timeout count',
-      (tester) async {
-        final (state, engine) = await _setupGame(tester);
-        addTearDown(engine.dispose);
+    testWidgets('undo while in team timeout restores the team timeout count', (
+      tester,
+    ) async {
+      final (state, engine) = await _setupGame(tester);
+      addTearDown(engine.dispose);
 
-        final initial = state.team1.timeouts;
-        engine.startJam();
-        engine.setTimeoutOwner('1'); // stops jam, assigns T1 timeout
-        await tester.pump();
-        expect(state.team1.timeouts, initial - 1);
-        expect(engine.phase, GamePhase.timeout);
+      final initial = state.team1.timeouts;
+      engine.startJam();
+      engine.setTimeoutOwner('1'); // stops jam, assigns T1 timeout
+      await tester.pump();
+      expect(state.team1.timeouts, initial - 1);
+      expect(engine.phase, GamePhase.timeout);
 
-        engine.undo(); // unstopJam: should restore jam AND T1 count
-        await tester.pump();
+      engine.undo(); // unstopJam: should restore jam AND T1 count
+      await tester.pump();
 
-        expect(engine.phase, GamePhase.jam);
-        expect(state.team1.timeouts, initial);
-        expect(state.timeoutOwner, '');
-        expect(state.clocks['Timeout']!.running, isFalse);
-      },
-    );
+      expect(engine.phase, GamePhase.jam);
+      expect(state.team1.timeouts, initial);
+      expect(state.timeoutOwner, '');
+      expect(state.clocks['Timeout']!.running, isFalse);
+    });
 
     testWidgets(
       'undo while in team official review restores the review count',
@@ -810,7 +826,9 @@ void main() {
 
         final initialTO = state.team1.timeouts;
         engine.setTimeoutOwner('1', isOfficialReview: true); // OR: review --
-        engine.setTimeoutOwner('1'); // switch to TO: review restored, timeout --
+        engine.setTimeoutOwner(
+          '1',
+        ); // switch to TO: review restored, timeout --
         await tester.pump();
 
         expect(state.team1.officialReviews, ruleset.reviewsPerPeriod);

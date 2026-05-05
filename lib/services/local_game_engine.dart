@@ -255,7 +255,9 @@ class LocalGameEngine with WidgetsBindingObserver implements GameEngine {
     if (_lastAction == null || _actionTimestamp == null) return;
 
     if (_lastAction!.type == _UndoType.unstopJam) {
-      final elapsed = DateTime.now().difference(_actionTimestamp!).inMilliseconds;
+      final elapsed = DateTime.now()
+          .difference(_actionTimestamp!)
+          .inMilliseconds;
       final projectedJamTime = (_lastAction!.jamTimeInternal ?? 0) - elapsed;
 
       if (projectedJamTime <= 0) {
@@ -321,7 +323,8 @@ class LocalGameEngine with WidgetsBindingObserver implements GameEngine {
     _backgroundClockSnapshot = {};
     _backgroundRunningSnapshot = {};
     for (final entry in _state.clocks.entries) {
-      _backgroundClockSnapshot![entry.key] = _internalClockTimes[entry.key] ?? entry.value.time;
+      _backgroundClockSnapshot![entry.key] =
+          _internalClockTimes[entry.key] ?? entry.value.time;
       _backgroundRunningSnapshot![entry.key] = entry.value.running;
     }
   }
@@ -604,7 +607,9 @@ class LocalGameEngine with WidgetsBindingObserver implements GameEngine {
 
     // Start intermission
     final intermissionDuration = _getDisplayTime(
-        ruleset.getIntermissionDurationMs(_currentPeriod), false);
+      ruleset.getIntermissionDurationMs(_currentPeriod),
+      false,
+    );
     _state.clocks['Intermission']!.time = intermissionDuration;
     _internalClockTimes['Intermission'] = intermissionDuration;
     _state.clocks['Intermission']!.number = _currentPeriod;
@@ -814,11 +819,17 @@ class LocalGameEngine with WidgetsBindingObserver implements GameEngine {
           final owner = _state.timeoutOwner;
           final wasOr = _state.isOfficialReview;
           if (owner == '1') {
-            if (wasOr) { _state.team1.officialReviews++; }
-            else { _state.team1.timeouts++; }
+            if (wasOr) {
+              _state.team1.officialReviews++;
+            } else {
+              _state.team1.timeouts++;
+            }
           } else if (owner == '2') {
-            if (wasOr) { _state.team2.officialReviews++; }
-            else { _state.team2.timeouts++; }
+            if (wasOr) {
+              _state.team2.officialReviews++;
+            } else {
+              _state.team2.timeouts++;
+            }
           }
           _state.timeoutOwner = "";
           _state.officialReview = "false";
@@ -900,7 +911,8 @@ class LocalGameEngine with WidgetsBindingObserver implements GameEngine {
     _state.labelUndo = "No Action";
   }
 
-  void _setUndoAction(_UndoType type, {
+  void _setUndoAction(
+    _UndoType type, {
     int? jamTime,
     int? jamTimeInternal,
     int? lineupTime,
@@ -941,11 +953,7 @@ class LocalGameEngine with WidgetsBindingObserver implements GameEngine {
   }
 }
 
-enum _UndoType {
-  unstopJam,
-  unstartJam,
-  unstartLineup,
-}
+enum _UndoType { unstopJam, unstartJam, unstartLineup }
 
 class _UndoAction {
   final _UndoType type;

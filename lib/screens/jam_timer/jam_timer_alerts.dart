@@ -126,7 +126,9 @@ extension _JamTimerAlerts on _JamTimerScreenState {
     _alertsInitialized = true;
 
     bool allowStopped =
-        activeClock != null && activeClock.name == 'Jam' && activeClock.time == 0;
+        activeClock != null &&
+        activeClock.name == 'Jam' &&
+        activeClock.time == 0;
 
     if (activeClock == null || (!activeClock.running && !allowStopped)) {
       _lastAlertLevel = 0;

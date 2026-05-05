@@ -15,6 +15,13 @@ class AppTextStyles {
     color: Colors.white,
   );
 
+  static final TextStyle clockTimeSmall = GoogleFonts.robotoMono(
+    fontSize: 48,
+    fontWeight: FontWeight.w700,
+    letterSpacing: -1.5,
+    color: Colors.white,
+  );
+
   static final TextStyle clockLabel = GoogleFonts.outfit(
     fontSize: 16,
     fontWeight: FontWeight.w500,
@@ -34,6 +41,19 @@ class AppTextStyles {
   static final TextStyle appBarTitle = GoogleFonts.outfit(
     fontSize: 20,
     fontWeight: FontWeight.bold,
+    letterSpacing: 2.0,
+    color: Colors.white,
+  );
+
+  static final TextStyle skaterNumber = GoogleFonts.robotoMono(
+    fontSize: 36,
+    fontWeight: FontWeight.w700,
+    color: Colors.white,
+  );
+
+  static final TextStyle alertLabel = GoogleFonts.outfit(
+    fontSize: 18,
+    fontWeight: FontWeight.w800,
     letterSpacing: 2.0,
     color: Colors.white,
   );

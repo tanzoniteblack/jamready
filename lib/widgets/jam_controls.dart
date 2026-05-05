@@ -57,7 +57,11 @@ class _JamControlsState extends State<JamControls> {
       _transitionedToJam = jamStarted;
     });
     _confirmationTimer = Timer(JamControls.cooldownDuration, () {
-      if (mounted) setState(() { _inConfirmation = false; });
+      if (mounted) {
+        setState(() {
+          _inConfirmation = false;
+        });
+      }
     });
   }
 

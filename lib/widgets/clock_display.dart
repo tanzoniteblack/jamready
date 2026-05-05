@@ -45,10 +45,7 @@ class _ClockDisplayState extends State<ClockDisplay>
     );
 
     _pulseAnimation = Tween<double>(begin: 0.98, end: 1.03).animate(
-      CurvedAnimation(
-        parent: _pulseController,
-        curve: Curves.easeInOut,
-      ),
+      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
 
     _pulseController.repeat(reverse: true);
@@ -102,7 +99,8 @@ class _ClockDisplayState extends State<ClockDisplay>
 
     final newTimeMs = await TimeEditDialog.show(
       context,
-      title: 'Set ${widget.clock.displayName.isNotEmpty ? widget.clock.displayName : widget.clock.name} Time',
+      title:
+          'Set ${widget.clock.displayName.isNotEmpty ? widget.clock.displayName : widget.clock.name} Time',
       currentTimeMs: widget.clock.time,
       getCurrentTimeMs: () => widget.clock.time,
     );
@@ -122,9 +120,9 @@ class _ClockDisplayState extends State<ClockDisplay>
     final color = !widget.enabled
         ? Colors.white12
         : widget.textColor ??
-            (widget.clock.running || widget.clock.time > 0
-                ? Colors.white
-                : Colors.white38);
+              (widget.clock.running || widget.clock.time > 0
+                  ? Colors.white
+                  : Colors.white38);
 
     Color? glowColor;
     if (widget.enabled && widget.clock.running) {
@@ -138,8 +136,9 @@ class _ClockDisplayState extends State<ClockDisplay>
       children: [
         Container(
           padding: EdgeInsets.symmetric(
-              horizontal: 24 * widget.scaleFactor,
-              vertical: 12 * widget.scaleFactor),
+            horizontal: 24 * widget.scaleFactor,
+            vertical: 12 * widget.scaleFactor,
+          ),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(16 * widget.scaleFactor),
             color: glowColor?.withValues(alpha: 0.05),
@@ -170,7 +169,9 @@ class _ClockDisplayState extends State<ClockDisplay>
                 child: Row(
                   children: [
                     _buildAdjustButton(
-                        "-1", widget.enabled ? () => _handleAdjust("-1000") : null),
+                      "-1",
+                      widget.enabled ? () => _handleAdjust("-1000") : null,
+                    ),
                     Expanded(
                       // Height cap ensures BoxFit.contain scales to fill width,
                       // not height. Roboto Mono "2:00" is ~2.4:1 wide, so a box
@@ -201,7 +202,9 @@ class _ClockDisplayState extends State<ClockDisplay>
                       ),
                     ),
                     _buildAdjustButton(
-                        "+1", widget.enabled ? () => _handleAdjust("+1000") : null),
+                      "+1",
+                      widget.enabled ? () => _handleAdjust("+1000") : null,
+                    ),
                   ],
                 ),
               ),
@@ -217,11 +220,14 @@ class _ClockDisplayState extends State<ClockDisplay>
                   child: Container(
                     margin: EdgeInsets.only(top: 8 * widget.scaleFactor),
                     padding: EdgeInsets.symmetric(
-                        horizontal: 12 * widget.scaleFactor,
-                        vertical: 8 * widget.scaleFactor),
+                      horizontal: 12 * widget.scaleFactor,
+                      vertical: 8 * widget.scaleFactor,
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.blue.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(8 * widget.scaleFactor),
+                      borderRadius: BorderRadius.circular(
+                        8 * widget.scaleFactor,
+                      ),
                       border: Border.all(
                         color: Colors.blue.withValues(alpha: 0.3),
                       ),
