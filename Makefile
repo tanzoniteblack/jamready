@@ -1,4 +1,4 @@
-.PHONY: unit integration test build-scoreboards test-scoreboards build-ios build-android release
+.PHONY: unit integration test serve-web build-scoreboards test-scoreboards build-ios build-android release
 
 # Run unit and widget tests only (fast, no device required)
 unit:
@@ -10,6 +10,10 @@ integration:
 
 # Run all tests
 test: unit integration
+
+# Serve the static support website locally at http://localhost:8080
+serve-web:
+	python3 -m http.server 8080 --directory support-page
 
 # Build Docker images for each scoreboard version (run once, before test-scoreboards)
 build-scoreboards:
