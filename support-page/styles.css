@@ -75,7 +75,13 @@ body {
   border-radius: 0.6rem;
 }
 
-.support-link {
+.site-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.site-nav a {
   color: var(--text);
   text-decoration: none;
   border: 1px solid var(--line);
@@ -341,8 +347,13 @@ a {
     padding: 0.7rem 0;
   }
 
-  .support-link {
+  .site-nav {
+    gap: 0.35rem;
+  }
+
+  .site-nav a {
     font-size: 0.86rem;
+    padding: 0.4rem 0.62rem;
   }
 
   .shot-grid {

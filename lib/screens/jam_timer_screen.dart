@@ -14,6 +14,7 @@ import '../widgets/prominent_period_clock.dart';
 import '../widgets/swipe_button.dart';
 import '../widgets/team_panel.dart';
 import 'home_screen.dart';
+import 'jam_timer_procedure_helper_screen.dart';
 
 part 'jam_timer/jam_timer_layout.dart';
 part 'jam_timer/jam_timer_controls.dart';
@@ -148,6 +149,14 @@ class _JamTimerScreenState extends State<JamTimerScreen>
         MaterialPageRoute(builder: (context) => const HomeScreen()),
       );
     }
+  }
+
+  void _openProcedureHelper(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => const JamTimerProcedureHelperScreen(),
+      ),
+    );
   }
 
   @override

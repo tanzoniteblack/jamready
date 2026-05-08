@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="JamReady jam timer whistle, verbal cue, and hand signal reference for roller derby jam timing.">
+  <title>JamReady Jam Timer Signals</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0b0c10;
+      --panel: #15171d;
+      --panel-strong: #1d2028;
+      --line: rgba(255, 255, 255, 0.14);
+      --text: #f8fafc;
+      --muted: #b8c0cc;
+      --accent: #f5a524;
+      --accent-soft: rgba(245, 165, 36, 0.14);
+      --green: #58d178;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background:
+        radial-gradient(circle at 18% 0%, rgba(245, 165, 36, 0.16), transparent 30rem),
+        linear-gradient(135deg, #0b0c10 0%, #15171d 52%, #090a0d 100%);
+      color: var(--text);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.5;
+    }
+
+    header,
+    main,
+    footer {
+      width: min(1120px, calc(100% - 32px));
+      margin: 0 auto;
+    }
+
+    header {
+      padding: 40px 0 24px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      color: var(--accent);
+      font-size: 0.82rem;
+      font-weight: 900;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+
+    .brand-mark {
+      display: inline-grid;
+      place-items: center;
+      width: 38px;
+      height: 38px;
+      border: 1px solid rgba(245, 165, 36, 0.45);
+      border-radius: 8px;
+      background: var(--accent-soft);
+      color: var(--text);
+      font-size: 1.1rem;
+    }
+
+    h1 {
+      max-width: 840px;
+      margin: 18px 0 12px;
+      font-size: clamp(2.1rem, 5vw, 4.8rem);
+      line-height: 0.95;
+      letter-spacing: 0;
+    }
+
+    .lede {
+      max-width: 760px;
+      margin: 0;
+      color: var(--muted);
+      font-size: clamp(1rem, 2vw, 1.22rem);
+    }
+
+    .quick-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+      margin: 24px 0;
+    }
+
+    .quick-item {
+      min-height: 92px;
+      padding: 14px;
+      border: 1px solid rgba(245, 165, 36, 0.36);
+      border-radius: 8px;
+      background: rgba(0, 0, 0, 0.28);
+    }
+
+    .quick-item strong {
+      display: block;
+      color: var(--accent);
+      font-size: 1.45rem;
+      line-height: 1;
+    }
+
+    .quick-item span {
+      display: block;
+      margin-top: 8px;
+      color: var(--text);
+      font-weight: 800;
+      font-size: 0.9rem;
+    }
+
+    section {
+      margin: 28px 0;
+    }
+
+    h2 {
+      margin: 0 0 12px;
+      color: var(--accent);
+      font-size: 0.86rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+
+    .procedure-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    article {
+      padding: 18px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: linear-gradient(180deg, var(--panel-strong), var(--panel));
+      box-shadow: 0 18px 42px rgba(0, 0, 0, 0.22);
+    }
+
+    article h3 {
+      margin: 0 0 8px;
+      font-size: 1.15rem;
+      line-height: 1.2;
+    }
+
+    .signal {
+      margin: 0 0 8px;
+      color: var(--green);
+      font-weight: 900;
+    }
+
+    article p {
+      margin: 0;
+      color: var(--muted);
+    }
+
+    footer {
+      padding: 18px 0 40px;
+      color: var(--muted);
+      font-size: 0.92rem;
+    }
+
+    a {
+      color: var(--accent);
+    }
+
+    @media (max-width: 860px) {
+      .quick-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .procedure-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 520px) {
+      header,
+      main,
+      footer {
+        width: min(100% - 24px, 1120px);
+      }
+
+      .quick-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <span class="brand-mark">?</span>
+      JamReady Reference
+    </div>
+    <h1>Jam timer responsibilities and signals</h1>
+    <p class="lede">A quick reference for the jam timer's verbal cues, whistles, and hand signals during lineup, jam starts and endings, stoppages, reviews, and period endings.</p>
+  </header>
+
+  <main>
+    <div class="quick-grid" aria-label="Quick whistle reference">
+      <div class="quick-item"><strong>Rolling</strong><span>Teams report or official end</span></div>
+      <div class="quick-item"><strong>5 sec</strong><span>Verbal cue and raised hand</span></div>
+      <div class="quick-item"><strong>1</strong><span>Short blast starts the jam</span></div>
+      <div class="quick-item"><strong>4</strong><span>Rapid blasts stop time</span></div>
+    </div>
+
+    <section aria-labelledby="jam-flow">
+      <h2 id="jam-flow">Jam Flow</h2>
+      <div class="procedure-grid">
+        <article>
+          <h3>Initial lineup</h3>
+          <p class="signal">Rolling whistle</p>
+          <p>Call teams to the track and begin lineup procedures.</p>
+        </article>
+        <article>
+          <h3>5 seconds before a jam begins</h3>
+          <p class="signal">Verbal call plus raised hand</p>
+          <p>Call "Five Seconds" while raising one hand with all five fingers extended toward the track.</p>
+        </article>
+        <article>
+          <h3>Jam starts</h3>
+          <p class="signal">1 short whistle blast</p>
+          <p>Lower the raised hand and point toward the track in front of the foremost blocker.</p>
+        </article>
+        <article>
+          <h3>Jam ends</h3>
+          <p class="signal">4 rapid short whistle blasts</p>
+          <p>Use the jam ending signal with hands repeatedly lifting off hips, elbows pointed outward.</p>
+        </article>
+      </div>
+    </section>
+
+    <section aria-labelledby="stoppages">
+      <h2 id="stoppages">Timeouts and Reviews</h2>
+      <div class="procedure-grid">
+        <article>
+          <h3>Team Timeout</h3>
+          <p class="signal">Announce "Timeout, [Team Color/Name]"</p>
+          <p>Form a clear T shape with the hands.</p>
+        </article>
+        <article>
+          <h3>Official Timeout</h3>
+          <p class="signal">Announce "Official Timeout"</p>
+          <p>Tap the tops of the shoulders with fingertips, elbows extended at shoulder height.</p>
+        </article>
+        <article>
+          <h3>Official Review</h3>
+          <p class="signal">Announce "Official Review, [Team Color/Name]"</p>
+          <p>Form a round O shape with fingers and thumbs.</p>
+        </article>
+        <article>
+          <h3>Timeout, official timeout, or review begins</h3>
+          <p class="signal">4 rapid short whistle blasts</p>
+          <p>Stop the period clock and signal the time stoppage.</p>
+        </article>
+      </div>
+    </section>
+
+    <section aria-labelledby="other-signals">
+      <h2 id="other-signals">Period End and Other Whistles</h2>
+      <div class="procedure-grid">
+        <article>
+          <h3>Timeout or period officially ends</h3>
+          <p class="signal">Rolling whistle</p>
+          <p>Use the rolling whistle to officially close the timeout or period.</p>
+        </article>
+        <article>
+          <h3>End of period or game after final jam</h3>
+          <p class="signal">Rolling whistle after review window</p>
+          <p>Wait until reviews are resolved or 30 seconds after the final jam ends.</p>
+        </article>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    Sources:
+    <a href="https://static.wftda.com/officiating/wftda-officiating-cues-codes-and-signals.pdf">WFTDA Officiating Cues, Codes and Signals</a>
+    and
+    <a href="https://rules.wftda.com/01_params.html">WFTDA Rules of Flat Track Roller Derby</a>.
+  </footer>
+</body>
+</html>

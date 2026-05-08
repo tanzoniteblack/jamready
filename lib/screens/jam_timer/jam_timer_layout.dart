@@ -62,6 +62,11 @@ extension _JamTimerLayout on _JamTimerScreenState {
         onPressed: () => _navigateToHome(context),
       ),
       actions: [
+        IconButton(
+          tooltip: 'Jam timer signals',
+          onPressed: () => _openProcedureHelper(context),
+          icon: const _WhistleHelpIcon(),
+        ),
         if (_isLocalMode)
           Padding(
             padding: const EdgeInsets.only(right: 12),
@@ -279,13 +284,15 @@ extension _JamTimerLayout on _JamTimerScreenState {
     // Disable controls when the game is officially over, during active
     // halftime intermission, or during unofficial score with no remaining
     // jams (noMoreJam=false means overtime is still possible, so keep live).
-    final controlsEnabled = isEnabled &&
+    final controlsEnabled =
+        isEnabled &&
         !_isGameOver(state) &&
         !_isHalftimeIntermission(state) &&
         !(_isUnofficialScore(state) && state.noMoreJam);
     final timeoutRunning = state.clocks['Timeout']?.running ?? false;
     final lineupRunning = state.clocks['Lineup']?.running ?? false;
-    final inOverlapTimeoutState = timeoutRunning && (state.inJam || lineupRunning);
+    final inOverlapTimeoutState =
+        timeoutRunning && (state.inJam || lineupRunning);
     final showTimeoutOnly = timeoutRunning && !inOverlapTimeoutState;
 
     return Container(
@@ -345,5 +352,150 @@ extension _JamTimerLayout on _JamTimerScreenState {
         ],
       ),
     );
+  }
+}
+
+class _WhistleHelpIcon extends StatelessWidget {
+  const _WhistleHelpIcon();
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 32,
+      height: 32,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Positioned.fill(
+            child: CustomPaint(
+              painter: _WhistleIconPainter(color: Colors.white70),
+            ),
+          ),
+          Positioned(
+            right: -2,
+            top: -2,
+            child: Container(
+              width: 15,
+              height: 15,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: Colors.orange.shade400,
+                shape: BoxShape.circle,
+                border: Border.all(color: const Color(0xFF121212), width: 1.5),
+              ),
+              child: const Text(
+                '?',
+                style: TextStyle(
+                  color: Colors.black,
+                  fontSize: 11,
+                  height: 1,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _WhistleIconPainter extends CustomPainter {
+  final Color color;
+
+  const _WhistleIconPainter({required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    // GiWhistle from react-icons/game-icons.net, CC Attribution.
+    final icon = _giWhistlePath();
+    final bounds = icon.getBounds();
+    final scale =
+        (size.shortestSide * 0.82) /
+        (bounds.width > bounds.height ? bounds.width : bounds.height);
+    final dx = (size.width - bounds.width * scale) / 2 - bounds.left * scale;
+    final dy = (size.height - bounds.height * scale) / 2 - bounds.top * scale;
+
+    canvas.save();
+    canvas.translate(dx, dy);
+    canvas.scale(scale);
+    canvas.drawPath(
+      icon,
+      Paint()
+        ..color = color
+        ..style = PaintingStyle.fill,
+    );
+    canvas.restore();
+  }
+
+  Path _giWhistlePath() {
+    return Path()
+      ..moveTo(93.75, 81.443)
+      ..relativeCubicTo(-5.38, 0, -12.368, 2.49, -22.358, 8.967)
+      ..relativeCubicTo(3.966, 4.682, 8.167, 9.687, 16.47, 19.256)
+      ..relativeCubicTo(5.782, 6.663, 11.618, 13.29, 16.026, 18.088)
+      ..relativeCubicTo(0.038, 0.042, 0.055, 0.055, 0.092, 0.096)
+      ..relativeLineTo(30.894, -17.932)
+      ..relativeLineTo(-14.652, -14.148)
+      ..relativeCubicTo(-11.292, -9.404, -18.644, -13.866, -25.418, -14.293)
+      ..relativeCubicTo(-0.345, -0.022, -0.696, -0.034, -1.055, -0.034)
+      ..close()
+      ..moveTo(213.83, 96.525)
+      ..relativeCubicTo(-0.885, -0.01, -1.767, -0.006, -2.643, 0.01)
+      ..relativeCubicTo(-10.46, 0.193, -20.2, 2.23, -26.742, 5.424)
+      ..relativeLineTo(-67.262, 39.038)
+      ..relativeCubicTo(2.45, 0.544, 4.885, 1.196, 7.287, 2.02)
+      ..relativeCubicTo(17.275, 5.923, 33.093, 18.223, 49.568, 34.7)
+      ..relativeLineTo(216.44, 213.5)
+      ..relativeLineTo(80.978, -44.433)
+      ..lineTo(258.54, 111.38)
+      ..relativeCubicTo(-8.656, -7.84, -22.49, -12.908, -36.693, -14.394)
+      ..relativeCubicTo(-2.677, -0.28, -5.363, -0.43, -8.018, -0.46)
+      ..close()
+      ..moveTo(58.192, 102.74)
+      ..relativeCubicTo(-17.543, 20.723, -20.57, 37.186, -15.326, 57.004)
+      ..relativeCubicTo(0.692, 2.618, 3.057, 6.357, 6.373, 10.47)
+      ..relativeCubicTo(2.195, -3.144, 4.55, -6.304, 7.086, -9.478)
+      ..relativeCubicTo(3.99, -4.995, 8.385, -9.183, 13.085, -12.558)
+      ..relativeLineTo(-0.106, -0.2)
+      ..relativeLineTo(2.768, -1.61)
+      ..relativeCubicTo(1.354, -0.862, 2.73, -1.66, 4.13, -2.393)
+      ..relativeLineTo(11.868, -6.89)
+      ..relativeCubicTo(-4.175, -4.618, -8.94, -10.017, -13.803, -15.622)
+      ..relativeCubicTo(-5.956, -6.864, -11.732, -13.62, -16.074, -18.723)
+      ..close()
+      ..moveTo(242.285, 116.178)
+      ..relativeLineTo(58.415, 61.67)
+      ..relativeCubicTo(-46.086, -5.037, -56.79, 13.2, -69.027, 34.2)
+      ..relativeLineTo(-57.334, -59.304)
+      ..relativeLineTo(67.946, -36.566)
+      ..close()
+      ..moveTo(103.702, 157.23)
+      ..relativeCubicTo(-0.714, -0.016, -1.43, -0.016, -2.15, 0.002)
+      ..relativeCubicTo(-6.976, 0.18, -14.207, 2.058, -22.252, 5.885)
+      ..relativeCubicTo(-3.035, 2.29, -5.99, 5.196, -8.91, 8.852)
+      ..relativeCubicTo(-25.77, 32.264, -30.45, 59.135, -25.484, 83.477)
+      ..relativeCubicTo(4.965, 24.343, 20.536, 46.656, 37.916, 66.455)
+      ..relativeCubicTo(13.314, 15.168, 28.86, 23.992, 48.472, 27.93)
+      ..relativeCubicTo(19.614, 3.94, 43.438, 2.708, 71.98, -3.475)
+      ..relativeCubicTo(33.246, -7.2, 66.01, 8.42, 95.81, 27.665)
+      ..relativeCubicTo(26.118, 16.868, 50.676, 37.09, 70.98, 49.95)
+      ..relativeLineTo(8.79, -18.935)
+      ..relativeLineTo(-217.52, -214.57)
+      ..relativeLineTo(-0.022, -0.022)
+      ..relativeCubicTo(-15.524, -15.524, -29.565, -25.905, -42.682, -30.402)
+      ..relativeCubicTo(-5.02, -1.722, -9.925, -2.695, -14.928, -2.813)
+      ..close()
+      ..moveTo(470.782, 367.686)
+      ..relativeLineTo(-73.45, 40.304)
+      ..relativeLineTo(-10.48, 22.567)
+      ..relativeLineTo(70.833, -38.41)
+      ..relativeLineTo(13.096, -24.46)
+      ..close();
+  }
+
+  @override
+  bool shouldRepaint(covariant _WhistleIconPainter oldDelegate) {
+    return oldDelegate.color != color;
   }
 }
