@@ -4,8 +4,14 @@ name: Remote engine tests
 # directly against a dockerized CRG scoreboard server, no app UI/emulator
 # involved) and publishes the results as a GitHub Check via dorny/test-reporter.
 #
-# Manual-only for now: run from the Actions tab, optionally against a
-# different set of scoreboard versions than the default (latest only).
+# Manual-only via workflow_dispatch, run from the Actions tab, optionally
+# against a different set of scoreboard versions than the default (latest
+# only).
+#
+# TEMPORARY: `push` is enabled below only so this workflow can be exercised
+# on this branch before it's merged - workflow_dispatch can't target a
+# workflow that doesn't exist on the default branch yet. Remove the `push`
+# trigger before merging to main.
 on:
   workflow_dispatch:
     inputs:
@@ -13,6 +19,8 @@ on:
         description: 'Comma-separated scoreboard versions to test (see scripts/test-remote-engine-scoreboards.sh)'
         required: false
         default: v2025.9
+  push:
+    branches: [test/remote-engine-tests]
 
 permissions:
   contents: read
@@ -39,10 +47,10 @@ jobs:
         run: flutter pub get
 
       - name: Build scoreboard Docker image(s)
-        run: ./scripts/build-scoreboard-images.sh --versions "${{ inputs.versions }}"
+        run: ./scripts/build-scoreboard-images.sh --versions "${{ inputs.versions || 'v2025.9' }}"
 
       - name: Run remote engine tests
-        run: ./scripts/test-remote-engine-scoreboards.sh --versions "${{ inputs.versions }}"
+        run: ./scripts/test-remote-engine-scoreboards.sh --versions "${{ inputs.versions || 'v2025.9' }}"
 
       - name: Upload test result JSON
         if: always()
