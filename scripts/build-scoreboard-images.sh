@@ -3,7 +3,10 @@
 # Run this once before running scoreboard integration tests.
 # Each image is tagged crg-scoreboard:<version>.
 #
-# Usage: ./scripts/build-scoreboard-images.sh
+# Usage: ./scripts/build-scoreboard-images.sh [--versions v1,v2,...]
+#
+# Options:
+#   --versions  Comma-separated list of versions to build (default: all)
 #
 # Requires: docker, git
 
@@ -11,7 +14,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-VERSIONS=(
+ALL_VERSIONS=(
   v2023.7
   v2025.0
   v2025.1
@@ -24,6 +27,18 @@ VERSIONS=(
   v2025.8
   v2025.9
 )
+
+VERSIONS=()
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --versions) IFS=',' read -ra VERSIONS <<< "$2"; shift 2 ;;
+    *)          echo "Unknown option: $1" >&2; exit 1 ;;
+  esac
+done
+
+if [ ${#VERSIONS[@]} -eq 0 ]; then
+  VERSIONS=("${ALL_VERSIONS[@]}")
+fi
 
 for VERSION in "${VERSIONS[@]}"; do
   IMAGE="crg-scoreboard:$VERSION"
