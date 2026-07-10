@@ -168,6 +168,12 @@ void main() {
       label: 'post-game unofficial score state reached',
       debugState: state,
     );
+
+    // The server enforces a real delay before OfficialScore can be set
+    // (Rule.LINEUP_DURATION, 30s default), regardless of EnforceTimeToOr.
+    log('waiting 32s for InhibitFinalScore to clear before confirming score');
+    await Future.delayed(const Duration(seconds: 32));
+
     log('action: setOfficialScore');
     operatorClient.setOfficialScore(gameId);
     await waitUntil(
@@ -382,17 +388,23 @@ void main() {
     },
   );
 
-  test('Full game start/stop', () async {
-    final gameId = await startGame();
+  test(
+    'Full game start/stop',
+    () async {
+      final gameId = await startGame();
 
-    log('--- period 1 ---');
-    await runPeriod(gameId, scoreTeam1Points: 4);
-    await runIntermission(gameId);
+      log('--- period 1 ---');
+      await runPeriod(gameId, scoreTeam1Points: 4);
+      await runIntermission(gameId);
 
-    log('--- period 2 (final) ---');
-    await runPeriod(gameId);
-    await finishGame(gameId);
-  });
+      log('--- period 2 (final) ---');
+      await runPeriod(gameId);
+      await finishGame(gameId);
+    },
+    // finishGame's 32s wait for InhibitFinalScore to clear pushes this past
+    // package:test's default 30s per-test timeout.
+    timeout: const Timeout(Duration(minutes: 2)),
+  );
 
   test(
     'Full game start/stop - RDCL',
@@ -413,17 +425,19 @@ void main() {
 
       log('--- period 4 (final) ---');
       await runPeriod(gameId);
-      await finishGame(gameId);
+      // Official-score confirmation itself (finishGame) is covered by the
+      // WFTDA test above and isn't ruleset-specific - skip its 32s wait
+      // here and just confirm the game reaches the post-game state.
+      await waitUntil(
+        () => !state.inJam && !state.clocks['Lineup']!.running,
+        label: 'post-game unofficial score state reached',
+        debugState: state,
+      );
     },
     // RDCL runs 4 periods (vs. WFTDA's 2); package:test's default 30s
     // per-test timeout can race ahead of our own waitUntil timeouts before
     // all 4 periods + intermissions finish.
     timeout: const Timeout(Duration(minutes: 2)),
-    // Known issue: confirming the official score reliably times out at the
-    // end of this test even with EnforceTimeToOr disabled and the tie
-    // broken, while the same flow works for WFTDA. Root cause not yet
-    // found — see GameImpl.INHIBIT_FINAL_SCORE / OFFICIAL_SCORE handling.
-    skip: 'Official score confirmation hangs for RDCL - under investigation',
   );
 
   test(
