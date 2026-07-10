@@ -1,0 +1,61 @@
+name: Remote engine tests
+
+# Runs remote_engine_test/ (lib/services/remote_game_engine.dart exercised
+# directly against a dockerized CRG scoreboard server, no app UI/emulator
+# involved) and publishes the results as a GitHub Check via dorny/test-reporter.
+#
+# Manual-only for now: run from the Actions tab, optionally against a
+# different set of scoreboard versions than the default (latest only).
+on:
+  workflow_dispatch:
+    inputs:
+      versions:
+        description: 'Comma-separated scoreboard versions to test (see scripts/test-remote-engine-scoreboards.sh)'
+        required: false
+        default: v2025.9
+
+permissions:
+  contents: read
+  checks: write
+
+jobs:
+  remote-engine-tests:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - uses: actions/cache@v4
+        with:
+          path: ~/.pub-cache
+          key: pub-${{ hashFiles('**/pubspec.lock') }}
+          restore-keys: pub-
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build scoreboard Docker image(s)
+        run: ./scripts/build-scoreboard-images.sh --versions "${{ inputs.versions }}"
+
+      - name: Run remote engine tests
+        run: ./scripts/test-remote-engine-scoreboards.sh --versions "${{ inputs.versions }}"
+
+      - name: Upload test result JSON
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: remote-engine-test-results
+          path: test-results/*.json
+          if-no-files-found: warn
+
+      - name: Publish test report
+        if: always()
+        uses: dorny/test-reporter@v3
+        with:
+          name: Remote engine test results
+          path: 'test-results/*.json'
+          reporter: flutter-json

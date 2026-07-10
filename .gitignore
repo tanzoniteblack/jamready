@@ -108,6 +108,9 @@ unlinked_spec.ds
 # Coverage
 coverage/
 
+# Machine-readable test reports (scripts/test-*-scoreboards.sh --results-dir)
+/test-results/
+
 # Symbols
 app.*.symbols
 

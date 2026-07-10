@@ -13,9 +13,13 @@
 # Usage: ./scripts/test-remote-engine-scoreboards.sh [options] [-- flutter test args]
 #
 # Options:
-#   --versions  Comma-separated list of versions to test (default: all, newest first)
-#   --host      Host address the tests connect to (default: 127.0.0.1)
-#   --port      Docker host port for the scoreboard container (default: 8001)
+#   --versions     Comma-separated list of versions to test (default: all, newest first)
+#   --host         Host address the tests connect to (default: 127.0.0.1)
+#   --port         Docker host port for the scoreboard container (default: 8001)
+#   --results-dir  Directory to write a machine-readable JSON test report per
+#                  version to, via `flutter test --file-reporter` (default:
+#                  test-results). Consume with e.g. dorny/test-reporter
+#                  (reporter: flutter-json) in CI.
 #
 # Passes any args after -- directly to flutter test.
 
@@ -38,6 +42,7 @@ ALL_VERSIONS=(
 VERSIONS=()
 HOST="127.0.0.1"
 PORT=8001
+RESULTS_DIR="test-results"
 FLUTTER_ARGS=()
 
 # ---------------------------------------------------------------------------
@@ -45,13 +50,16 @@ FLUTTER_ARGS=()
 # ---------------------------------------------------------------------------
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --versions) IFS=',' read -ra VERSIONS <<< "$2"; shift 2 ;;
-    --host)  HOST="$2"; shift 2 ;;
-    --port)  PORT="$2"; shift 2 ;;
-    --)      shift; FLUTTER_ARGS=("$@"); break ;;
-    *)       echo "Unknown option: $1" >&2; exit 1 ;;
+    --versions)    IFS=',' read -ra VERSIONS <<< "$2"; shift 2 ;;
+    --host)        HOST="$2"; shift 2 ;;
+    --port)        PORT="$2"; shift 2 ;;
+    --results-dir) RESULTS_DIR="$2"; shift 2 ;;
+    --)            shift; FLUTTER_ARGS=("$@"); break ;;
+    *)             echo "Unknown option: $1" >&2; exit 1 ;;
   esac
 done
+
+mkdir -p "$RESULTS_DIR"
 
 if [ ${#VERSIONS[@]} -eq 0 ]; then
   VERSIONS=("${ALL_VERSIONS[@]}")
@@ -110,11 +118,13 @@ for VERSION in "${VERSIONS[@]}"; do
 
   echo "--> Running tests"
   TEST_LOG=$(mktemp)
+  REPORT_FILE="$RESULTS_DIR/remote-engine-$VERSION.json"
   EXIT_CODE=0
   flutter test remote_engine_test/ \
     --dart-define=SCOREBOARD_HOST="$HOST" \
     --dart-define=SCOREBOARD_PORT="$PORT" \
     --dart-define=SCOREBOARD_VERSION="$VERSION" \
+    --file-reporter="json:$REPORT_FILE" \
     "${FLUTTER_ARGS[@]+"${FLUTTER_ARGS[@]}"}" \
     2>&1 | tee "$TEST_LOG" \
     || EXIT_CODE=$?
@@ -123,10 +133,10 @@ for VERSION in "${VERSIONS[@]}"; do
 
   if [ $EXIT_CODE -eq 0 ]; then
     PASS+=("$VERSION")
-    echo "--> PASS: $VERSION"
+    echo "--> PASS: $VERSION (report: $REPORT_FILE)"
     rm -f "$TEST_LOG"
   else
-    echo "--> FAIL: $VERSION (exit $EXIT_CODE)"
+    echo "--> FAIL: $VERSION (exit $EXIT_CODE, report: $REPORT_FILE)"
     rm -f "$TEST_LOG"
     echo ""
     echo "========================================"
