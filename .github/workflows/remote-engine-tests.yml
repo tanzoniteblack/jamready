@@ -46,7 +46,9 @@ jobs:
 
       - uses: subosito/flutter-action@v2
         with:
+          flutter-version: '3.41.6'
           channel: stable
+          cache: true
 
       - uses: actions/cache@v6
         with:
@@ -55,7 +57,7 @@ jobs:
           restore-keys: pub-
 
       - name: Install dependencies
-        run: flutter pub get
+        run: flutter pub get --enforce-lockfile
 
       - name: Build scoreboard Docker image
         run: ./scripts/build-scoreboard-images.sh --versions "${{ matrix.version }}"

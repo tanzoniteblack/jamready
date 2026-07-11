@@ -6,28 +6,52 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: read
+  checks: write
+
 jobs:
   ci:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: subosito/flutter-action@v2
         with:
+          flutter-version: '3.41.6'
           channel: stable
+          cache: true
 
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         with:
           path: ~/.pub-cache
           key: pub-${{ hashFiles('**/pubspec.lock') }}
           restore-keys: pub-
 
       - name: Install dependencies
-        run: flutter pub get
+        run: flutter pub get --enforce-lockfile
 
       - name: Analyze
         run: flutter analyze --no-fatal-infos
 
       - name: Unit tests
-        run: flutter test
+        run: |
+          mkdir -p test-results
+          flutter test --file-reporter=json:test-results/unit-tests.json
+
+      - name: Upload test result JSON
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: unit-test-results
+          path: test-results/*.json
+          if-no-files-found: warn
+
+      - name: Publish test report
+        if: always()
+        uses: dorny/test-reporter@v3
+        with:
+          name: Unit tests
+          path: 'test-results/*.json'
+          reporter: flutter-json

@@ -1,6 +1,7 @@
 # Miscellaneous
 *.class
 *.lock
+!pubspec.lock
 *.log
 *.pyc
 *.swp
@@ -8,6 +9,7 @@
 .history
 
 .idea/
+*.iml
 
 # Flutter repo-specific
 /bin/cache/
