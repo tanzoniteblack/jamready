@@ -55,7 +55,7 @@ jobs:
           restore-keys: pub-
 
       - name: Install dependencies
-        run: flutter pub get
+        run: flutter pub get --enforce-lockfile
 
       - name: Build scoreboard Docker image
         run: ./scripts/build-scoreboard-images.sh --versions "${{ matrix.version }}"

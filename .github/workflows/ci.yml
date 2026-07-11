@@ -28,7 +28,7 @@ jobs:
           restore-keys: pub-
 
       - name: Install dependencies
-        run: flutter pub get
+        run: flutter pub get --enforce-lockfile
 
       - name: Analyze
         run: flutter analyze --no-fatal-infos
