@@ -3,6 +3,8 @@ import '../../models/skater_seat.dart';
 import '../../styles/text_styles.dart';
 import '../../widgets/seat_card.dart';
 
+const jammerBlockerDividerHeight = 7.0;
+
 /// Standard AppBar used across all box timer screens.
 AppBar standardAppBar({
   required BuildContext context,
@@ -40,6 +42,57 @@ Widget buildBlockerStack(List<SkaterSeat> blockers) {
   );
 }
 
+/// Separates the jammer timer from the blocker timer group.
+Widget buildJammerBlockerDivider(Color color) {
+  final accent = _contrastSafeTimerAccent(color);
+  return Container(
+    height: jammerBlockerDividerHeight,
+    decoration: BoxDecoration(
+      color: const Color(0xFF0B0D0F),
+      border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
+      borderRadius: BorderRadius.circular(jammerBlockerDividerHeight / 2),
+      boxShadow: [
+        BoxShadow(color: accent.withValues(alpha: 0.36), blurRadius: 8),
+      ],
+    ),
+    child: Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 1, vertical: 1),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              accent.withValues(alpha: 0.52),
+              accent,
+              accent.withValues(alpha: 0.52),
+            ],
+          ),
+          borderRadius: BorderRadius.circular(2),
+        ),
+      ),
+    ),
+  );
+}
+
+Color _contrastSafeTimerAccent(Color color) {
+  const surface = Color(0xFF0E1012);
+  var accent = color;
+  for (var step = 1; step <= 10; step++) {
+    if (_contrastRatio(accent, surface) >= 3) return accent;
+    accent = Color.lerp(color, Colors.white, step / 10)!;
+  }
+  return Colors.white;
+}
+
+double _contrastRatio(Color first, Color second) {
+  final lighter = first.computeLuminance() > second.computeLuminance()
+      ? first.computeLuminance()
+      : second.computeLuminance();
+  final darker = first.computeLuminance() > second.computeLuminance()
+      ? second.computeLuminance()
+      : first.computeLuminance();
+  return (lighter + 0.05) / (darker + 0.05);
+}
+
 /// Computes the dynamic accent color based on seat states.
 Color? computeAccentFromSeats(Iterable<SkaterSeat> seats, [Color? teamColor]) {
   if (seats.any((s) => s.state == SeatState.done)) return Colors.red.shade700;
@@ -62,41 +115,44 @@ Widget buildTeamHeader(
 ) {
   final darkText = fgColor.computeLuminance() < 0.22;
   final shadow = Shadow(color: glowColor.withValues(alpha: 0.8), blurRadius: 8);
-  return Row(
-    children: [
-      Container(
-        width: 8,
-        height: 8,
-        decoration: colorSwatchDecoration(bgColor, glowColor: glowColor),
-      ),
-      const SizedBox(width: 6),
-      Expanded(
-        child: Align(
-          alignment: Alignment.centerLeft,
-          child: Container(
-            padding: darkText
-                ? const EdgeInsets.symmetric(horizontal: 6, vertical: 2)
-                : EdgeInsets.zero,
-            decoration: BoxDecoration(
-              color: darkText
-                  ? Colors.white.withValues(alpha: 0.88)
-                  : Colors.transparent,
-              borderRadius: BorderRadius.circular(4),
-            ),
-            child: Text(
-              name,
-              style: AppTextStyles.clockLabel.copyWith(
-                color: fgColor,
-                fontSize: 13,
-                letterSpacing: 1.2,
-                shadows: darkText ? [] : [shadow],
+  return SizedBox(
+    height: 28,
+    child: Row(
+      children: [
+        Container(
+          width: 8,
+          height: 8,
+          decoration: colorSwatchDecoration(bgColor, glowColor: glowColor),
+        ),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: Container(
+              padding: darkText
+                  ? const EdgeInsets.symmetric(horizontal: 6, vertical: 2)
+                  : EdgeInsets.zero,
+              decoration: BoxDecoration(
+                color: darkText
+                    ? Colors.white.withValues(alpha: 0.88)
+                    : Colors.transparent,
+                borderRadius: BorderRadius.circular(4),
               ),
-              overflow: TextOverflow.ellipsis,
+              child: Text(
+                name,
+                style: AppTextStyles.clockLabel.copyWith(
+                  color: fgColor,
+                  fontSize: 13,
+                  letterSpacing: 1.2,
+                  shadows: darkText ? [] : [shadow],
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
           ),
         ),
-      ),
-    ],
+      ],
+    ),
   );
 }
 

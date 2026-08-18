@@ -197,7 +197,7 @@ class _SeatCardState extends State<SeatCard>
       SeatState.running => const Color(0xFF1A7A36),
       SeatState.standing => Colors.orange.shade700,
       SeatState.done => Colors.red.shade700,
-      SeatState.paused => const Color(0xFF135A28),
+      SeatState.paused => const Color(0xFF155D8F),
       SeatState.empty => Colors.transparent,
     };
     final teamSurfaceColor = _teamSurfaceColor(teamInfo);
@@ -360,12 +360,13 @@ class _SeatCardState extends State<SeatCard>
       SeatState.running => const Color(0xFF4CD97B),
       SeatState.standing => Colors.amber.shade300,
       SeatState.done => Colors.red.shade300,
-      SeatState.paused => Colors.white38,
+      SeatState.paused => const Color(0xFF6CC7FF),
       SeatState.empty => Colors.white24,
     };
     final labelColor = switch (seatState) {
       SeatState.standing => Colors.amber.shade400,
       SeatState.done => Colors.red.shade400,
+      SeatState.paused => const Color(0xFF6CC7FF),
       _ => Colors.white38,
     };
     final isJammer = seat.position == SkaterPosition.jammer;
@@ -376,16 +377,17 @@ class _SeatCardState extends State<SeatCard>
         final height = constraints.maxHeight;
         final shortCard = height < 150;
         final tinyCard = height < 118 || width < 160;
-        final padding = (math.min(width, height) * 0.055).clamp(7.0, 14.0);
-        final topControlHeight = tinyCard ? 32.0 : 38.0;
-        final bottomControlHeight = tinyCard ? 34.0 : 42.0;
+        final contentPadding = (math.min(width, height) * 0.055).clamp(
+          7.0,
+          14.0,
+        );
+        final headerHeight = tinyCard ? 36.0 : 48.0;
+        final bodyGap = tinyCard ? 6.0 : 12.0;
         final centerLaneHeight =
-            (height -
-                    padding * 2 -
-                    topControlHeight -
-                    bottomControlHeight -
-                    (tinyCard ? 4 : 12))
-                .clamp(36.0, height);
+            (height - contentPadding * 2 - headerHeight - bodyGap).clamp(
+              36.0,
+              height,
+            );
         final timerFontSize = (math.min(
           width * 0.46,
           centerLaneHeight * (shortCard ? 0.62 : 0.72),
@@ -395,8 +397,6 @@ class _SeatCardState extends State<SeatCard>
               14.0,
               32.0,
             );
-        final numberWidth = (width * 0.34).clamp(70.0, 132.0);
-        final penaltyWidth = (width * 0.36).clamp(76.0, 150.0);
         final showTapHint = isEmpty && height >= 132 && width >= 170;
 
         Widget timerBlock = Column(
@@ -418,18 +418,42 @@ class _SeatCardState extends State<SeatCard>
             SizedBox(height: shortCard ? 2 : 6),
             AnimatedSwitcher(
               duration: const Duration(milliseconds: 180),
-              child: Text(
-                actionLabel,
-                key: ValueKey(actionLabel),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: AppTextStyles.alertLabel.copyWith(
-                  color: labelColor,
-                  fontSize: actionFontSize,
-                  letterSpacing: 0,
-                  height: 0.95,
-                ),
-              ),
+              child: seatState == SeatState.paused
+                  ? Row(
+                      key: const ValueKey('paused'),
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.pause_circle_filled_rounded,
+                          color: labelColor,
+                          size: actionFontSize * 0.82,
+                        ),
+                        SizedBox(width: shortCard ? 4 : 6),
+                        Text(
+                          actionLabel,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: AppTextStyles.alertLabel.copyWith(
+                            color: labelColor,
+                            fontSize: actionFontSize,
+                            letterSpacing: 0,
+                            height: 0.95,
+                          ),
+                        ),
+                      ],
+                    )
+                  : Text(
+                      actionLabel,
+                      key: ValueKey(actionLabel),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTextStyles.alertLabel.copyWith(
+                        color: labelColor,
+                        fontSize: actionFontSize,
+                        letterSpacing: 0,
+                        height: 0.95,
+                      ),
+                    ),
             ),
             if (showTapHint) ...[
               const SizedBox(height: 6),
@@ -462,92 +486,88 @@ class _SeatCardState extends State<SeatCard>
           );
         }
 
-        final secondPenaltyButton = AnimatedOpacity(
+        final headerPenaltyControls = AnimatedOpacity(
           duration: const Duration(milliseconds: 180),
           opacity: canToggleSecondPenalty ? 1.0 : 0.28,
-          child: IgnorePointer(
-            ignoring: !canToggleSecondPenalty,
-            child: _SecondPenaltyButton(
-              compact: tinyCard,
-              active: hasSecondPenalty,
-              onTap: () {
-                if (hasSecondPenalty) {
-                  state.removePenaltyFromSeat(seat);
-                } else {
-                  state.addPenaltyToSeat(seat);
-                }
-              },
+          child: GestureDetector(
+            onTap: () {},
+            behavior: HitTestBehavior.opaque,
+            child: AbsorbPointer(
+              absorbing: !canToggleSecondPenalty,
+              child: hasSecondPenalty
+                  ? Row(
+                      children: [
+                        Expanded(
+                          child: _HeaderPenaltyButton(
+                            compact: tinyCard,
+                            label: '−30',
+                            semanticLabel: 'Remove 30-second penalty',
+                            color: Colors.amber.shade100,
+                            onTap: () => state.removePenaltyFromSeat(seat),
+                          ),
+                        ),
+                        VerticalDivider(
+                          width: 1,
+                          thickness: 1,
+                          color: Colors.white.withValues(alpha: 0.3),
+                        ),
+                        Expanded(
+                          child: _HeaderPenaltyButton(
+                            compact: tinyCard,
+                            label: '+30',
+                            semanticLabel: 'Add 30-second penalty',
+                            color: Colors.white,
+                            onTap: () => state.addPenaltyToSeat(seat),
+                          ),
+                        ),
+                      ],
+                    )
+                  : _HeaderPenaltyButton(
+                      compact: tinyCard,
+                      label: '+30',
+                      semanticLabel: 'Add 30-second penalty',
+                      color: Colors.white,
+                      onTap: () => state.addPenaltyToSeat(seat),
+                    ),
             ),
           ),
         );
-        final bottomChildren = <Widget>[
-          SizedBox(
-            width: penaltyWidth,
-            height: bottomControlHeight,
-            child: secondPenaltyButton,
-          ),
-        ];
-        if (widget.penaltyOnLeft != true) {
-          bottomChildren.insert(0, const Spacer());
-        }
-        if (widget.penaltyOnLeft == true) bottomChildren.add(const Spacer());
-
         return Semantics(
           button: true,
           label:
               '${isJammer ? 'Jammer' : 'Blocker'} seat ${seat.skaterNumber.isEmpty ? 'empty' : seat.skaterNumber}, $timeStr, $actionLabel',
-          child: Padding(
-            padding: EdgeInsets.all(padding),
-            child: Stack(
-              children: [
-                Positioned.fill(
-                  top: topControlHeight + (tinyCard ? 1 : 4),
-                  bottom: bottomControlHeight + (tinyCard ? 1 : 4),
-                  child: Center(
-                    child: FittedBox(fit: BoxFit.scaleDown, child: timerBlock),
-                  ),
+          child: Stack(
+            children: [
+              // The header is its own edge-to-edge region. It never shares
+              // padding or a hit target with the timer action area.
+              Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                height: headerHeight,
+                child: _SeatHeader(
+                  roleLabel: isJammer ? 'J' : 'B',
+                  numberLabel: isEmpty || seat.skaterNumber == '?'
+                      ? '#?'
+                      : '#${seat.skaterNumber}',
+                  onTap: () => _onNumberTap(state),
+                  teamInfo: teamInfo,
+                  dimmed: isEmpty,
+                  compact: tinyCard,
+                  penaltyOnLeft: widget.penaltyOnLeft != false,
+                  singleColumn: widget.penaltyOnLeft == null,
+                  pairedPenaltyControls: hasSecondPenalty,
+                  penaltyControls: headerPenaltyControls,
                 ),
-                Positioned(
-                  top: 0,
-                  left: 0,
-                  child: SizedBox(
-                    height: topControlHeight,
-                    child: _SeatRoleBadge(
-                      label: isJammer ? 'J' : 'B',
-                      semanticLabel: isJammer ? 'Jammer' : 'Blocker',
-                      teamInfo: teamInfo,
-                      dimmed: isEmpty,
-                      compact: tinyCard,
-                    ),
-                  ),
+              ),
+              Positioned.fill(
+                top: headerHeight + bodyGap,
+                bottom: contentPadding,
+                child: Center(
+                  child: FittedBox(fit: BoxFit.scaleDown, child: timerBlock),
                 ),
-                Positioned(
-                  top: 0,
-                  right: 0,
-                  child: SizedBox(
-                    width: numberWidth,
-                    height: topControlHeight,
-                    child: _NumberButton(
-                      label: isEmpty || seat.skaterNumber == '?'
-                          ? '#?'
-                          : '#${seat.skaterNumber}',
-                      onTap: () => _onNumberTap(state),
-                      active: !isEmpty && seat.skaterNumber != '?',
-                      compact: tinyCard,
-                    ),
-                  ),
-                ),
-                Positioned(
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  child: SizedBox(
-                    height: bottomControlHeight,
-                    child: Row(children: bottomChildren),
-                  ),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
         );
       },
@@ -562,53 +582,177 @@ class _SeatCardState extends State<SeatCard>
   }
 }
 
-class _SeatRoleBadge extends StatelessWidget {
-  final String label;
-  final String semanticLabel;
+class _SeatHeader extends StatelessWidget {
+  final String roleLabel;
+  final String numberLabel;
+  final VoidCallback onTap;
   final TeamInfo teamInfo;
   final bool dimmed;
   final bool compact;
+  final bool penaltyOnLeft;
+  final bool singleColumn;
+  final bool pairedPenaltyControls;
+  final Widget penaltyControls;
 
-  const _SeatRoleBadge({
-    required this.label,
-    required this.semanticLabel,
+  const _SeatHeader({
+    required this.roleLabel,
+    required this.numberLabel,
+    required this.onTap,
     required this.teamInfo,
     required this.dimmed,
     required this.compact,
+    required this.penaltyOnLeft,
+    required this.singleColumn,
+    required this.pairedPenaltyControls,
+    required this.penaltyControls,
   });
 
   @override
   Widget build(BuildContext context) {
-    final size = compact ? 32.0 : 38.0;
-    final darkText = teamInfo.fgColor.computeLuminance() < 0.22;
-    final fillColor = darkText
-        ? Colors.white.withValues(alpha: dimmed ? 0.62 : 0.9)
-        : teamInfo.bgColor.withValues(alpha: dimmed ? 0.16 : 0.28);
-    final borderColor = darkText
-        ? teamInfo.fgColor.withValues(alpha: dimmed ? 0.35 : 0.82)
-        : teamInfo.fgColor.withValues(alpha: dimmed ? 0.26 : 0.7);
+    final foreground = teamInfo.fgColor.computeLuminance() < 0.22
+        ? Colors.white
+        : teamInfo.fgColor;
+    final fillColor = Color.lerp(
+      const Color(0xFF171A1D),
+      teamInfo.bgColor,
+      dimmed ? 0.12 : 0.22,
+    )!;
+    final dividerColor = foreground.withValues(alpha: dimmed ? 0.28 : 0.5);
+    final penaltySection = singleColumn
+        ? SizedBox(
+            width: compact
+                ? (pairedPenaltyControls ? 136 : 88)
+                : (pairedPenaltyControls ? 176 : 120),
+            child: penaltyControls,
+          )
+        : Expanded(flex: pairedPenaltyControls ? 3 : 2, child: penaltyControls);
+    final assignmentSection = Expanded(
+      flex: pairedPenaltyControls ? 2 : 3,
+      child: _SeatAssignmentBar(
+        roleLabel: roleLabel,
+        numberLabel: numberLabel,
+        onTap: onTap,
+        teamInfo: teamInfo,
+        dimmed: dimmed,
+        compact: compact,
+        condensed: pairedPenaltyControls,
+      ),
+    );
+    final divider = VerticalDivider(
+      width: 1,
+      thickness: 1,
+      color: dividerColor,
+    );
 
+    return Container(
+      decoration: BoxDecoration(
+        color: fillColor,
+        border: Border(bottom: BorderSide(color: dividerColor, width: 3)),
+      ),
+      child: Row(
+        children: penaltyOnLeft
+            ? [penaltySection, divider, assignmentSection]
+            : [assignmentSection, divider, penaltySection],
+      ),
+    );
+  }
+}
+
+class _SeatAssignmentBar extends StatelessWidget {
+  final String roleLabel;
+  final String numberLabel;
+  final VoidCallback onTap;
+  final TeamInfo teamInfo;
+  final bool dimmed;
+  final bool compact;
+  final bool condensed;
+
+  const _SeatAssignmentBar({
+    required this.roleLabel,
+    required this.numberLabel,
+    required this.onTap,
+    required this.teamInfo,
+    required this.dimmed,
+    required this.compact,
+    required this.condensed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final useLightText = teamInfo.fgColor.computeLuminance() < 0.22;
+    final foreground = useLightText ? Colors.white : teamInfo.fgColor;
     return Tooltip(
-      message: semanticLabel,
-      child: Semantics(
-        label: semanticLabel,
-        child: Container(
-          width: compact ? 44 : 54,
-          height: size,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: fillColor,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: borderColor, width: 1.4),
-          ),
-          child: Text(
-            label,
-            style: AppTextStyles.clockLabel.copyWith(
-              color: teamInfo.fgColor.withValues(alpha: dimmed ? 0.72 : 1),
-              fontSize: compact ? 17 : 21,
-              fontWeight: FontWeight.w900,
-              letterSpacing: 0,
-              height: 1,
+      message: 'Set player number',
+      child: GestureDetector(
+        onTap: onTap,
+        behavior: HitTestBehavior.opaque,
+        child: Semantics(
+          button: true,
+          label: 'Set $roleLabel player number',
+          child: Container(
+            padding: EdgeInsets.symmetric(
+              horizontal: compact || condensed ? 4 : 12,
+            ),
+            alignment: Alignment.centerLeft,
+            child: Row(
+              children: [
+                Expanded(
+                  child: FittedBox(
+                    alignment: Alignment.centerLeft,
+                    fit: BoxFit.scaleDown,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          roleLabel,
+                          style: AppTextStyles.clockLabel.copyWith(
+                            color: foreground.withValues(
+                              alpha: dimmed ? 0.72 : 1,
+                            ),
+                            fontSize: compact || condensed ? 16 : 21,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 0,
+                            height: 1,
+                          ),
+                        ),
+                        Padding(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: compact || condensed ? 3 : 9,
+                          ),
+                          child: Text(
+                            '·',
+                            style: AppTextStyles.clockLabel.copyWith(
+                              color: foreground.withValues(
+                                alpha: dimmed ? 0.45 : 0.7,
+                              ),
+                              fontSize: compact || condensed ? 16 : 21,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ),
+                        Text(
+                          numberLabel,
+                          maxLines: 1,
+                          style: AppTextStyles.skaterNumber.copyWith(
+                            fontSize: compact || condensed ? 16 : 21,
+                            color: foreground.withValues(
+                              alpha: dimmed ? 0.72 : 1,
+                            ),
+                            letterSpacing: 0,
+                            height: 1,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                SizedBox(width: compact || condensed ? 2 : 6),
+                Icon(
+                  Icons.edit_rounded,
+                  size: compact || condensed ? 12 : 16,
+                  color: foreground.withValues(alpha: dimmed ? 0.5 : 0.8),
+                ),
+              ],
             ),
           ),
         ),
@@ -617,17 +761,19 @@ class _SeatRoleBadge extends StatelessWidget {
   }
 }
 
-class _NumberButton extends StatelessWidget {
+class _HeaderPenaltyButton extends StatelessWidget {
+  final bool compact;
   final String label;
+  final String semanticLabel;
+  final Color color;
   final VoidCallback onTap;
-  final bool active;
-  final bool compact;
 
-  const _NumberButton({
+  const _HeaderPenaltyButton({
+    required this.compact,
     required this.label,
+    required this.semanticLabel,
+    required this.color,
     required this.onTap,
-    this.active = false,
-    required this.compact,
   });
 
   @override
@@ -637,107 +783,26 @@ class _NumberButton extends StatelessWidget {
       behavior: HitTestBehavior.opaque,
       child: Semantics(
         button: true,
-        label: 'Set player number',
-        child: Container(
-          padding: EdgeInsets.symmetric(horizontal: compact ? 8 : 10),
-          decoration: BoxDecoration(
-            color: active
-                ? Colors.white.withValues(alpha: 0.14)
-                : Colors.white.withValues(alpha: 0.07),
-            border: Border.all(color: active ? Colors.white60 : Colors.white24),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Flexible(
-                child: FittedBox(
-                  fit: BoxFit.scaleDown,
-                  child: Text(
-                    label,
-                    maxLines: 1,
-                    style: AppTextStyles.skaterNumber.copyWith(
-                      fontSize: compact ? 17 : 21,
-                      color: active ? Colors.white : Colors.white70,
-                      letterSpacing: 0,
-                      height: 1,
-                    ),
+        label: semanticLabel,
+        child: SizedBox.expand(
+          child: Padding(
+            padding: EdgeInsets.symmetric(horizontal: compact ? 7 : 10),
+            child: Center(
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  style: AppTextStyles.buttonText.copyWith(
+                    color: color,
+                    fontSize: compact ? 15 : 18,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 0,
+                    height: 1,
                   ),
                 ),
               ),
-              SizedBox(width: compact ? 3 : 5),
-              Icon(
-                Icons.edit_rounded,
-                size: compact ? 14 : 16,
-                color: active ? Colors.white : Colors.white54,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _SecondPenaltyButton extends StatelessWidget {
-  final bool compact;
-  final bool active;
-  final VoidCallback onTap;
-
-  const _SecondPenaltyButton({
-    required this.compact,
-    required this.active,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final icon = active ? Icons.undo_rounded : Icons.add_rounded;
-    final label = active ? 'UNDO' : '+30';
-
-    return GestureDetector(
-      onTap: onTap,
-      behavior: HitTestBehavior.opaque,
-      child: Semantics(
-        button: true,
-        label: active ? 'Undo second penalty' : 'Assign second penalty',
-        child: Container(
-          padding: EdgeInsets.symmetric(horizontal: compact ? 7 : 10),
-          decoration: BoxDecoration(
-            color: active
-                ? Colors.amber.withValues(alpha: 0.18)
-                : Colors.white.withValues(alpha: 0.08),
-            border: Border.all(
-              color: active ? Colors.amber.shade300 : Colors.white30,
             ),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                icon,
-                size: compact ? 16 : 18,
-                color: active ? Colors.amber.shade200 : Colors.white70,
-              ),
-              SizedBox(width: compact ? 3 : 6),
-              Flexible(
-                child: FittedBox(
-                  fit: BoxFit.scaleDown,
-                  child: Text(
-                    label,
-                    maxLines: 1,
-                    style: AppTextStyles.buttonText.copyWith(
-                      color: active ? Colors.amber.shade100 : Colors.white,
-                      fontSize: compact ? 15 : 18,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: 0,
-                      height: 1,
-                    ),
-                  ),
-                ),
-              ),
-            ],
           ),
         ),
       ),

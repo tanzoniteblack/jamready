@@ -41,6 +41,7 @@ class _BoxTimerScreenState extends State<BoxTimerScreen> {
   Widget build(BuildContext context) {
     final state = context.watch<PenaltyBoxState>();
     final teamIdx = state.teamIndex ?? 1;
+    final teamColor = state.teamInfo(teamIdx).glowColor;
     final blockers = state.blockerSeats(teamIdx);
     final jammer = state.jammerSeat(teamIdx);
     final showJammer =
@@ -81,12 +82,18 @@ class _BoxTimerScreenState extends State<BoxTimerScreen> {
                         child:
                             MediaQuery.of(context).orientation ==
                                 Orientation.landscape
-                            ? _buildLandscape(jammer, blockers, showJammer)
+                            ? _buildLandscape(
+                                jammer,
+                                blockers,
+                                showJammer,
+                                teamColor,
+                              )
                             : _buildPortrait(
                                 jammer,
                                 blockers,
                                 state,
                                 showJammer,
+                                teamColor,
                               ),
                       ),
                     ),
@@ -105,6 +112,7 @@ class _BoxTimerScreenState extends State<BoxTimerScreen> {
     List<SkaterSeat> blockers,
     PenaltyBoxState state,
     bool showJammer,
+    Color teamColor,
   ) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -113,6 +121,8 @@ class _BoxTimerScreenState extends State<BoxTimerScreen> {
         const SizedBox(height: 16),
         if (showJammer) ...[
           Expanded(child: SeatCard(seat: jammer)),
+          const SizedBox(height: 8),
+          buildJammerBlockerDivider(teamColor),
           const SizedBox(height: 8),
           Expanded(child: SeatCard(seat: blockers[0])),
           const SizedBox(height: 8),
@@ -129,6 +139,7 @@ class _BoxTimerScreenState extends State<BoxTimerScreen> {
     SkaterSeat jammer,
     List<SkaterSeat> blockers,
     bool showJammer,
+    Color teamColor,
   ) {
     if (!showJammer) {
       return Row(
@@ -142,23 +153,19 @@ class _BoxTimerScreenState extends State<BoxTimerScreen> {
       );
     }
 
-    // Full layout: jammer + blockers in uniform 2x2 grid
+    // Keep the jammer as its own group, above the blocker row.
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Expanded(
-          child: Row(
-            children: [
-              Expanded(child: SeatCard(seat: jammer)),
-              const SizedBox(width: 8),
-              Expanded(child: SeatCard(seat: blockers[0])),
-            ],
-          ),
-        ),
+        Expanded(child: SeatCard(seat: jammer)),
+        const SizedBox(height: 8),
+        buildJammerBlockerDivider(teamColor),
         const SizedBox(height: 8),
         Expanded(
           child: Row(
             children: [
+              Expanded(child: SeatCard(seat: blockers[0])),
+              const SizedBox(width: 8),
               Expanded(child: SeatCard(seat: blockers[1])),
               const SizedBox(width: 8),
               Expanded(child: SeatCard(seat: blockers[2])),

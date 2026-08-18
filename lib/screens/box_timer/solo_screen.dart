@@ -57,6 +57,7 @@ class SoloScreen extends StatelessWidget {
                                         teamIndex: 1,
                                         state: state,
                                         landscape: isLandscape,
+                                        teamGap: teamGap,
                                       ),
                                     ),
                                     SizedBox(width: teamGap),
@@ -65,6 +66,7 @@ class SoloScreen extends StatelessWidget {
                                         teamIndex: 2,
                                         state: state,
                                         landscape: isLandscape,
+                                        teamGap: teamGap,
                                       ),
                                     ),
                                   ],
@@ -119,11 +121,13 @@ class _SoloTeamColumn extends StatelessWidget {
   final int teamIndex;
   final PenaltyBoxState state;
   final bool landscape;
+  final double teamGap;
 
   const _SoloTeamColumn({
     required this.teamIndex,
     required this.state,
     this.landscape = false,
+    required this.teamGap,
   });
 
   @override
@@ -155,6 +159,8 @@ class _SoloTeamColumn extends StatelessWidget {
             child: SeatCard(seat: jammer, penaltyOnLeft: penaltyOnLeft),
           ),
           SizedBox(height: rowGap),
+          _buildSharedDivider(teamInfo.glowColor),
+          SizedBox(height: rowGap),
           Expanded(
             child: Row(
               children: [
@@ -183,6 +189,8 @@ class _SoloTeamColumn extends StatelessWidget {
             child: SeatCard(seat: jammer, penaltyOnLeft: penaltyOnLeft),
           ),
           SizedBox(height: rowGap),
+          _buildSharedDivider(teamInfo.glowColor),
+          SizedBox(height: rowGap),
           Expanded(
             child: SeatCard(seat: blockers[0], penaltyOnLeft: penaltyOnLeft),
           ),
@@ -196,6 +204,27 @@ class _SoloTeamColumn extends StatelessWidget {
           ),
         ],
       ],
+    );
+  }
+
+  Widget _buildSharedDivider(Color color) {
+    final extension = teamGap / 2;
+    return SizedBox(
+      height: jammerBlockerDividerHeight,
+      child: LayoutBuilder(
+        builder: (context, constraints) => Transform.translate(
+          offset: Offset(teamIndex == 1 ? 0 : -extension, 0),
+          child: OverflowBox(
+            alignment: Alignment.centerLeft,
+            minWidth: constraints.maxWidth + extension,
+            maxWidth: constraints.maxWidth + extension,
+            child: SizedBox(
+              width: constraints.maxWidth + extension,
+              child: buildJammerBlockerDivider(color),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
