@@ -350,7 +350,7 @@ class _SeatCardState extends State<SeatCard>
     final timeStr = isEmpty ? '0:30' : _formatTime(seat.timeRemaining);
     final actionLabel = switch (seatState) {
       SeatState.standing => 'STAND',
-      SeatState.done => 'GO',
+      SeatState.done => 'RELEASE',
       SeatState.paused => 'PAUSED',
       SeatState.running => 'SEATED',
       SeatState.empty => 'OPEN',

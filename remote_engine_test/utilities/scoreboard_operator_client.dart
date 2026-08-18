@@ -66,6 +66,26 @@ class ScoreboardOperatorClient {
     );
   }
 
+  /// Starts the current jam, as the scoreboard's primary control does.
+  void startJam() => _setCurrentGame('StartJam', true);
+
+  /// Advances the current game out of its current phase. Before the first
+  /// jam, this starts lineup; while a jam is active, it ends that jam.
+  void stopJam() => _setCurrentGame('StopJam', true);
+
+  void _setCurrentGame(String property, dynamic value) {
+    setValue('ScoreBoard.CurrentGame.$property', value);
+  }
+
+  /// Sets an arbitrary scoreboard value as an independent operator client.
+  /// This lets compatibility tests verify state changes originating outside
+  /// the engine under test.
+  void setValue(String key, dynamic value) {
+    _channel.sink.add(
+      jsonEncode({'action': 'Set', 'key': key, 'value': value, 'flag': ''}),
+    );
+  }
+
   /// Awards [points] to a team's current scoring trip — the same WS key a
   /// real operator's "+4"-style scoring button sends. Only takes effect
   /// while a jam is actually running (`Team.TRIP_SCORE`'s handler in

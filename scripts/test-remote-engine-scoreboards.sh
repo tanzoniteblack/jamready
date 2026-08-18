@@ -26,6 +26,8 @@
 set -euo pipefail
 
 ALL_VERSIONS=(
+  # Seattle Derby Brats' temporary server-authoritative penalty-box fork.
+  feature-pbt
   v2025.9
   v2025.8
   v2025.7

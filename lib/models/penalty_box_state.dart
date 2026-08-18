@@ -131,6 +131,16 @@ class PenaltyBoxState extends ChangeNotifier {
     _ => null,
   };
 
+  void setTimerView(AppRole newRole) {
+    role = newRole;
+    teamIndex = switch (newRole) {
+      AppRole.team1BlockersOnly || AppRole.team1Full => 1,
+      AppRole.team2Full || AppRole.team2BlockersOnly => 2,
+      _ => null,
+    };
+    notifyListeners();
+  }
+
   SkaterSeat get team1Jammer => seats[0];
   SkaterSeat get team1Blocker1 => seats[1];
   SkaterSeat get team1Blocker2 => seats[2];

@@ -1,3 +1,4 @@
+ARG SCOREBOARD_REPOSITORY=https://github.com/rollerderby/scoreboard.git
 ARG VERSION
 
 FROM eclipse-temurin:8-jdk AS builder
@@ -5,8 +6,8 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends ant git \
     && rm -rf /var/lib/apt/lists/*
 ARG VERSION
-RUN git clone --depth 1 --branch ${VERSION} \
-      https://github.com/rollerderby/scoreboard.git /src
+ARG SCOREBOARD_REPOSITORY
+RUN git clone --depth 1 --branch ${VERSION} ${SCOREBOARD_REPOSITORY} /src
 WORKDIR /src
 RUN ant compile
 

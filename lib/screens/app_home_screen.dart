@@ -79,7 +79,7 @@ class AppHomeScreen extends StatelessWidget {
                       ),
                       const SizedBox(height: 10),
                       Text(
-                        'Open only the controls you are responsible for during the bout.',
+                        'Opens only the controls you are responsible.',
                         style: AppTextStyles.infoText.copyWith(
                           color: Colors.white54,
                           fontSize: 14,

@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
+
 import '../../models/skater_seat.dart';
 import '../../styles/text_styles.dart';
 
-/// Role selector — each card starts the game immediately on tap.
-class RoleSelector extends StatelessWidget {
+/// Chooses the timers a user needs before opening the timer screen.
+class RoleSelector extends StatefulWidget {
   final String team1Name;
   final String team2Name;
   final Color team1Color;
@@ -20,163 +21,198 @@ class RoleSelector extends StatelessWidget {
   });
 
   @override
+  State<RoleSelector> createState() => _RoleSelectorState();
+}
+
+class _RoleSelectorState extends State<RoleSelector> {
+  _ViewChoice? _choice;
+
+  void _select(_ViewChoice choice) => setState(() => _choice = choice);
+
+  void _openTeam(int teamIndex) {
+    final role = switch ((_choice!, teamIndex)) {
+      (_ViewChoice.singleTeam, 1) => AppRole.team1Full,
+      (_ViewChoice.singleTeam, 2) => AppRole.team2Full,
+      (_ViewChoice.blockersOnly, 1) => AppRole.team1BlockersOnly,
+      (_ViewChoice.blockersOnly, 2) => AppRole.team2BlockersOnly,
+      _ => throw StateError('A team is only available for team views.'),
+    };
+    widget.onTap(role);
+  }
+
+  @override
   Widget build(BuildContext context) {
-    Widget roleRow(
-      List<
-        ({
-          AppRole role,
-          String label,
-          String subtitle,
-          IconData icon,
-          Color color,
-        })
-      >
-      options,
-    ) {
-      return Row(
-        children: options
-            .expand(
-              (opt) => [
-                Expanded(
-                  child: _RoleOption(
-                    role: opt.role,
-                    label: opt.label,
-                    subtitle: opt.subtitle,
-                    icon: opt.icon,
-                    color: opt.color,
-                    onTap: onTap,
-                  ),
-                ),
-                if (opt != options.last) const SizedBox(width: 10),
-              ],
-            )
-            .toList(),
-      );
-    }
+    final isTeamChoice =
+        _choice == _ViewChoice.singleTeam ||
+        _choice == _ViewChoice.blockersOnly;
 
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        roleRow([
-          (
-            role: AppRole.pbm,
-            label: 'PBM',
-            subtitle: 'Both jammers',
-            icon: Icons.swap_horiz,
-            color: Colors.deepOrange.shade400,
+        for (final choice in _ViewChoice.values) ...[
+          _ChoiceTile(
+            choice: choice,
+            selected: _choice == choice,
+            onTap: () => _select(choice),
           ),
-          (
-            role: AppRole.solo,
-            label: 'Solo',
-            subtitle: 'All seats',
-            icon: Icons.grid_view,
-            color: Colors.purple.shade400,
+          const SizedBox(height: 10),
+        ],
+        if (isTeamChoice) ...[
+          const SizedBox(height: 10),
+          Text(
+            'CHOOSE A TEAM',
+            style: AppTextStyles.clockLabel.copyWith(
+              color: Colors.white70,
+              fontSize: 13,
+              letterSpacing: 1.5,
+            ),
           ),
-        ]),
-        const SizedBox(height: 10),
-        roleRow([
-          (
-            role: AppRole.team1BlockersOnly,
-            label: team1Name,
-            subtitle: '3 blockers',
-            icon: Icons.people_outline,
-            color: team1Color,
+          const SizedBox(height: 12),
+          _TeamTile(
+            name: widget.team1Name,
+            color: widget.team1Color,
+            onTap: () => _openTeam(1),
           ),
-          (
-            role: AppRole.team1Full,
-            label: team1Name,
-            subtitle: 'Jammer + blockers',
-            icon: Icons.timer,
-            color: team1Color,
+          const SizedBox(height: 10),
+          _TeamTile(
+            name: widget.team2Name,
+            color: widget.team2Color,
+            onTap: () => _openTeam(2),
           ),
-        ]),
-        const SizedBox(height: 10),
-        roleRow([
-          (
-            role: AppRole.team2BlockersOnly,
-            label: team2Name,
-            subtitle: '3 blockers',
-            icon: Icons.people_outline,
-            color: team2Color,
+        ] else if (_choice != null) ...[
+          const SizedBox(height: 10),
+          SizedBox(
+            height: 54,
+            child: ElevatedButton(
+              onPressed: () => widget.onTap(
+                _choice == _ViewChoice.allPlayers ? AppRole.solo : AppRole.pbm,
+              ),
+              child: Text('OPEN TIMERS', style: AppTextStyles.buttonText),
+            ),
           ),
-          (
-            role: AppRole.team2Full,
-            label: team2Name,
-            subtitle: 'Jammer + blockers',
-            icon: Icons.timer,
-            color: team2Color,
-          ),
-        ]),
+        ],
       ],
     );
   }
 }
 
-class _RoleOption extends StatelessWidget {
-  final AppRole role;
-  final String label;
-  final String subtitle;
-  final IconData icon;
-  final Color color;
-  final void Function(AppRole) onTap;
+enum _ViewChoice { allPlayers, jammersOnly, singleTeam, blockersOnly }
 
-  const _RoleOption({
-    required this.role,
-    required this.label,
-    required this.subtitle,
-    required this.icon,
+extension on _ViewChoice {
+  String get label => switch (this) {
+    _ViewChoice.allPlayers => 'All players',
+    _ViewChoice.jammersOnly => 'Jammers only',
+    _ViewChoice.singleTeam => 'A single team',
+    _ViewChoice.blockersOnly => 'A single team — blockers only',
+  };
+
+  String get subtitle => switch (this) {
+    _ViewChoice.allPlayers => 'Timers for every player',
+    _ViewChoice.jammersOnly => 'Both teams’ jammers',
+    _ViewChoice.singleTeam => 'Jammer and blockers for one team',
+    _ViewChoice.blockersOnly => 'Blocker timers for one team',
+  };
+
+  IconData get icon => switch (this) {
+    _ViewChoice.allPlayers => Icons.groups_outlined,
+    _ViewChoice.jammersOnly => Icons.timer_outlined,
+    _ViewChoice.singleTeam => Icons.group_outlined,
+    _ViewChoice.blockersOnly => Icons.people_outline,
+  };
+}
+
+class _ChoiceTile extends StatelessWidget {
+  final _ViewChoice choice;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _ChoiceTile({
+    required this.choice,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = selected ? Colors.deepOrange.shade300 : Colors.white70;
+    return Semantics(
+      selected: selected,
+      button: true,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: selected
+                ? Colors.deepOrange.withValues(alpha: 0.16)
+                : Colors.white.withValues(alpha: 0.04),
+            border: Border.all(
+              color: selected ? accent : Colors.white24,
+              width: selected ? 2 : 1,
+            ),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(
+            children: [
+              Icon(choice.icon, color: accent),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(choice.label, style: AppTextStyles.buttonText),
+                    const SizedBox(height: 3),
+                    Text(choice.subtitle, style: AppTextStyles.infoText),
+                  ],
+                ),
+              ),
+              Icon(
+                selected ? Icons.check_circle : Icons.radio_button_unchecked,
+                color: accent,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _TeamTile extends StatelessWidget {
+  final String name;
+  final Color color;
+  final VoidCallback onTap;
+
+  const _TeamTile({
+    required this.name,
     required this.color,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    final darkAccent = color.computeLuminance() < 0.22;
-    final cardColor = darkAccent
-        ? Colors.white.withValues(alpha: 0.9)
-        : Colors.white.withValues(alpha: 0.04);
-    final borderColor = darkAccent
-        ? color.withValues(alpha: 0.75)
-        : Colors.white24;
-    final subtitleColor = darkAccent ? Colors.black54 : Colors.white54;
-
-    return GestureDetector(
-      onTap: () => onTap(role),
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+        padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: cardColor,
-          border: Border.all(color: borderColor),
+          color: Colors.white.withValues(alpha: 0.04),
+          border: Border.all(color: color.withValues(alpha: 0.8)),
           borderRadius: BorderRadius.circular(12),
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        child: Row(
           children: [
-            Row(
-              children: [
-                Icon(icon, color: color, size: 24),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    label,
-                    style: AppTextStyles.clockLabel.copyWith(
-                      color: color,
-                      fontSize: 20,
-                      letterSpacing: 0.5,
-                      fontWeight: FontWeight.w600,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ],
+            Container(
+              width: 12,
+              height: 12,
+              decoration: BoxDecoration(color: color, shape: BoxShape.circle),
             ),
-            const SizedBox(height: 6),
-            Text(
-              subtitle,
-              style: AppTextStyles.infoText.copyWith(
-                fontSize: 15,
-                color: subtitleColor,
-              ),
-            ),
+            const SizedBox(width: 14),
+            Expanded(child: Text(name, style: AppTextStyles.buttonText)),
+            const Icon(Icons.chevron_right, color: Colors.white70),
           ],
         ),
       ),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../models/penalty_box_state.dart';
+import '../../models/skater_seat.dart';
 import '../../services/penalty_engine.dart';
 import '../../styles/background.dart';
 import '../../styles/text_styles.dart';
@@ -8,12 +9,14 @@ import '../../widgets/seat_card.dart';
 import 'connection_dot.dart';
 import 'jam_status_bar.dart';
 import 'shared_helpers.dart';
+import 'timer_view_switcher.dart';
 
 /// Solo view — all seats for both teams.
 class SoloScreen extends StatelessWidget {
   final PenaltyEngine engine;
+  final ValueChanged<AppRole>? onViewSelected;
 
-  const SoloScreen({super.key, required this.engine});
+  const SoloScreen({super.key, required this.engine, this.onViewSelected});
 
   @override
   Widget build(BuildContext context) {
@@ -92,8 +95,13 @@ class SoloScreen extends StatelessWidget {
       leading: const Icon(Icons.arrow_back, color: Colors.white70),
       title: Row(
         children: [
-          Text('JAMBOX', style: AppTextStyles.appBarTitle),
-          const Spacer(),
+          Expanded(
+            child: TimerViewSwitcher(
+              state: state,
+              onSelected: onViewSelected ?? state.setTimerView,
+            ),
+          ),
+          const SizedBox(width: 8),
           if (!engine.isLocal)
             Text(
               'P${state.periodNumber}  J${state.jamNumber}',

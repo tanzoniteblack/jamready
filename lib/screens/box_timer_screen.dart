@@ -9,7 +9,7 @@ import '../widgets/seat_card.dart';
 import 'box_timer/connection_dot.dart';
 import 'box_timer/jam_status_bar.dart';
 import 'box_timer/shared_helpers.dart';
-import 'box_timer/team_color_picker.dart';
+import 'box_timer/timer_view_switcher.dart';
 
 // Re-export screens for convenience
 export 'box_timer/pbm_screen.dart';
@@ -19,8 +19,9 @@ export 'box_timer/solo_screen.dart';
 /// Shows one team's jammer (inner) seat and blocker (outer) seats stacked vertically.
 class BoxTimerScreen extends StatefulWidget {
   final PenaltyEngine engine;
+  final ValueChanged<AppRole>? onViewSelected;
 
-  const BoxTimerScreen({super.key, required this.engine});
+  const BoxTimerScreen({super.key, required this.engine, this.onViewSelected});
 
   @override
   State<BoxTimerScreen> createState() => _BoxTimerScreenState();
@@ -40,7 +41,6 @@ class _BoxTimerScreenState extends State<BoxTimerScreen> {
   Widget build(BuildContext context) {
     final state = context.watch<PenaltyBoxState>();
     final teamIdx = state.teamIndex ?? 1;
-    final teamInfo = state.teamInfo(teamIdx);
     final blockers = state.blockerSeats(teamIdx);
     final jammer = state.jammerSeat(teamIdx);
     final showJammer =
@@ -66,7 +66,7 @@ class _BoxTimerScreenState extends State<BoxTimerScreen> {
           child: Scaffold(
             backgroundColor: Colors.transparent,
             resizeToAvoidBottomInset: false,
-            appBar: _buildAppBar(context, state, teamInfo, widget.engine),
+            appBar: _buildAppBar(context, state, widget.engine),
             body: RefreshIndicator(
               onRefresh: widget.engine.reconnect,
               child: LayoutBuilder(
@@ -172,56 +172,20 @@ class _BoxTimerScreenState extends State<BoxTimerScreen> {
   AppBar _buildAppBar(
     BuildContext context,
     PenaltyBoxState state,
-    TeamInfo teamInfo,
     PenaltyEngine engine,
   ) {
-    final darkTeamText = teamInfo.fgColor.computeLuminance() < 0.22;
-
     return standardAppBar(
       context: context,
       leading: const Icon(Icons.arrow_back, color: Colors.white70),
       title: Row(
         children: [
-          GestureDetector(
-            onTap: engine.isLocal
-                ? () => _showColorPicker(context, state, teamInfo.index)
-                : null,
-            child: Container(
-              width: 10,
-              height: 10,
-              decoration: colorSwatchDecoration(
-                teamInfo.bgColor,
-                glowColor: teamInfo.glowColor,
-              ),
+          Expanded(
+            child: TimerViewSwitcher(
+              state: state,
+              onSelected: widget.onViewSelected ?? state.setTimerView,
             ),
           ),
-          const SizedBox(width: 10),
-          Container(
-            padding: darkTeamText
-                ? const EdgeInsets.symmetric(horizontal: 7, vertical: 2)
-                : EdgeInsets.zero,
-            decoration: BoxDecoration(
-              color: darkTeamText
-                  ? Colors.white.withValues(alpha: 0.9)
-                  : Colors.transparent,
-              borderRadius: BorderRadius.circular(4),
-            ),
-            child: Text(
-              teamInfo.name.toUpperCase(),
-              style: AppTextStyles.appBarTitle.copyWith(
-                color: teamInfo.fgColor,
-                shadows: darkTeamText
-                    ? []
-                    : [
-                        Shadow(
-                          color: teamInfo.glowColor.withValues(alpha: 0.8),
-                          blurRadius: 8,
-                        ),
-                      ],
-              ),
-            ),
-          ),
-          const Spacer(),
+          const SizedBox(width: 8),
           if (!engine.isLocal)
             Text(
               'P${state.periodNumber}  J${state.jamNumber}',
@@ -232,19 +196,5 @@ class _BoxTimerScreenState extends State<BoxTimerScreen> {
         ],
       ),
     );
-  }
-
-  void _showColorPicker(
-    BuildContext context,
-    PenaltyBoxState state,
-    int teamIdx,
-  ) {
-    showDialog<Color>(
-      context: context,
-      builder: (_) =>
-          TeamColorPickerDialog(currentColor: state.teamInfo(teamIdx).color),
-    ).then((color) {
-      if (color != null) state.setTeamColor(teamIdx, color);
-    });
   }
 }

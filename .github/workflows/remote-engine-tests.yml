@@ -40,6 +40,8 @@ jobs:
           - v2025.7
           - v2025.8
           - v2025.9
+          # Seattle Derby Brats' temporary server-authoritative penalty-box fork.
+          - feature-pbt
 
     steps:
       - uses: actions/checkout@v7

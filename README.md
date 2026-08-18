@@ -46,22 +46,24 @@ make test        # both of the above
 
 The scoreboard tests connect to a real CRG scoreboard over WebSocket and verify compatibility across multiple versions. They require Docker and git (the scoreboard build runs entirely inside Docker — no local JDK or Ant needed).
 
-Build the scoreboard images once before running either suite. You can build every supported version or select specific versions:
+Build the scoreboard images once before running either suite. You can build every supported official version plus the Seattle Derby Brats' temporary `katpet/scoreboard@feature-pbt` compatibility target, or select specific versions:
 
 ```bash
 make build-scoreboards
 ./scripts/build-scoreboard-images.sh --versions v2025.9,v2025.8
+./scripts/build-scoreboard-images.sh --versions feature-pbt
 ```
 
 The source for each scoreboard version is cloned and compiled inside a multi-stage Docker build (`scripts/scoreboard.Dockerfile`).
 
 ### Headless remote-engine suite
 
-The fast suite exercises `RemoteGameEngine` and `ScoreboardState` directly, without building the app or launching an emulator. It runs against every scoreboard image, newest version first, stops on the first failure, and writes a Flutter JSON report for each version to `test-results/`.
+The fast suite exercises the remote engines directly, without building the app or launching an emulator. It runs against every scoreboard image, including `feature-pbt`, newest version first, stops on the first failure, and writes a Flutter JSON report for each version to `test-results/`.
 
 ```bash
 ./scripts/test-remote-engine-scoreboards.sh
 ./scripts/test-remote-engine-scoreboards.sh --versions v2025.9,v2025.8
+./scripts/test-remote-engine-scoreboards.sh --versions feature-pbt
 ```
 
 Useful options:
@@ -97,7 +99,7 @@ Arguments after `--` are passed to `flutter test`.
 
 ### Continuous integration
 
-The main CI workflow runs static analysis and unit/widget tests on pushes and pull requests to `main`. Test results are uploaded as JSON artifacts and published as a GitHub Check. Pull requests also run the headless remote-engine suite as a matrix across the supported CRG scoreboard versions, with a separate artifact and check for each version. The older `v2023.7` scoreboard is currently excluded from that CI matrix while its failing test is investigated.
+The main CI workflow runs static analysis and unit/widget tests on pushes and pull requests to `main`. Test results are uploaded as JSON artifacts and published as a GitHub Check. Pull requests also run the headless remote-engine suite as a matrix across the supported CRG scoreboard versions and the temporary `feature-pbt` compatibility target, with a separate artifact and check for each version. The older `v2023.7` scoreboard is currently excluded from that CI matrix while its failing test is investigated.
 
 ## Releasing
 

@@ -10,7 +10,7 @@ import '../services/penalty_engine.dart';
 import '../services/remote_penalty_engine.dart';
 import '../styles/background.dart';
 import '../styles/text_styles.dart';
-import 'box_timer_screen.dart';
+import 'box_timer/timer_view_host.dart';
 import 'home/qr_scanner_screen.dart';
 import 'home/role_selector.dart';
 import 'home/shared_helpers.dart';
@@ -188,23 +188,12 @@ class _PenaltyBoxHomeScreenState extends State<PenaltyBoxHomeScreen> {
 
     if (!mounted) return;
 
-    Widget screen;
-    switch (role) {
-      case AppRole.pbm:
-        screen = PbmScreen(engine: engine);
-      case AppRole.team1BlockersOnly:
-      case AppRole.team1Full:
-      case AppRole.team2Full:
-      case AppRole.team2BlockersOnly:
-        screen = BoxTimerScreen(engine: engine);
-      case AppRole.solo:
-        screen = SoloScreen(engine: engine);
-    }
-
     await Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) =>
-            ChangeNotifierProvider.value(value: state, child: screen),
+        builder: (_) => ChangeNotifierProvider.value(
+          value: state,
+          child: TimerViewHost(engine: engine),
+        ),
       ),
     );
 
@@ -463,7 +452,7 @@ class _PenaltyBoxHomeScreenState extends State<PenaltyBoxHomeScreen> {
                             ],
 
                             Text(
-                              'YOUR ROLE',
+                              'WHO DO YOU NEED TO SEE?',
                               style: AppTextStyles.clockLabel.copyWith(
                                 color: Colors.white70,
                                 fontSize: 13,
