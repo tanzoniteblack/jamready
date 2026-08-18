@@ -35,6 +35,7 @@ class RemotePenaltyEngine extends PenaltyEngine with WidgetsBindingObserver {
   bool _manualDisconnect = false;
   bool _boxSeatMode = false;
   bool _bootstrapping = true;
+  String? _currentGameId;
   int _reconnectAttempts = 0;
   String? _lastUrl;
   final Random _random = Random();
@@ -155,6 +156,9 @@ class RemotePenaltyEngine extends PenaltyEngine with WidgetsBindingObserver {
     if (!_isConnected) return;
 
     final paths = [
+      // Current game ID lets us distinguish a new game from a normal reset
+      // between jams.
+      'ScoreBoard.CurrentGame.Game',
       // Jam clock
       'ScoreBoard.CurrentGame.Clock(Jam).Running',
       'ScoreBoard.CurrentGame.Clock(Jam).Number',
@@ -244,6 +248,10 @@ class RemotePenaltyEngine extends PenaltyEngine with WidgetsBindingObserver {
       if (key == 'ScoreBoard.CurrentGame.InJam') {
         delta.jamRunning = value == true || value == 'true';
         delta.jamRunningIsDefinitive = true;
+        continue;
+      }
+      if (key == 'ScoreBoard.CurrentGame.Game') {
+        delta.gameId = value?.toString();
         continue;
       }
       if (key == 'ScoreBoard.CurrentGame.Clock(Jam).Running') {
@@ -340,6 +348,17 @@ class RemotePenaltyEngine extends PenaltyEngine with WidgetsBindingObserver {
   /// Phase 2: apply a parsed delta to state in the correct order.
   void _applyDelta(_WsDelta delta) {
     final jamWasRunning = _state.jamRunning;
+
+    final gameId = delta.gameId;
+    if (gameId != null && gameId.isNotEmpty) {
+      if (_currentGameId != null && _currentGameId != gameId) {
+        _log.i('New remote game detected; clearing timers and roster mappings');
+        _state.clearTimersForNewGame();
+        _state.clearRemoteRosters();
+        _bootstrapping = true;
+      }
+      _currentGameId = gameId;
+    }
 
     if (delta.jamRunning != null) {
       _state.jamRunning = delta.jamRunning!;
@@ -742,6 +761,7 @@ class RemotePenaltyEngine extends PenaltyEngine with WidgetsBindingObserver {
 /// Typed intermediate representation of a single WS state message.
 /// Built in phase 1 (_buildDelta) with no side effects, applied in phase 2 (_applyDelta).
 class _WsDelta {
+  String? gameId;
   bool? jamRunning;
   bool jamRunningIsDefinitive = false;
   int? jamNumber;

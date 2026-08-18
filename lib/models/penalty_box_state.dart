@@ -141,6 +141,25 @@ class PenaltyBoxState extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Clears active and queued penalty timers when the remote scoreboard moves
+  /// to a different game. This deliberately preserves team and roster data.
+  void clearTimersForNewGame() {
+    for (final seat in seats) {
+      seat.clear();
+    }
+    queue.clear();
+    notifyListeners();
+  }
+
+  /// Discards remote roster mappings so the next game snapshot is authoritative.
+  /// Known skater numbers remain as local entry history.
+  void clearRemoteRosters() {
+    _rosterTeam1.clear();
+    _rosterTeam2.clear();
+    _uuidToNumber1.clear();
+    _uuidToNumber2.clear();
+  }
+
   SkaterSeat get team1Jammer => seats[0];
   SkaterSeat get team1Blocker1 => seats[1];
   SkaterSeat get team1Blocker2 => seats[2];

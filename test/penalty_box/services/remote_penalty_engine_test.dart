@@ -64,6 +64,51 @@ void main() {
   // ---------------------------------------------------------------------------
 
   group('Group A — CRG message parsing', () {
+    test(
+      'a new remote game clears timers and replaces changed game data',
+      () async {
+        final (:engine, :channel, :state) = await setupEngine();
+        await sendAndPump(channel, {
+          'ScoreBoard.CurrentGame.Game': 'game-one',
+          'ScoreBoard.CurrentGame.Team(1).Name': 'Salt',
+          'ScoreBoard.CurrentGame.Team(1).Skater(old-skater).RosterNumber':
+              '10',
+        });
+
+        state.seatSkater(
+          seat: state.team1Jammer,
+          number: '10',
+          position: SkaterPosition.jammer,
+        );
+        state.seatSkater(
+          seat: state.team2Blocker1,
+          number: '20',
+          position: SkaterPosition.blocker,
+        );
+        state.addToQueue(
+          teamIdx: 1,
+          number: '30',
+          position: SkaterPosition.blocker,
+        );
+
+        await sendAndPump(channel, {
+          'ScoreBoard.CurrentGame.Game': 'game-two',
+          'ScoreBoard.CurrentGame.Team(1).Name': 'Black',
+          'ScoreBoard.CurrentGame.Team(1).Skater(new-skater).RosterNumber':
+              '42',
+        });
+
+        expect(
+          state.seats,
+          everyElement(predicate<SkaterSeat>((seat) => seat.isEmpty)),
+        );
+        expect(state.queue, isEmpty);
+        expect(state.team1.name, 'Black');
+        expect(state.lookupSkaterId(1, '10'), isNull);
+        expect(state.lookupSkaterId(1, '42'), 'new-skater');
+      },
+    );
+
     test('InJam=true sets jamRunning and clears bootstrap', () async {
       final (:engine, :channel, :state) = await setupEngine();
 
