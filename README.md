@@ -46,24 +46,34 @@ make test        # both of the above
 
 The scoreboard tests connect to a real CRG scoreboard over WebSocket and verify compatibility across multiple versions. They require Docker and git (the scoreboard build runs entirely inside Docker — no local JDK or Ant needed).
 
-Build the scoreboard images once before running either suite. You can build every supported official version plus the Seattle Derby Brats' temporary `katpet/scoreboard@feature-pbt` compatibility target, or select specific versions:
+Build the scoreboard images once before running either suite. You can build every supported version or select specific versions:
 
 ```bash
 make build-scoreboards
 ./scripts/build-scoreboard-images.sh --versions v2025.9,v2025.8
-./scripts/build-scoreboard-images.sh --versions feature-pbt
 ```
 
 The source for each scoreboard version is cloned and compiled inside a multi-stage Docker build (`scripts/scoreboard.Dockerfile`).
 
+### Combined compatibility run
+
+Run both suites and create one version-first Allure report:
+
+```bash
+./scripts/test-scoreboards.sh --jobs 4 --emulator-jobs 2
+```
+
+`--jobs` controls headless remote-engine workers. `--emulator-jobs` is independently capped at the number of running Android emulators, so it cannot overcommit devices. The coordinator runs the headless suite first, then the emulator suite, and writes one report to `test-results/scoreboards-<timestamp>-<pid>/allure-report/index.html`.
+
 ### Headless remote-engine suite
 
-The fast suite exercises the remote engines directly, without building the app or launching an emulator. It runs against every scoreboard image, including `feature-pbt`, newest version first, stops on the first failure, and writes a Flutter JSON report for each version to `test-results/`.
+The fast suite exercises the remote game and penalty engines directly, without building the app or launching an emulator. It includes the temporary `feature-pbt` penalty-box compatibility target. Local runs can fan out versions across independent Flutter workers; each worker uses an isolated copy of the current checkout, so uncommitted changes are included and concurrent Flutter builds do not share `build/` or `.dart_tool/`.
 
 ```bash
 ./scripts/test-remote-engine-scoreboards.sh
 ./scripts/test-remote-engine-scoreboards.sh --versions v2025.9,v2025.8
 ./scripts/test-remote-engine-scoreboards.sh --versions feature-pbt
+./scripts/test-remote-engine-scoreboards.sh --jobs 2
 ```
 
 Useful options:
@@ -71,19 +81,24 @@ Useful options:
 ```
 --versions     Comma-separated list of versions to test
 --host         Host address the tests connect to (default: 127.0.0.1)
---port         Docker host port (default: 8001)
---results-dir  JSON report directory (default: test-results)
+--port         First Docker host port to try (default: 8001)
+--jobs         Versions to run concurrently locally (default: 1)
+--results-dir  Parent directory for local reports (default: test-results)
+--no-html      Leave raw Allure result files without generating HTML
 ```
 
-Arguments after `--` are passed to `flutter test`.
+The runner finds an available Docker port for each worker, including a retry if Docker loses a port-binding race. A local run writes logs and raw Allure results to `test-results/remote-engine-<timestamp>-<pid>/`, plus a self-contained report at `allure-report/index.html` that can be opened directly from Finder. Report generation uses `npx -y allure@3`, so it requires Node.js 20+; use `--no-html` to skip it.
+
+Arguments after `--` are passed to `flutter test`. GitHub Actions continues to emit its existing per-version JSON files for the GitHub test reporter.
 
 ### App integration suite
 
-The UI-driven suite builds and controls the Flutter app on an Android emulator. It also runs against each scoreboard image, newest version first, and stops on the first failure.
+The UI-driven suite builds and controls the Flutter app on Android emulators. When several emulators are already running, it fans versions out across them; each concurrent worker uses an isolated copy of the current checkout, an independent Docker port, and a distinct Docker container. If no emulator is running, the script starts one and runs sequentially.
 
 ```bash
 make test-scoreboards
 ./scripts/test-all-scoreboards.sh --versions v2025.9,v2025.8
+./scripts/test-all-scoreboards.sh --jobs 2
 ```
 
 Useful options:
@@ -92,14 +107,19 @@ Useful options:
 --versions  Comma-separated list of versions to test
 --avd       AVD name (default: first from `emulator -list-avds`)
 --host      Host address the tests connect to (default: 10.0.2.2)
---port      Docker host port (default: 8001)
+--port      First Docker host port to try (default: 8001)
+--jobs      Maximum emulator workers to use (default: all running emulators)
+--results-dir  Parent directory for local reports (default: test-results)
+--no-html      Leave raw Allure result files without generating HTML
 ```
+
+`--jobs` is capped at the number of available emulators (and test versions), so asking for more never starts extra emulators. The runner selects an available Docker port for each worker and retries after a binding race. It writes logs and raw Allure results to `test-results/scoreboard-integration-<timestamp>-<pid>/`, plus a self-contained report at `allure-report/index.html` when Node.js 20+ is available.
 
 Arguments after `--` are passed to `flutter test`.
 
 ### Continuous integration
 
-The main CI workflow runs static analysis and unit/widget tests on pushes and pull requests to `main`. Test results are uploaded as JSON artifacts and published as a GitHub Check. Pull requests also run the headless remote-engine suite as a matrix across the supported CRG scoreboard versions and the temporary `feature-pbt` compatibility target, with a separate artifact and check for each version. The older `v2023.7` scoreboard is currently excluded from that CI matrix while its failing test is investigated.
+The main CI workflow runs static analysis and unit/widget tests on pushes and pull requests to `main`. Test results are uploaded as JSON artifacts and published as a GitHub Check. Pull requests also run the headless remote-engine suite as a matrix across the supported CRG scoreboard versions and the temporary `feature-pbt` penalty-box compatibility target, with a separate artifact and check for each version.
 
 ## Releasing
 

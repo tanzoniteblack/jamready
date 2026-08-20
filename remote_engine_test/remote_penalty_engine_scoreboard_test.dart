@@ -3,7 +3,7 @@
 // game state while JamBox maintains penalty-seat timers locally; it deliberately
 // has no widget tree or emulator in the test loop.
 import 'package:flutter/services.dart';
-import 'package:flutter_test/flutter_test.dart';
+import 'package:allure_flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:jam_ready/models/penalty_box_state.dart';

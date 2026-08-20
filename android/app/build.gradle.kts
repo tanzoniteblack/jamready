@@ -40,6 +40,8 @@ android {
     }
 
     signingConfigs {
+        // Local debug and integration-test builds do not have release signing
+        // credentials. Only create the release signing config when supplied.
         if (keystorePropertiesFile.exists()) {
             create("release") {
                 keyAlias = keystoreProperties.getProperty("keyAlias")
