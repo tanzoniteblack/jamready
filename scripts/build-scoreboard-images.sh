@@ -15,7 +15,6 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 ALL_VERSIONS=(
-  v2023.7
   v2025.0
   v2025.1
   v2025.2

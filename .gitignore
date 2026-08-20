@@ -113,6 +113,9 @@ coverage/
 # Machine-readable test reports (scripts/test-*-scoreboards.sh --results-dir)
 /test-results/
 
+# Default output directory used by Allure when tests run outside the scripts.
+/allure-results/
+
 # Symbols
 app.*.symbols
 
@@ -126,3 +129,4 @@ vendor/
 !**/ios/**/default.perspectivev3
 !/packages/flutter_tools/test/data/dart_dependencies_test/**/.packages
 !/dev/ci/**/Gemfile.lock
+.agents/
