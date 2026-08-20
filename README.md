@@ -67,12 +67,11 @@ Run both suites and create one version-first Allure report:
 
 ### Headless remote-engine suite
 
-The fast suite exercises the remote game and penalty engines directly, without building the app or launching an emulator. It includes the temporary `feature-pbt` penalty-box compatibility target. Local runs can fan out versions across independent Flutter workers; each worker uses an isolated copy of the current checkout, so uncommitted changes are included and concurrent Flutter builds do not share `build/` or `.dart_tool/`.
+The fast suite exercises the remote game and penalty engines directly, without building the app or launching an emulator. Local runs can fan out versions across independent Flutter workers; each worker uses an isolated copy of the current checkout, so uncommitted changes are included and concurrent Flutter builds do not share `build/` or `.dart_tool/`.
 
 ```bash
 ./scripts/test-remote-engine-scoreboards.sh
 ./scripts/test-remote-engine-scoreboards.sh --versions v2025.9,v2025.8
-./scripts/test-remote-engine-scoreboards.sh --versions feature-pbt
 ./scripts/test-remote-engine-scoreboards.sh --jobs 2
 ```
 
@@ -119,7 +118,7 @@ Arguments after `--` are passed to `flutter test`.
 
 ### Continuous integration
 
-The main CI workflow runs static analysis and unit/widget tests on pushes and pull requests to `main`. Test results are uploaded as JSON artifacts and published as a GitHub Check. Pull requests also run the headless remote-engine suite as a matrix across the supported CRG scoreboard versions and the temporary `feature-pbt` penalty-box compatibility target, with a separate artifact and check for each version.
+The main CI workflow runs static analysis and unit/widget tests on pushes and pull requests to `main`. Test results are uploaded as JSON artifacts and published as a GitHub Check. Pull requests also run the headless remote-engine suite as a matrix across the supported CRG scoreboard versions, with a separate artifact and check for each version.
 
 ## Releasing
 

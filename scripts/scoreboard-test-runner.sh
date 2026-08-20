@@ -16,8 +16,6 @@ SCOREBOARD_ALL_VERSIONS=(
   v2025.2
   v2025.1
   v2025.0
-  # Seattle Derby Brats' temporary server-authoritative penalty-box fork.
-  feature-pbt
 )
 
 scoreboard_require_positive_integer() {

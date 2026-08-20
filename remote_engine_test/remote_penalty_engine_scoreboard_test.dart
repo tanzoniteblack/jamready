@@ -88,42 +88,4 @@ void main() {
       );
     },
   );
-
-  test(
-    'feature-pbt server BoxSeat state is tracked remotely',
-    () async {
-      log('action: startNewGame');
-      await operatorClient.startNewGame();
-
-      await waitUntil(
-        () => state.onSeatStarted != null,
-        label: 'feature-pbt BoxSeat protocol is discovered',
-      );
-
-      log('operator action: start team 1 blocker box seat');
-      operatorClient.setValue(
-        'ScoreBoard.CurrentGame.Team(1).BoxSeat(Blocker1).StartBox',
-        true,
-      );
-      await waitUntil(
-        () => state.team1Blocker1.isOccupied,
-        label: 'server BoxSeat Started update occupies blocker seat',
-      );
-      expect(state.team1Blocker1.skaterNumber, '?');
-      expect(state.team1Blocker1.timeRemaining, const Duration(seconds: 30));
-
-      log('operator action: add 30 seconds to blocker box time');
-      operatorClient.setValue(
-        'ScoreBoard.CurrentGame.Team(1).BoxSeat(Blocker1).BoxTimeChange',
-        30,
-      );
-      await waitUntil(
-        () => state.team1Blocker1.timeRemaining == const Duration(seconds: 60),
-        label: 'server BoxClock update applies the external time change',
-      );
-    },
-    skip: scoreboardVersion() == 'feature-pbt'
-        ? false
-        : 'Requires katpet/scoreboard feature-pbt BoxSeat protocol',
-  );
 }

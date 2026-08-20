@@ -252,24 +252,8 @@ class PenaltyBoxState extends ChangeNotifier {
   void setKnownNumbersSaveCallback(VoidCallback? cb) =>
       _onKnownNumbersChanged = cb;
 
-  // BoxSeat action callbacks — set by RemotePenaltyEngine when in BoxSeat sync mode.
-  // null = local mode (no WS commands sent).
-  void Function(SkaterSeat)? onSeatStarted;
-  void Function(SkaterSeat)? onSeatCleared;
-  void Function(SkaterSeat, int seconds)? onSeatTimeChanged;
-  void Function(SkaterSeat, String number)? onSkaterAssigned;
-  void Function(SkaterSeat, bool running)? onSeatRunningChanged;
-
-  /// Called by the remote engine to push UI updates when seat state is mutated directly.
-  void notifyFromEngine() => notifyListeners();
-
-  void clearBoxSeatCallbacks() {
-    onSeatStarted = null;
-    onSeatCleared = null;
-    onSeatTimeChanged = null;
-    onSkaterAssigned = null;
-    onSeatRunningChanged = null;
-  }
+  /// Publishes a state mutation made by a remote game update.
+  void notifyFromRemote() => notifyListeners();
 
   List<String> knownNumbers(int teamIdx) {
     final s = teamIdx == 1 ? _knownNumbersTeam1 : _knownNumbersTeam2;
@@ -419,8 +403,6 @@ class PenaltyBoxState extends ChangeNotifier {
       seat.isRunning = true;
       if (position == SkaterPosition.jammer) _applyJammerArrivalSync(seat);
     }
-    onSeatStarted?.call(seat);
-    onSkaterAssigned?.call(seat, number);
     notifyListeners();
   }
 
@@ -435,7 +417,6 @@ class PenaltyBoxState extends ChangeNotifier {
     if (jamRunning && seat.position == SkaterPosition.jammer) {
       _applyJammerArrivalSync(seat);
     }
-    onSeatStarted?.call(seat);
     notifyListeners();
   }
 
@@ -456,7 +437,6 @@ class PenaltyBoxState extends ChangeNotifier {
     if (jamRunning && !seat.isRunning) {
       seat.isRunning = true;
     }
-    onSeatTimeChanged?.call(seat, 30);
     notifyListeners();
   }
 
@@ -471,7 +451,6 @@ class PenaltyBoxState extends ChangeNotifier {
       seat.isRunning = true;
     }
     if (seat.timeRemaining <= Duration.zero) seat.isRunning = false;
-    onSeatTimeChanged?.call(seat, delta.inSeconds);
     notifyListeners();
   }
 
@@ -482,17 +461,12 @@ class PenaltyBoxState extends ChangeNotifier {
       seat.timeRemaining = Duration.zero;
       seat.isRunning = false;
     }
-    onSeatTimeChanged?.call(seat, -30);
     notifyListeners();
   }
 
   void clearSeat(SkaterSeat seat) {
-    // In BoxSeat mode, always clear locally and let server confirm.
-    // In local mode, promote from queue if available.
     final teamQueue = queueForTeam(seat.teamIndex);
-    if (onSeatCleared == null &&
-        teamQueue.isNotEmpty &&
-        seat.position != SkaterPosition.jammer) {
+    if (teamQueue.isNotEmpty && seat.position != SkaterPosition.jammer) {
       final next = teamQueue.first;
       queue.remove(next);
       seat.setSkater(
@@ -504,7 +478,6 @@ class PenaltyBoxState extends ChangeNotifier {
     } else {
       seat.clear();
     }
-    onSeatCleared?.call(seat);
     notifyListeners();
   }
 
@@ -533,7 +506,6 @@ class PenaltyBoxState extends ChangeNotifier {
   void toggleSeatTimer(SkaterSeat seat) {
     if (!seat.isOccupied || seat.timeRemaining <= Duration.zero) return;
     seat.isRunning = !seat.isRunning;
-    onSeatRunningChanged?.call(seat, seat.isRunning);
     notifyListeners();
   }
 
@@ -541,7 +513,6 @@ class PenaltyBoxState extends ChangeNotifier {
     final seat = jammerSeat(teamIdx);
     if (seat.isOccupied && jamRunning) {
       seat.isRunning = true;
-      onSeatStarted?.call(seat);
       notifyListeners();
     }
   }

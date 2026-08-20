@@ -152,22 +152,6 @@ void main() {
 
       expect(state.team1Blocker1.isRunning, isFalse);
     });
-
-    test('fires onSeatStarted and onSkaterAssigned callbacks', () {
-      String? startedId;
-      String? assignedNumber;
-      state.onSeatStarted = (s) => startedId = s.id;
-      state.onSkaterAssigned = (s, n) => assignedNumber = n;
-
-      state.seatSkater(
-        seat: state.team1Jammer,
-        number: '42',
-        position: SkaterPosition.jammer,
-      );
-
-      expect(startedId, state.team1Jammer.id);
-      expect(assignedNumber, '42');
-    });
   });
 
   // ---------------------------------------------------------------------------
@@ -247,59 +231,27 @@ void main() {
     });
   });
 
-  group('clearSeat() — BoxSeat mode (onSeatCleared callback set)', () {
-    setUp(() {
-      state.onSeatCleared = (_) {};
-    });
-
-    test('calls onSeatCleared and does NOT promote from queue', () {
-      seatBlocker(state, 1, '11', seatIndex: 0);
-      state.addToQueue(
-        teamIdx: 1,
-        number: '33',
-        position: SkaterPosition.blocker,
-      );
-
-      String? clearedId;
-      state.onSeatCleared = (s) => clearedId = s.id;
-      state.clearSeat(state.team1Blocker1);
-
-      expect(clearedId, state.team1Blocker1.id);
-      // Seat is cleared
-      expectSeatEmpty(state.team1Blocker1);
-      // Queue is preserved — server decides promotion
-      expect(state.queueForTeam(1), hasLength(1));
-    });
-  });
-
   // ---------------------------------------------------------------------------
   // addPenaltyToSeat / removePenaltyFromSeat
   // ---------------------------------------------------------------------------
 
   group('addPenaltyToSeat() / removePenaltyFromSeat()', () {
-    test('addPenalty adds 30s and fires onSeatTimeChanged with +30', () {
+    test('addPenalty adds 30s', () {
       seatBlocker(state, 1, '11');
-      int? sentDelta;
-      state.onSeatTimeChanged = (_, d) => sentDelta = d;
 
       state.addPenaltyToSeat(state.team1Blocker1);
 
       expectTimeRemaining(state.team1Blocker1, const Duration(seconds: 60));
-      expect(sentDelta, 30);
     });
 
-    test('removePenalty removes 30s and fires onSeatTimeChanged with -30', () {
+    test('removePenalty removes 30s', () {
       seatBlocker(state, 1, '11');
       state.addPenaltyToSeat(
         state.team1Blocker1,
       ); // A second penalty adds 30 seconds.
-      int? sentDelta;
-      state.onSeatTimeChanged = (_, d) => sentDelta = d;
-
       state.removePenaltyFromSeat(state.team1Blocker1);
 
       expectTimeRemaining(state.team1Blocker1, const Duration(seconds: 30));
-      expect(sentDelta, -30);
     });
 
     test('removePenalty clamps timeRemaining to zero', () {
@@ -334,16 +286,6 @@ void main() {
       seatBlocker(state, 1, '11');
       state.adjustTime(state.team1Blocker1, const Duration(seconds: -60));
       expectTimeRemaining(state.team1Blocker1, Duration.zero);
-    });
-
-    test('fires onSeatTimeChanged with delta in seconds', () {
-      seatBlocker(state, 1, '11');
-      int? sentDelta;
-      state.onSeatTimeChanged = (_, d) => sentDelta = d;
-
-      state.adjustTime(state.team1Blocker1, const Duration(seconds: 15));
-
-      expect(sentDelta, 15);
     });
   });
 
