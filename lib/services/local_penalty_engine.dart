@@ -12,10 +12,8 @@ class LocalPenaltyEngine extends PenaltyEngine with WidgetsBindingObserver {
   Timer? _ticker;
   DateTime? _lastTick;
 
-  LocalPenaltyEngine(
-    this._state, {
-    @visibleForTesting DateTime Function()? clock,
-  }) : _clock = clock ?? DateTime.now;
+  LocalPenaltyEngine(this._state, {DateTime Function()? clock})
+    : _clock = clock ?? DateTime.now;
 
   @override
   PenaltyBoxState get state => _state;

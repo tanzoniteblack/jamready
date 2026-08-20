@@ -236,6 +236,68 @@ void main() {
 
   group('Group B — BoxClock bootstrap and ownership', () {
     test(
+      'connection snapshot loads all timers and their running state',
+      () async {
+        final (:engine, :channel, :state) = await setupEngine();
+
+        await sendAndPump(channel, {
+          'ScoreBoard.CurrentGame.InJam': true,
+          'ScoreBoard.CurrentGame.Clock(Period).Number': 2,
+          'ScoreBoard.CurrentGame.Clock(Jam).Number': 7,
+          'ScoreBoard.CurrentGame.Team(1).BoxSeat(Jammer).Started': true,
+          'ScoreBoard.CurrentGame.Team(1).BoxSeat(Blocker1).Started': true,
+          'ScoreBoard.CurrentGame.Team(2).BoxSeat(Jammer).Started': true,
+          'ScoreBoard.CurrentGame.BoxClock(Team1Jammer).Time': 12000,
+          'ScoreBoard.CurrentGame.BoxClock(Team1Jammer).Running': true,
+          'ScoreBoard.CurrentGame.BoxClock(Team1Blocker1).Time': 27000,
+          'ScoreBoard.CurrentGame.BoxClock(Team1Blocker1).Running': false,
+          'ScoreBoard.CurrentGame.BoxClock(Team2Jammer).Time': 5000,
+          'ScoreBoard.CurrentGame.BoxClock(Team2Jammer).Running': true,
+        });
+
+        expect(state.jamRunning, isTrue);
+        expect(state.periodNumber, 2);
+        expect(state.jamNumber, 7);
+        expectTimeRemaining(state.team1Jammer, const Duration(seconds: 12));
+        expect(state.team1Jammer.isRunning, isTrue);
+        expectTimeRemaining(state.team1Blocker1, const Duration(seconds: 27));
+        expect(state.team1Blocker1.isRunning, isFalse);
+        expectTimeRemaining(state.team2Jammer, const Duration(seconds: 5));
+        expect(state.team2Jammer.isRunning, isTrue);
+
+        await engine.dispose();
+      },
+    );
+
+    test(
+      'remote jammer swap accepts the server-synchronized timer values',
+      () async {
+        final (:engine, :channel, :state) = await setupEngine();
+
+        await sendAndPump(channel, {
+          'ScoreBoard.CurrentGame.InJam': true,
+          'ScoreBoard.CurrentGame.Team(1).BoxSeat(Jammer).Started': true,
+          'ScoreBoard.CurrentGame.BoxClock(Team1Jammer).Time': 20000,
+          'ScoreBoard.CurrentGame.BoxClock(Team1Jammer).Running': true,
+        });
+        await sendAndPump(channel, {
+          'ScoreBoard.CurrentGame.Team(2).BoxSeat(Jammer).Started': true,
+          'ScoreBoard.CurrentGame.BoxClock(Team1Jammer).Time': 0,
+          'ScoreBoard.CurrentGame.BoxClock(Team1Jammer).Running': false,
+          'ScoreBoard.CurrentGame.BoxClock(Team2Jammer).Time': 10000,
+          'ScoreBoard.CurrentGame.BoxClock(Team2Jammer).Running': true,
+        });
+
+        expectTimeRemaining(state.team1Jammer, Duration.zero);
+        expect(state.team1Jammer.isRunning, isFalse);
+        expectTimeRemaining(state.team2Jammer, const Duration(seconds: 10));
+        expect(state.team2Jammer.isRunning, isTrue);
+
+        await engine.dispose();
+      },
+    );
+
+    test(
       'bootstrap: owned seat time applied unconditionally on first connect',
       () async {
         final (:engine, :channel, :state) = await setupEngine();
@@ -666,7 +728,47 @@ void main() {
   });
 
   // ---------------------------------------------------------------------------
-  // Group G: reportPenalty()
+  // Group G: local clock fallback
+  // ---------------------------------------------------------------------------
+
+  group('Group G — local clock fallback', () {
+    testWidgets('timers continue after the server connection is lost', (
+      tester,
+    ) async {
+      final channel = FakeWebSocketChannel();
+      final state = makeState();
+      final engine = RemotePenaltyEngine(
+        state,
+        channelFactory: (_) => channel,
+        wakelockEnable: () {},
+        wakelockDisable: () {},
+        localClock: () => tester.binding.clock.now(),
+      );
+      await engine.connect('http://localhost:8000');
+      await tester.pump();
+
+      state.jamRunning = true;
+      state.seatSkater(
+        seat: state.team1Blocker1,
+        number: '22',
+        position: SkaterPosition.blocker,
+      );
+      final timeBeforeDisconnect = state.team1Blocker1.timeRemaining;
+
+      channel.dispose();
+      await tester.pump();
+      expect(state.connectionStatus, ConnectionStatus.disconnected);
+
+      await tester.pump(const Duration(seconds: 1));
+      expect(state.team1Blocker1.timeRemaining, lessThan(timeBeforeDisconnect));
+      expect(state.team1Blocker1.isRunning, isTrue);
+
+      await engine.dispose();
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Group H: reportPenalty()
   // ---------------------------------------------------------------------------
 
   group('Group G — reportPenalty()', () {

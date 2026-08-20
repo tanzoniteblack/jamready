@@ -1,4 +1,4 @@
-.PHONY: unit integration test serve-web build-scoreboards test-scoreboards build-ios build-android release
+.PHONY: unit integration test serve-web build-scoreboards test-scoreboards test-remote-engine-scoreboards build-ios build-android release
 
 # Run unit and widget tests only (fast, no device required)
 unit:
@@ -19,8 +19,12 @@ serve-web:
 build-scoreboards:
 	./scripts/build-scoreboard-images.sh
 
-# Run scoreboard integration tests against each Docker image
-test-scoreboards: build-scoreboards
+# Run remote-engine tests directly against each Docker image
+test-remote-engine-scoreboards: build-scoreboards
+	./scripts/test-remote-engine-scoreboards.sh
+
+# Run app and remote-engine scoreboard tests against each Docker image
+test-scoreboards: build-scoreboards test-remote-engine-scoreboards
 	./scripts/test-all-scoreboards.sh
 
 # Build iOS release archive only (tests must pass first)

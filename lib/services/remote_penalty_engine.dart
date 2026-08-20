@@ -43,6 +43,7 @@ class RemotePenaltyEngine extends PenaltyEngine with WidgetsBindingObserver {
   final WebSocketChannel Function(Uri)? _channelFactoryOverride;
   final void Function()? _wakelockEnableOverride;
   final void Function()? _wakelockDisableOverride;
+  final DateTime Function()? _localClockOverride;
 
   // Cached regex patterns for _parsePath (compiled once, not per message)
   static final _reTeamName = RegExp(
@@ -70,10 +71,12 @@ class RemotePenaltyEngine extends PenaltyEngine with WidgetsBindingObserver {
     @visibleForTesting WebSocketChannel Function(Uri)? channelFactory,
     @visibleForTesting void Function()? wakelockEnable,
     @visibleForTesting void Function()? wakelockDisable,
+    @visibleForTesting DateTime Function()? localClock,
   }) : _channelFactoryOverride = channelFactory,
        _wakelockEnableOverride = wakelockEnable,
-       _wakelockDisableOverride = wakelockDisable {
-    _localEngine = LocalPenaltyEngine(_state);
+       _wakelockDisableOverride = wakelockDisable,
+       _localClockOverride = localClock {
+    _localEngine = LocalPenaltyEngine(_state, clock: _localClockOverride);
   }
 
   @override

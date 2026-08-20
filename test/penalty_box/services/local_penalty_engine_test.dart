@@ -100,6 +100,25 @@ void main() {
   // ---------------------------------------------------------------------------
 
   group('Timer tick', () {
+    test(
+      'jammer swap applies WFTDA arrival timing while the local engine runs',
+      () async {
+        final state = makeState();
+        final engine = await startEngine(state);
+
+        seatJammer(state, 1, '10');
+        state.tick(const Duration(seconds: 10));
+        seatJammer(state, 2, '20');
+
+        expectTimeRemaining(state.team1Jammer, Duration.zero);
+        expectTimeRemaining(state.team2Jammer, const Duration(seconds: 10));
+        expect(state.team1Jammer.isRunning, isFalse);
+        expect(state.team2Jammer.isRunning, isTrue);
+
+        await engine.dispose();
+      },
+    );
+
     test('running seat loses time after 100ms tick', () {
       final state = makeState();
 
