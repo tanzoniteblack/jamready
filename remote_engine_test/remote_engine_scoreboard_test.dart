@@ -43,6 +43,9 @@ void main() {
 
     setUp(() async {
       await allure.parameter('scoreboard_version', version);
+      await allure.label('parentSuite', 'Scoreboard compatibility');
+      await allure.label('suite', version);
+      await allure.label('subSuite', 'remote_engine_scoreboard_test.dart');
       log('--- setUp: connecting engine to ws://$host:$port ---');
       state = ScoreboardState();
       engine = RemoteGameEngine(state);

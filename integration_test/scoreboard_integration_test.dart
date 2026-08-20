@@ -1,8 +1,12 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:allure_flutter_test/integration_test.dart';
+// The Allure Flutter drop-in writes from the Android test process, where its
+// default results directory is read-only. The runner captures Flutter's
+// host-side JSON stream and converts it to Allure results instead.
 import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:integration_test/integration_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 

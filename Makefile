@@ -19,9 +19,9 @@ serve-web:
 build-scoreboards:
 	./scripts/build-scoreboard-images.sh
 
-# Run scoreboard integration tests against each Docker image
+# Run both scoreboard compatibility suites against each Docker image
 test-scoreboards: build-scoreboards
-	./scripts/test-all-scoreboards.sh
+	./scripts/test-scoreboards.sh
 
 # Build iOS release archive only (tests must pass first)
 build-ios: test

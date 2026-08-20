@@ -25,23 +25,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ALLURE_CONFIG="$SCRIPT_DIR/../allurerc.mjs"
-
-ALL_VERSIONS=(
-  # Seattle Derby Brats' temporary server-authoritative penalty-box fork.
-  feature-pbt
-  v2025.9
-  v2025.8
-  v2025.7
-  v2025.6
-  v2025.5
-  v2025.4
-  v2025.3
-  v2025.2
-  v2025.1
-  v2025.0
-  v2023.7
-)
+source "$SCRIPT_DIR/scoreboard-test-runner.sh"
 
 VERSIONS=()
 HOST="127.0.0.1"
@@ -66,18 +50,11 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-if [[ ! "$JOBS" =~ ^[1-9][0-9]*$ ]]; then
-  echo "error: --jobs must be a positive integer" >&2
-  exit 1
-fi
-
-if [[ ! "$PORT" =~ ^[0-9]+$ ]] || (( PORT < 1 || PORT > 65535 )); then
-  echo "error: --port must be a valid TCP port" >&2
-  exit 1
-fi
+scoreboard_require_positive_integer --jobs "$JOBS" || exit 1
+scoreboard_require_valid_port "$PORT" || exit 1
 
 if [ ${#VERSIONS[@]} -eq 0 ]; then
-  VERSIONS=("${ALL_VERSIONS[@]}")
+  VERSIONS=("${SCOREBOARD_ALL_VERSIONS[@]}")
 fi
 
 if (( JOBS > ${#VERSIONS[@]} )); then
@@ -88,43 +65,12 @@ if [[ -z "$PORT_STRIDE" ]]; then
   PORT_STRIDE="$JOBS"
 fi
 
-if [[ ! "$PORT_STRIDE" =~ ^[1-9][0-9]*$ ]]; then
-  echo "error: --port-stride must be a positive integer" >&2
-  exit 1
-fi
-
-if ! command -v lsof &>/dev/null; then
-  echo "error: lsof is required to find an available Docker host port" >&2
-  exit 1
-fi
-
-# Returns success only when no process is listening on [port]. Docker publishes
-# to 0.0.0.0, so checking every listening address avoids host-specific misses.
-port_is_available() {
-  ! lsof -nP -iTCP:"$1" -sTCP:LISTEN &>/dev/null
-}
-
-# Find a free port in one worker's stride. Each worker starts at a different
-# offset and advances by JOBS, so workers cannot select the same fallback port.
-find_available_port() {
-  local candidate="$1"
-  local stride="$2"
-
-  while (( candidate <= 65535 )); do
-    if port_is_available "$candidate"; then
-      echo "$candidate"
-      return
-    fi
-    candidate=$((candidate + stride))
-  done
-
-  echo "error: no available port found at or above $1" >&2
-  return 1
-}
+scoreboard_require_positive_integer --port-stride "$PORT_STRIDE" || exit 1
+scoreboard_require_port_finder || exit 1
 
 WORKER_PORTS=()
 for (( worker=0; worker<JOBS; worker++ )); do
-  if ! worker_port="$(find_available_port "$((PORT + worker))" "$PORT_STRIDE")"; then
+  if ! worker_port="$(scoreboard_find_available_port "$((PORT + worker))" "$PORT_STRIDE")"; then
     exit 1
   fi
   WORKER_PORTS+=("$worker_port")
@@ -216,9 +162,9 @@ run_version() {
       exit_code=1
     else
       while true; do
-        if ! port_is_available "$worker_port"; then
+        if ! scoreboard_port_is_available "$worker_port"; then
           echo "--> Port $worker_port is in use; trying another port"
-          worker_port="$(find_available_port "$((worker_port + PORT_STRIDE))" "$PORT_STRIDE")" || {
+          worker_port="$(scoreboard_find_available_port "$((worker_port + PORT_STRIDE))" "$PORT_STRIDE")" || {
             exit_code=1
             break
           }
@@ -234,7 +180,7 @@ run_version() {
         # failed container and retry the next port in this worker's stride.
         docker rm -f "$container" &>/dev/null || true
         echo "--> Docker could not bind port $worker_port; trying another port"
-        worker_port="$(find_available_port "$((worker_port + PORT_STRIDE))" "$PORT_STRIDE")" || {
+        worker_port="$(scoreboard_find_available_port "$((worker_port + PORT_STRIDE))" "$PORT_STRIDE")" || {
           exit_code=1
           break
         }
@@ -408,12 +354,6 @@ for version in "${VERSIONS[@]}"; do
 done
 
 if "$GENERATE_HTML"; then
-  if ! command -v npx &>/dev/null; then
-    echo "error: npx is required to generate the Allure HTML report" >&2
-    echo "--> Raw Allure results: $ALLURE_RESULTS_DIR" >&2
-    exit 1
-  fi
-
   echo "--> Generating Allure HTML report"
   ALLURE_INPUTS=("$ALLURE_RESULTS_DIR")
   if "$ISOLATE_FLUTTER_WORKERS"; then
@@ -428,10 +368,7 @@ if "$GENERATE_HTML"; then
       ALLURE_INPUTS=("$ALLURE_RESULTS_DIR")
     fi
   fi
-  if ! npx -y allure@3 generate "${ALLURE_INPUTS[@]}" \
-    --config "$ALLURE_CONFIG" \
-    -o "$ALLURE_REPORT_DIR"; then
-    echo "error: Allure report generation failed" >&2
+  if ! scoreboard_generate_allure_report "$ALLURE_REPORT_DIR" "${ALLURE_INPUTS[@]}"; then
     echo "--> Raw Allure results: $ALLURE_RESULTS_DIR" >&2
     exit 1
   fi
