@@ -200,6 +200,201 @@ void main() {
   });
 
   // ---------------------------------------------------------------------------
+  // Jammer Swaps Visualised (WFTDA §4.4.2)
+  // ---------------------------------------------------------------------------
+
+  group('Jammer Swaps Visualised', () {
+    Future<PenaltyBoxState> runningState() async {
+      final state = makeState();
+      final engine = await startEngine(state);
+      addTearDown(engine.dispose);
+      return state;
+    }
+
+    test('Scenario 1: one jammer serves a normal penalty', () async {
+      final state = await runningState();
+      seatJammer(state, 1, '10');
+      state.tick(const Duration(seconds: 10));
+
+      expectTimeRemaining(state.team1Jammer, const Duration(seconds: 20));
+    });
+
+    test('Scenario 2: one-for-one jammer swap', () async {
+      final state = await runningState();
+      seatJammer(state, 1, '10');
+      state.tick(const Duration(seconds: 20));
+      seatJammer(state, 2, '20');
+
+      expectJammerTimes(
+        state,
+        team1: Duration.zero,
+        team2: const Duration(seconds: 20),
+      );
+    });
+
+    test('Scenario 3: completed penalty is not paired again', () async {
+      final state = await runningState();
+      seatJammer(state, 1, '10', penalties: 2);
+      state.tick(const Duration(seconds: 45));
+      seatJammer(state, 2, '20');
+
+      expectJammerTimes(
+        state,
+        team1: Duration.zero,
+        team2: const Duration(seconds: 15),
+      );
+    });
+
+    test('Scenario 4: a later penalty can be fully cancelled', () async {
+      final state = await runningState();
+      seatJammer(state, 1, '10', penalties: 2);
+      state.tick(const Duration(seconds: 15));
+      seatJammer(state, 2, '20');
+
+      expectJammerTimes(
+        state,
+        team1: const Duration(seconds: 15),
+        team2: Duration.zero,
+      );
+    });
+
+    test('Scenario 5: simultaneous jammer penalties release both', () async {
+      final state = await runningState();
+      seatJammer(state, 1, '10');
+      seatJammer(state, 2, '20');
+
+      expectJammerTimes(state, team1: Duration.zero, team2: Duration.zero);
+    });
+
+    test('Scenario 6: a new penalty is not paired with settled time', () async {
+      final state = await runningState();
+      seatJammer(state, 1, '10');
+      state.tick(const Duration(seconds: 15));
+      seatJammer(state, 2, '20');
+      state.clearSeat(state.team1Jammer);
+      seatJammer(state, 1, '11');
+
+      expectJammerTimes(
+        state,
+        team1: const Duration(seconds: 30),
+        team2: const Duration(seconds: 15),
+      );
+    });
+
+    test('Scenario 7: an extra arriving penalty remains unpaired', () async {
+      final state = await runningState();
+      seatJammer(state, 1, '10');
+      state.tick(const Duration(seconds: 15));
+      seatJammer(state, 2, '20', penalties: 2);
+
+      expectJammerTimes(
+        state,
+        team1: Duration.zero,
+        team2: const Duration(seconds: 45),
+      );
+      expect(state.team2Jammer.unmatchedPenalties, 1);
+    });
+
+    test(
+      'Scenario 8: a second unmatched penalty supports a second swap',
+      () async {
+        final state = await runningState();
+        seatJammer(state, 1, '10');
+        state.tick(const Duration(seconds: 15));
+        seatJammer(state, 2, '20', penalties: 2);
+        state.clearSeat(state.team1Jammer);
+        state.tick(const Duration(seconds: 30));
+        seatJammer(state, 1, '11');
+
+        expectJammerTimes(
+          state,
+          team1: const Duration(seconds: 15),
+          team2: Duration.zero,
+        );
+      },
+    );
+
+    test(
+      'Scenario 9: a completed first penalty is not reduced again',
+      () async {
+        final state = await runningState();
+        seatJammer(state, 1, '10');
+        state.tick(const Duration(seconds: 15));
+        seatJammer(state, 2, '20', penalties: 2);
+        state.clearSeat(state.team1Jammer);
+        state.tick(const Duration(seconds: 20));
+        seatJammer(state, 1, '11');
+
+        expectJammerTimes(
+          state,
+          team1: const Duration(seconds: 5),
+          team2: Duration.zero,
+        );
+      },
+    );
+
+    test(
+      'Scenario 10: no swap occurs when the other jammer has left',
+      () async {
+        final state = await runningState();
+        seatJammer(state, 1, '10');
+        state.tick(const Duration(seconds: 10));
+        state.clearSeat(state.team1Jammer);
+        seatJammer(state, 2, '20');
+
+        expectTimeRemaining(state.team2Jammer, const Duration(seconds: 30));
+      },
+    );
+
+    test(
+      'Scenario 11: a manual return can retain remaining time and a new penalty',
+      () async {
+        final state = await runningState();
+        seatJammer(state, 1, '10', penalties: 2);
+        state.adjustTime(state.team1Jammer, const Duration(seconds: -10));
+
+        expectTimeRemaining(state.team1Jammer, const Duration(seconds: 50));
+      },
+    );
+
+    test(
+      'Scenario 12: an officiating-error return adds no extra penalty',
+      () async {
+        final state = await runningState();
+        seatJammer(state, 1, '10');
+        state.adjustTime(state.team1Jammer, const Duration(seconds: -10));
+
+        expectTimeRemaining(state.team1Jammer, const Duration(seconds: 20));
+      },
+    );
+
+    test(
+      'Scenario 13: an officiating-error return can be immediately released',
+      () async {
+        final state = await runningState();
+        seatJammer(state, 1, '10');
+        state.adjustTime(state.team1Jammer, const Duration(seconds: -30));
+
+        expectTimeRemaining(state.team1Jammer, Duration.zero);
+        expect(state.team1Jammer.isRunning, isFalse);
+      },
+    );
+
+    test('Scenario 14: three penalties support sequential swaps', () async {
+      final state = await runningState();
+      seatJammer(state, 1, '10', penalties: 3);
+      state.tick(const Duration(seconds: 10));
+      seatJammer(state, 2, '20');
+      state.clearSeat(state.team2Jammer);
+      state.tick(const Duration(seconds: 5));
+      seatJammer(state, 2, '21');
+
+      expectTimeRemaining(state.team1Jammer, const Duration(seconds: 15));
+      expect(state.team1Jammer.unmatchedPenalties, 1);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
   // Known number persistence
   // ---------------------------------------------------------------------------
 

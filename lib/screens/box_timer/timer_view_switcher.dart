@@ -168,7 +168,6 @@ class _TimerViewOption extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isSpecialist = role == AppRole.pbm || role == AppRole.solo;
     return Column(
       children: [
         if (role == AppRole.pbm) const Divider(color: Colors.white24),

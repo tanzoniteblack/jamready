@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'skater_seat.dart';
 
@@ -328,7 +330,12 @@ class PenaltyBoxState extends ChangeNotifier {
     // All of sitting's penalties already matched — arriving serves full time
     if (sitting.unmatchedPenalties == 0) return;
 
-    var sittingMax = pd * sitting.unmatchedPenalties;
+    // A completed penalty cannot be paired with a later arrival. Limit the
+    // eligible penalties to the penalties that still have time remaining.
+    final activePenalties =
+        (sitting.timeRemaining.inMicroseconds + pd.inMicroseconds - 1) ~/
+        pd.inMicroseconds;
+    var sittingMax = pd * min(sitting.unmatchedPenalties, activePenalties);
     var arrivingMax = pd * arriving.penaltyCount;
     // Clamp sitting's eligible time to the unmatched portion
     var sittingTime = sitting.timeRemaining < sittingMax

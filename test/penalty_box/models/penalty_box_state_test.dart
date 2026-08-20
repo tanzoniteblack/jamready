@@ -290,7 +290,9 @@ void main() {
 
     test('removePenalty removes 30s and fires onSeatTimeChanged with -30', () {
       seatBlocker(state, 1, '11');
-      state.addPenaltyToSeat(state.team1Blocker1); // 60s, penaltyCount=2
+      state.addPenaltyToSeat(
+        state.team1Blocker1,
+      ); // A second penalty adds 30 seconds.
       int? sentDelta;
       state.onSeatTimeChanged = (_, d) => sentDelta = d;
 
@@ -443,7 +445,7 @@ void main() {
   // ---------------------------------------------------------------------------
 
   group('_applyJammerArrivalSync() — WFTDA §4.4', () {
-    // All tests start the jam first so isRunning=true on seated jammers.
+    // Start each test during a jam so newly seated jammers begin serving time.
 
     setUp(() => state.onJamStart());
 
@@ -456,9 +458,10 @@ void main() {
     test(
       'sitting jammer not running — no sync, arriving gets full 30s (§4.4 guard)',
       () {
-        // Seat T1 jammer manually without triggering sync
+        // Put T1 in the box without starting their timer.
         state.team1Jammer.setSkater(number: '10', pos: SkaterPosition.jammer);
-        state.team1Jammer.isRunning = false; // paused — should not trigger sync
+        state.team1Jammer.isRunning =
+            false; // A paused jammer cannot swap time.
 
         seatJammer(state, 2, '20');
 
@@ -470,15 +473,15 @@ void main() {
       'simple swap: 1-penalty each, 10s elapsed — sitting released, arriving gets 10s (§4.4.1)',
       () {
         seatJammer(state, 1, '10');
-        // Simulate 10 seconds served by T1
+        // T1 serves 10 seconds before T2 arrives.
         state.tick(const Duration(seconds: 10));
 
         seatJammer(state, 2, '20');
 
         expectJammerTimes(
           state,
-          team1: Duration.zero, // sitting released
-          team2: const Duration(seconds: 10), // arriving serves elapsed
+          team1: Duration.zero,
+          team2: const Duration(seconds: 10),
         );
         expect(state.team1Jammer.isRunning, isFalse);
       },
@@ -487,7 +490,7 @@ void main() {
     test(
       'arriving just as sitting seated (0 elapsed) — sitting released, arriving gets ~0s',
       () {
-        seatJammer(state, 1, '10'); // 30s remaining, 0 elapsed
+        seatJammer(state, 1, '10'); // T1 has not yet served any time.
 
         seatJammer(state, 2, '20');
 
@@ -498,16 +501,16 @@ void main() {
     test(
       'sitting has 2 penalties with enough time: arriving 1-penalty cancels against one, sitting released of excess, arriving released (§4.4.2)',
       () {
-        // T1: seated, then given a second penalty → penaltyCount=2, timeRemaining=60s.
-        // Tick 20s → T1 has 40s remaining.
+        // T1 receives two penalties, for 60 seconds total. After 20 seconds,
+        // T1 has 40 seconds left.
         seatJammer(state, 1, '10');
-        state.addPenaltyToSeat(state.team1Jammer); // → 60s, penaltyCount=2
-        state.tick(const Duration(seconds: 20)); // → 40s remaining
+        state.addPenaltyToSeat(state.team1Jammer);
+        state.tick(const Duration(seconds: 20));
 
-        // T2 arrives with 1 penalty (penaltyCount=1 at sync time — always from setSkater).
-        // sittingMax=60, arrivingMax=30, sittingTime=40, arrivingTime=30.
-        // Loop: 40≥30 AND 30≥30 → sittingTime=10, arrivingTime=0, sittingMax=30, arrivingMax=0.
-        // arrivingMax==0 → T2 fully cancelled (released), T1 keeps 10s.
+        // T2 now arrives with one penalty. It cancels one of T1's two
+        // outstanding penalties. T2 is released immediately; T1 has already
+        // served 20 seconds and keeps the final 10 seconds of the remaining
+        // penalty.
         seatJammer(state, 2, '20');
 
         expect(state.team1Jammer.timeRemaining, const Duration(seconds: 10));
@@ -517,37 +520,34 @@ void main() {
     );
 
     test(
-      'sitting has 2 penalties with little time: nightmare scenario — arriving gets full 30s (§4.4.3)',
+      'completed penalties are not matched with a later arrival (Scenario 3)',
       () {
-        // T1: 2 penalties, 60s. Tick 55s → T1 has 5s remaining.
+        // T1 receives two penalties, for 60 seconds total. After 55 seconds,
+        // their first penalty is complete and the second has 5 seconds left.
         seatJammer(state, 1, '10');
-        state.addPenaltyToSeat(state.team1Jammer); // → 60s, penaltyCount=2
-        state.tick(const Duration(seconds: 55)); // → 5s remaining
+        state.addPenaltyToSeat(state.team1Jammer);
+        state.tick(const Duration(seconds: 55));
 
-        // T2 arrives with 1 penalty.
-        // sittingMax=60, arrivingMax=30, sittingTime=5.
-        // Loop: 5≥30? No → loop doesn't run.
-        // sittingMax(60) != arrivingMax(30) → nightmare scenario.
-        // T1 keeps 5s, T2 gets full 30s.
+        // T2 arrives with 1 penalty. Only T1's active, second penalty is
+        // eligible for the swap, so both penalties are shortened by 25s.
         seatJammer(state, 2, '20');
 
-        expect(state.team1Jammer.timeRemaining, const Duration(seconds: 5));
-        expect(state.team2Jammer.timeRemaining, const Duration(seconds: 30));
+        expect(state.team1Jammer.timeRemaining, Duration.zero);
+        expect(state.team2Jammer.timeRemaining, const Duration(seconds: 25));
       },
     );
 
     test(
       'sitting has 2 penalties, exactly 30s remaining: arriving gets elapsed of second penalty, sitting released',
       () {
-        // T1: 2 penalties, 60s. Tick 30s → T1 has 30s remaining (sittingTime = 30s = 1 penalty).
+        // T1 receives two penalties. After 30 seconds, their first penalty is
+        // complete and the second has 30 seconds left.
         seatJammer(state, 1, '10');
-        state.addPenaltyToSeat(state.team1Jammer); // → 60s, penaltyCount=2
-        state.tick(const Duration(seconds: 30)); // → 30s remaining
+        state.addPenaltyToSeat(state.team1Jammer);
+        state.tick(const Duration(seconds: 30));
 
-        // T2 arrives.
-        // sittingMax=60, arrivingMax=30, sittingTime=30, arrivingTime=30.
-        // Loop: 30≥30 AND 30≥30 → sittingTime=0, arrivingTime=0, sittingMax=30, arrivingMax=0.
-        // arrivingMax==0 → T2 released (0s), T1 released (0s).
+        // T2 arrives with one penalty. T1's remaining penalty and T2's new
+        // penalty cancel each other completely, so both are released.
         seatJammer(state, 2, '20');
 
         expect(state.team1Jammer.timeRemaining, Duration.zero);
@@ -559,11 +559,11 @@ void main() {
       // Seat T1 jammer with expired time then trigger jam start.
       state.team1Jammer.setSkater(number: '10', pos: SkaterPosition.jammer);
       state.team1Jammer.timeRemaining = Duration.zero;
-      state.onJamEnd(); // reset jamRunning
+      state.onJamEnd(); // End the jam before starting the next one.
       state.onJamStart();
 
       expectSeatEmpty(state.team1Jammer);
-      // T2 unaffected
+      // T2 remains empty.
       expectSeatEmpty(state.team2Jammer);
     });
 
@@ -574,7 +574,7 @@ void main() {
 
       seatJammer(state, 2, '20');
 
-      // Blocker seat time unchanged by jammer sync
+      // Jammer swaps do not change blocker time.
       expectTimeRemaining(state.team1Blocker1, const Duration(seconds: 25));
     });
 
@@ -583,21 +583,21 @@ void main() {
     test(
       'returning jammer after swap serves full 30s, committed time unaffected (Scenario 6)',
       () {
-        // T1 (1 penalty) sits, 10s elapsed → 20s remaining
+        // T1 has one penalty and serves 10 seconds, leaving 20 seconds.
         seatJammer(state, 1, '10');
         state.tick(const Duration(seconds: 10));
 
-        // T2 arrives (1 penalty) → simple swap: T1 released, T2 gets elapsed (10s)
-        // T2.unmatchedPenalties = 0 after being matched
+        // T2 then arrives with one penalty. Their penalties swap: T1 is
+        // released, T2 has 10 seconds left, and that penalty is fully paired.
         seatJammer(state, 2, '20');
         expect(state.team1Jammer.timeRemaining, Duration.zero);
         expect(state.team2Jammer.timeRemaining, const Duration(seconds: 10));
 
-        // Clear T1 (done); T2 is still serving
+        // T1 leaves the box while T2 is still serving time.
         state.clearSeat(state.team1Jammer);
 
-        // T1 returns with a new penalty while T2 still serving
-        // T2.unmatchedPenalties == 0 → early return → T1 gets full 30s
+        // T1 returns with a new penalty. Because T2's remaining time has
+        // already been paired, T1 serves the full 30 seconds.
         seatJammer(state, 1, '11');
         expectJammerTimes(
           state,
@@ -613,13 +613,13 @@ void main() {
         seatJammer(state, 1, '10');
         state.tick(const Duration(seconds: 10));
 
-        seatJammer(state, 2, '20'); // T2 gets 10s, unmatch=0
+        seatJammer(state, 2, '20'); // T2 has 10 seconds left after the swap.
         state.clearSeat(state.team1Jammer);
 
-        // T2 almost done
-        state.tick(const Duration(seconds: 8)); // T2: 10s - 8s = 2s remaining
+        // T2 serves another 8 seconds, leaving 2 seconds.
+        state.tick(const Duration(seconds: 8));
 
-        // T1 returns — T2.unmatch==0 → full 30s, T2 time unchanged
+        // T1's new penalty is separate from T2's already paired time.
         seatJammer(state, 1, '11');
         expectJammerTimes(
           state,
@@ -634,21 +634,18 @@ void main() {
     test(
       'arriving jammer with 2 penalties: matched pair resolved, extra penalty unaffected (Scenario 7)',
       () {
-        // T1 (1 penalty) sitting, 10s elapsed → 20s remaining
+        // T1 has one penalty and has served 10 seconds, leaving 20 seconds.
         seatJammer(state, 1, '10');
-        state.tick(const Duration(seconds: 10)); // T1: 20s
+        state.tick(const Duration(seconds: 10));
 
-        // T2 arrives with 2 penalties (60s, unmatch=2)
-        // sittingMax=30, arrivingMax=60, sittingTime=20
-        // §4.4.1 extended: elapsed=10, arrivingTime=10+(60-30)=40s; T1 released
+        // T2 arrives with two penalties. One pairs with T1's penalty; the
+        // other remains to be served. T1 is released and T2 has 40 seconds.
         seatJammer(state, 2, '20', penalties: 2);
 
         expectJammerTimes(
           state,
-          team1: Duration.zero, // released
-          team2: const Duration(
-            seconds: 40,
-          ), // elapsed(10) + unmatched penalty(30)
+          team1: Duration.zero,
+          team2: const Duration(seconds: 40),
         );
         expect(state.team1Jammer.isRunning, isFalse);
         expect(state.team2Jammer.unmatchedPenalties, 1);
@@ -660,22 +657,21 @@ void main() {
     test(
       'second swap: returning jammer matches opponent\'s unmatched second penalty (Scenario 8)',
       () {
-        // Blue (T1) seated, 10s elapsed → 20s remaining
+        // Blue has one penalty and has served 10 seconds, leaving 20 seconds.
         seatJammer(state, 1, '10');
         state.tick(const Duration(seconds: 10));
 
-        // Pink (T2) arrives with 2 penalties → first swap
-        // Blue→0s (released, unmatch=0), Pink→40s (unmatch=1)
+        // Pink arrives with two penalties. The first pairs with Blue's
+        // penalty, leaving Pink with 40 seconds from the second penalty.
         seatJammer(state, 2, '20', penalties: 2);
         state.clearSeat(state.team1Jammer);
 
-        // Tick 15s: Pink serves 10s credit + 5s of unmatched penalty → 25s remaining
+        // Pink serves 15 seconds, leaving 25 seconds on the unpaired penalty.
         state.tick(const Duration(seconds: 15));
         expect(state.team2Jammer.timeRemaining, const Duration(seconds: 25));
 
-        // Blue returns with 1 new penalty → second swap
-        // Pink's unmatched penalty has 5s elapsed (25s remaining of 30s unmatched)
-        // Pink released (0s), Blue gets elapsed (5s)
+        // Blue returns with one new penalty. It pairs with Pink's remaining
+        // penalty: Pink is released and Blue has 5 seconds left.
         seatJammer(state, 1, '11');
         expectJammerTimes(
           state,
@@ -689,14 +685,13 @@ void main() {
     // --- Scenario 14: 3-penalty jammer vs sequential 1-penalty arrivals ---
 
     test('3-penalty jammer vs sequential 1-penalty arrivals (Scenario 14)', () {
-      // T1 seated with 3 penalties (90s), 10s elapsed → 80s remaining
+      // T1 receives three penalties, for 90 seconds total. After 10 seconds,
+      // T1 has 80 seconds left.
       seatJammer(state, 1, '10', penalties: 3);
       state.tick(const Duration(seconds: 10));
 
-      // T2 first arrival (1 penalty): cancel one pair, T2 released, T1 reduced
-      // sittingMax=90, arrivingMax=30, sittingTime=80
-      // Loop: 80>=30 AND 30>=30 → sittingTime=50, arrivingTime=0, sittingMax=60, arrivingMax=0
-      // arrivingMax==0 → T2 released, T1→50s, T1.unmatch=2
+      // T2 arrives with one penalty. It pairs with one of T1's penalties, so
+      // T2 is released and T1 has 50 seconds left across two unpaired penalties.
       seatJammer(state, 2, '20');
       expect(state.team2Jammer.timeRemaining, Duration.zero);
       expect(state.team2Jammer.isRunning, isFalse);
@@ -704,12 +699,10 @@ void main() {
       expect(state.team1Jammer.unmatchedPenalties, 2);
 
       state.clearSeat(state.team2Jammer);
-      state.tick(const Duration(seconds: 5)); // T1: 45s remaining
+      state.tick(const Duration(seconds: 5));
 
-      // T2 second arrival (1 penalty): cancel another pair, T2 released again
-      // sittingMax=60, arrivingMax=30, sittingTime=45
-      // Loop: 45>=30 AND 30>=30 → sittingTime=15, arrivingTime=0, sittingMax=30, arrivingMax=0
-      // arrivingMax==0 → T2 released, T1→15s, T1.unmatch=1
+      // T2 returns with another penalty. It pairs with T1's next unpaired
+      // penalty, so T2 is released again and T1 has 15 seconds left.
       seatJammer(state, 2, '21');
       expect(state.team2Jammer.timeRemaining, Duration.zero);
       expect(state.team1Jammer.timeRemaining, const Duration(seconds: 15));
