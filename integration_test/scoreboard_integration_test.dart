@@ -1,8 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
+
+import 'package:allure_flutter_test/integration_test.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_test/flutter_test.dart';
-import 'package:integration_test/integration_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
@@ -336,91 +336,86 @@ Future<void> _finishGame(
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
-  testWidgets(
-    'Jam, lineup, and undo control flow',
-    (tester) async {
-      final client = await _launchAppAndConnect(tester);
-      addTearDown(client.close);
-      addTearDown(() async {
-        await tester.pumpWidget(const SizedBox.shrink());
-        await tester.pump();
-      });
+  testWidgets('Jam, lineup, and undo control flow', (tester) async {
+    final client = await _launchAppAndConnect(tester);
+    addTearDown(client.close);
+    addTearDown(() async {
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump();
+    });
 
-      await client.startNewGame();
-      await _ensureSwipeToLineup(tester);
+    await client.startNewGame();
+    await _ensureSwipeToLineup(tester);
 
-      // Pre-game: no undo action available yet.
-      await pumpUntil(
-        tester,
-        () => !scoreboardState(tester).hasUndoAction,
-        timeout: const Duration(seconds: 10),
-      );
-      expect(
-        find.textContaining('NO UNDO AVAILABLE'),
-        findsOneWidget,
-        reason: 'Should show NO UNDO AVAILABLE when no action',
-      );
+    // Pre-game: no undo action available yet.
+    await pumpUntil(
+      tester,
+      () => !scoreboardState(tester).hasUndoAction,
+      timeout: const Duration(seconds: 10),
+    );
+    expect(
+      find.textContaining('NO UNDO AVAILABLE'),
+      findsOneWidget,
+      reason: 'Should show NO UNDO AVAILABLE when no action',
+    );
 
-      // Swiping to start lineup starts the lineup clock only.
-      await swipeToStartLineup(tester);
-      await pumpUntil(tester, () {
-        final state = scoreboardState(tester);
-        return state.clocks['Lineup']!.running &&
-            !state.clocks['Jam']!.running &&
-            !state.clocks['Period']!.running;
-      }, timeout: const Duration(seconds: 20));
-      await validateActiveDisplay(tester, .lineup);
+    // Swiping to start lineup starts the lineup clock only.
+    await swipeToStartLineup(tester);
+    await pumpUntil(tester, () {
+      final state = scoreboardState(tester);
+      return state.clocks['Lineup']!.running &&
+          !state.clocks['Jam']!.running &&
+          !state.clocks['Period']!.running;
+    }, timeout: const Duration(seconds: 20));
+    await validateActiveDisplay(tester, .lineup);
 
-      // Starting a jam starts the jam and period clocks.
-      await tapJamControl(tester, scoreboardState(tester).labelStart);
-      await pumpUntil(tester, () {
-        final state = scoreboardState(tester);
-        return state.clocks['Jam']!.running && state.clocks['Period']!.running;
-      }, timeout: const Duration(seconds: 20));
-      await validateActiveDisplay(tester, .jam);
+    // Starting a jam starts the jam and period clocks.
+    await tapJamControl(tester, scoreboardState(tester).labelStart);
+    await pumpUntil(tester, () {
+      final state = scoreboardState(tester);
+      return state.clocks['Jam']!.running && state.clocks['Period']!.running;
+    }, timeout: const Duration(seconds: 20));
+    await validateActiveDisplay(tester, .jam);
 
-      // Undo (unstart jam) → should return to lineup.
-      await _swipeUndoButton(tester);
-      await pumpUntil(tester, () {
-        final state = scoreboardState(tester);
-        return state.clocks['Lineup']!.running &&
-            !state.clocks['Jam']!.running;
-      }, timeout: const Duration(seconds: 20));
-      await validateActiveDisplay(tester, ActiveDisplay.lineup);
+    // Undo (unstart jam) → should return to lineup.
+    await _swipeUndoButton(tester);
+    await pumpUntil(tester, () {
+      final state = scoreboardState(tester);
+      return state.clocks['Lineup']!.running && !state.clocks['Jam']!.running;
+    }, timeout: const Duration(seconds: 20));
+    await validateActiveDisplay(tester, ActiveDisplay.lineup);
 
-      // Start the jam again, then stop it — should end the jam and start
-      // the next lineup.
-      await tapJamControl(tester, scoreboardState(tester).labelStart);
-      await pumpUntil(
-        tester,
-        () => scoreboardState(tester).clocks['Jam']!.running,
-        timeout: const Duration(seconds: 20),
-      );
-      await validateActiveDisplay(tester, .jam);
+    // Start the jam again, then stop it — should end the jam and start
+    // the next lineup.
+    await tapJamControl(tester, scoreboardState(tester).labelStart);
+    await pumpUntil(
+      tester,
+      () => scoreboardState(tester).clocks['Jam']!.running,
+      timeout: const Duration(seconds: 20),
+    );
+    await validateActiveDisplay(tester, .jam);
 
-      await tapJamControl(tester, scoreboardState(tester).labelStop);
-      await pumpUntil(tester, () {
-        final state = scoreboardState(tester);
-        return !state.clocks['Jam']!.running &&
-            state.clocks['Lineup']!.running;
-      }, timeout: const Duration(seconds: 20));
-      await validateActiveDisplay(tester, .lineup);
+    await tapJamControl(tester, scoreboardState(tester).labelStop);
+    await pumpUntil(tester, () {
+      final state = scoreboardState(tester);
+      return !state.clocks['Jam']!.running && state.clocks['Lineup']!.running;
+    }, timeout: const Duration(seconds: 20));
+    await validateActiveDisplay(tester, .lineup);
 
-      // Undo is now available and shows the real action label from the
-      // server (not the "no action" sentinel).
-      await pumpUntil(
-        tester,
-        () => scoreboardState(tester).hasUndoAction,
-        timeout: const Duration(seconds: 10),
-      );
-      final undoLabel = scoreboardState(tester).labelUndo;
-      expect(
-        find.textContaining(undoLabel.toUpperCase()),
-        findsAtLeast(1),
-        reason: 'Undo label "$undoLabel" should be visible on screen',
-      );
-    },
-  );
+    // Undo is now available and shows the real action label from the
+    // server (not the "no action" sentinel).
+    await pumpUntil(
+      tester,
+      () => scoreboardState(tester).hasUndoAction,
+      timeout: const Duration(seconds: 10),
+    );
+    final undoLabel = scoreboardState(tester).labelUndo;
+    expect(
+      find.textContaining(undoLabel.toUpperCase()),
+      findsAtLeast(1),
+      reason: 'Undo label "$undoLabel" should be visible on screen',
+    );
+  });
 
   testWidgets(
     'Timeout flow highlights controls, decrements review counts, and undo restores timeout',

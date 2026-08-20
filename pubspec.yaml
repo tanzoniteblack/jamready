@@ -48,6 +48,7 @@ dev_dependencies:
     sdk: flutter
   integration_test:
     sdk: flutter
+  allure_flutter_test: ^1.2.1
   flutter_launcher_icons: ^0.14.4
 
   # The "flutter_lints" package below contains a set of recommended lints to

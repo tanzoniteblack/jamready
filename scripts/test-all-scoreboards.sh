@@ -1,6 +1,7 @@
 #!/bin/bash
 # Run integration tests against each scoreboard Docker image sequentially,
-# newest version first. Stops on the first failure.
+# newest version first. Stops on the first failure and writes a local Allure
+# report with the completed versions' results.
 # Run build-scoreboard-images.sh first.
 #
 # Usage: ./scripts/test-all-scoreboards.sh [options] [-- flutter test args]
@@ -10,6 +11,8 @@
 #   --avd       AVD name to use (default: first from `emulator -list-avds`)
 #   --host      Override the host address the tests connect to (default: 10.0.2.2)
 #   --port      Docker host port for the scoreboard container (default: 8001)
+#   --results-dir  Parent directory for local reports (default: test-results)
+#   --no-html      Leave Allure result files without generating an HTML report
 #
 # Emulator handling:
 #   If an Android emulator is already running the script uses it.
@@ -20,6 +23,9 @@
 # Passes any args after -- directly to flutter test.
 
 set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ALLURE_CONFIG="$SCRIPT_DIR/../allurerc.mjs"
 
 ALL_VERSIONS=(
   v2025.9
@@ -33,12 +39,15 @@ ALL_VERSIONS=(
   v2025.1
   v2025.0
   v2023.7
+  feature-pbt
 )
 
 VERSIONS=()
 AVD=""
 HOST="10.0.2.2"
 PORT=8001
+RESULTS_DIR="test-results"
+GENERATE_HTML=true
 FLUTTER_ARGS=()
 
 # ---------------------------------------------------------------------------
@@ -50,6 +59,8 @@ while [[ $# -gt 0 ]]; do
     --avd)   AVD="$2"; shift 2 ;;
     --host)  HOST="$2"; shift 2 ;;
     --port)  PORT="$2"; shift 2 ;;
+    --results-dir) RESULTS_DIR="$2"; shift 2 ;;
+    --no-html) GENERATE_HTML=false; shift ;;
     --)      shift; FLUTTER_ARGS=("$@"); break ;;
     *)       echo "Unknown option: $1" >&2; exit 1 ;;
   esac
@@ -58,6 +69,36 @@ done
 if [ ${#VERSIONS[@]} -eq 0 ]; then
   VERSIONS=("${ALL_VERSIONS[@]}")
 fi
+
+RUN_ID="$(date +%Y%m%d-%H%M%S)-$$"
+RUN_DIR="$RESULTS_DIR/scoreboard-integration-$RUN_ID"
+LOG_DIR="$RUN_DIR/logs"
+ALLURE_RESULTS_DIR="$RUN_DIR/allure-results"
+ALLURE_REPORT_DIR="$RUN_DIR/allure-report"
+mkdir -p "$LOG_DIR" "$ALLURE_RESULTS_DIR"
+
+generate_allure_report() {
+  if ! "$GENERATE_HTML"; then
+    echo "--> Raw Allure results: $ALLURE_RESULTS_DIR"
+    return
+  fi
+
+  if ! command -v npx &>/dev/null; then
+    echo "error: npx is required to generate the Allure HTML report" >&2
+    echo "--> Raw Allure results: $ALLURE_RESULTS_DIR" >&2
+    return 1
+  fi
+
+  echo "--> Generating Allure HTML report"
+  if ! npx -y allure@3 generate "$ALLURE_RESULTS_DIR"/* \
+    --config "$ALLURE_CONFIG" \
+    -o "$ALLURE_REPORT_DIR"; then
+    echo "error: Allure report generation failed" >&2
+    echo "--> Raw Allure results: $ALLURE_RESULTS_DIR" >&2
+    return 1
+  fi
+  echo "--> Allure report: $ALLURE_REPORT_DIR/index.html"
+}
 
 # ---------------------------------------------------------------------------
 # Emulator helpers
@@ -182,6 +223,7 @@ trap cleanup EXIT
 echo ""
 echo "--> Testing ${#VERSIONS[@]} version(s) on $SERIAL  port $PORT"
 echo "--> Versions: ${VERSIONS[*]}"
+echo "--> Run directory: $RUN_DIR"
 
 PASS=()
 
@@ -220,9 +262,11 @@ for VERSION in "${VERSIONS[@]}"; do
   echo "--> Scoreboard ready"
 
   echo "--> Running tests"
-  TEST_LOG=$(mktemp)
+  TEST_LOG="$LOG_DIR/$VERSION.log"
+  VERSION_ALLURE_RESULTS_DIR="$ALLURE_RESULTS_DIR/$VERSION"
+  mkdir -p "$VERSION_ALLURE_RESULTS_DIR"
   EXIT_CODE=0
-  flutter test integration_test/scoreboard_integration_test.dart \
+  ALLURE_RESULTS_DIR="$VERSION_ALLURE_RESULTS_DIR" flutter test integration_test/scoreboard_integration_test.dart \
     -d "$SERIAL" \
     --dart-define=SCOREBOARD_HOST="$HOST" \
     --dart-define=SCOREBOARD_PORT="$PORT" \
@@ -235,13 +279,12 @@ for VERSION in "${VERSIONS[@]}"; do
 
   if [ $EXIT_CODE -eq 0 ]; then
     PASS+=("$VERSION")
-    echo "--> PASS: $VERSION"
-    rm -f "$TEST_LOG"
+    echo "--> PASS: $VERSION (log: $TEST_LOG)"
   else
-    echo "--> FAIL: $VERSION (exit $EXIT_CODE)"
+    echo "--> FAIL: $VERSION (exit $EXIT_CODE, log: $TEST_LOG)"
     echo "--> Test output:"
     cat "$TEST_LOG"
-    rm -f "$TEST_LOG"
+    generate_allure_report || true
     echo ""
     echo "========================================"
     echo " Stopped at first failure"
@@ -257,3 +300,4 @@ echo "========================================"
 echo " All versions passed"
 echo "========================================"
 for V in "${PASS[@]+"${PASS[@]}"}"; do echo "  PASS  $V"; done
+generate_allure_report
