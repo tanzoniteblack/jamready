@@ -87,6 +87,23 @@ void main() {
     expect(find.text('All players'), findsOneWidget);
   });
 
+  testWidgets('opens the penalty box signals helper', (tester) async {
+    final state = makeState();
+    final engine = LocalPenaltyEngine(state);
+
+    await tester.pumpWidget(
+      ChangeNotifierProvider.value(
+        value: state,
+        child: MaterialApp(home: TimerViewHost(engine: engine)),
+      ),
+    );
+
+    await tester.tap(find.byTooltip('Penalty box signals'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Penalty Box Signals'), findsOneWidget);
+  });
+
   testWidgets('timers stay present while swapping between every timer view', (
     tester,
   ) async {

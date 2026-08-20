@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../models/skater_seat.dart';
 import '../../styles/text_styles.dart';
 import '../../widgets/seat_card.dart';
+import '../penalty_box_procedure_helper_screen.dart';
 
 const jammerBlockerDividerHeight = 7.0;
 
@@ -22,6 +23,17 @@ AppBar standardAppBar({
       icon: leading,
       onPressed: () => Navigator.of(context).pop(),
     ),
+    actions: [
+      IconButton(
+        tooltip: 'Penalty box signals',
+        onPressed: () => Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => const PenaltyBoxProcedureHelperScreen(),
+          ),
+        ),
+        icon: const Icon(Icons.record_voice_over_outlined),
+      ),
+    ],
     flexibleSpace: Align(
       alignment: Alignment.bottomCenter,
       child: Container(height: 1, color: Colors.white.withValues(alpha: 0.1)),
