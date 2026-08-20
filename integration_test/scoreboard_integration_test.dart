@@ -165,10 +165,17 @@ Future<ScoreboardTestClient> _launchAppAndConnect(WidgetTester tester) async {
   SharedPreferences.setMockInitialValues({});
 
   app.main();
-  // Wait for the settings screen to appear
+  // The app opens on the role picker. Choose the timer flow before looking
+  // for its remote-scoreboard settings.
   await tester.pump(const Duration(seconds: 1));
+  await pumpUntil(
+    tester,
+    () => find.text('Jam Timer Operator').evaluate().isNotEmpty,
+    timeout: const Duration(seconds: 10),
+  );
+  await tester.tap(find.text('Jam Timer Operator'));
 
-  // Wait for settings screen to be visible
+  // Wait for the timer settings screen to be visible after navigation.
   await pumpUntil(
     tester,
     () => find
