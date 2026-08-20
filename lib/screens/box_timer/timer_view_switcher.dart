@@ -63,23 +63,31 @@ class TimerViewSwitcher extends StatelessWidget {
       context: context,
       backgroundColor: const Color(0xFF1A1C21),
       showDragHandle: true,
+      isScrollControlled: true,
       builder: (sheetContext) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('TIMER VIEW', style: AppTextStyles.clockLabel),
-              const SizedBox(height: 8),
-              for (final role in orderedTimerViews(state))
-                _TimerViewOption(
-                  role: role,
-                  state: state,
-                  selected: role == state.role,
-                  onTap: () => Navigator.of(sheetContext).pop(role),
-                ),
-            ],
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.sizeOf(sheetContext).height * 0.9,
+          ),
+          child: SingleChildScrollView(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('TIMER VIEW', style: AppTextStyles.clockLabel),
+                  const SizedBox(height: 8),
+                  for (final role in orderedTimerViews(state))
+                    _TimerViewOption(
+                      role: role,
+                      state: state,
+                      selected: role == state.role,
+                      onTap: () => Navigator.of(sheetContext).pop(role),
+                    ),
+                ],
+              ),
+            ),
           ),
         ),
       ),
@@ -172,7 +180,7 @@ class _TimerViewOption extends StatelessWidget {
               ? const Icon(Icons.check, color: Colors.deepOrangeAccent)
               : null,
           textColor: selected ? Colors.deepOrange.shade200 : Colors.white,
-          dense: isSpecialist,
+          dense: false,
         ),
       ],
     );
