@@ -77,6 +77,34 @@ class ScoreboardOperatorClient {
     setValue('ScoreBoard.CurrentGame.$property', value);
   }
 
+  /// Adds a skater with [number] to a team's roster, as the scoreboard's
+  /// roster editor does.
+  void addSkater(int teamNumber, String skaterId, String number) {
+    setValue(
+      'ScoreBoard.CurrentGame.Team($teamNumber).Skater($skaterId).RosterNumber',
+      number,
+    );
+  }
+
+  /// Puts a rostered skater in a team's jammer position, as the scoreboard's
+  /// lineup screen does. This is what makes CRG report the skater's Role as
+  /// "Jammer".
+  void setJammer(int teamNumber, String skaterId) {
+    setValue(
+      'ScoreBoard.CurrentGame.Team($teamNumber).Position(Jammer).Skater',
+      skaterId,
+    );
+  }
+
+  /// Sends or releases a team's jammer to/from the penalty box, as the
+  /// scoreboard's penalty box screen does.
+  void setJammerInPenaltyBox(int teamNumber, bool inBox) {
+    setValue(
+      'ScoreBoard.CurrentGame.Team($teamNumber).Position(Jammer).PenaltyBox',
+      inBox,
+    );
+  }
+
   /// Sets an arbitrary scoreboard value as an independent operator client.
   /// This lets compatibility tests verify state changes originating outside
   /// the engine under test.

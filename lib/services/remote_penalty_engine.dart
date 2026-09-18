@@ -183,7 +183,7 @@ class RemotePenaltyEngine extends PenaltyEngine with WidgetsBindingObserver {
       'ScoreBoard.CurrentGame.Team(1).Skater(*).Name',
       'ScoreBoard.CurrentGame.Team(2).Skater(*).RosterNumber',
       'ScoreBoard.CurrentGame.Team(2).Skater(*).Name',
-      // Skater role (for jammer number display)
+      // Skater role, so a jammer penalty timer can auto-fill the jammer number
       'ScoreBoard.CurrentGame.Team(1).Skater(*).Role',
       'ScoreBoard.CurrentGame.Team(2).Skater(*).Role',
     ];
@@ -356,7 +356,7 @@ class RemotePenaltyEngine extends PenaltyEngine with WidgetsBindingObserver {
     }
 
     for (final (t, uuid, role) in delta.skaterRoles) {
-      _onSkaterRole(t, uuid, role);
+      _state.updateSkaterRole(t, uuid, role);
     }
 
     final jamNowRunning = _state.jamRunning;
@@ -385,17 +385,6 @@ class RemotePenaltyEngine extends PenaltyEngine with WidgetsBindingObserver {
       return Color(int.parse(fullHex, radix: 16));
     } catch (_) {
       return null;
-    }
-  }
-
-  void _onSkaterRole(int teamIdx, String uuid, String role) {
-    if (role != 'Jammer') return;
-    final number = _state.skaterNumberByUuid(teamIdx, uuid);
-    if (number == null || number.isEmpty) return;
-    final seat = _state.jammerSeat(teamIdx);
-    if (seat.skaterNumber != number) {
-      seat.skaterNumber = number;
-      _state.notifyFromRemote();
     }
   }
 

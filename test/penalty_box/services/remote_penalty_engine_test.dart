@@ -107,6 +107,114 @@ void main() {
     });
   });
 
+  group('jammer role', () {
+    test('auto-fills a jammer timer without seating the jammer', () async {
+      final (:engine, :channel, :state) = await setupEngine();
+      await sendAndPump(channel, {
+        'ScoreBoard.CurrentGame.Team(1).Skater(uuid-123).RosterNumber': '42',
+        'ScoreBoard.CurrentGame.Team(1).Skater(uuid-123).Role': 'Jammer',
+      });
+
+      expect(state.team1Jammer.isOccupied, isFalse);
+      state.startSeatAnonymously(state.team1Jammer);
+      expect(state.team1Jammer.skaterNumber, '42');
+      await engine.dispose();
+    });
+
+    test('a jammer change does not affect the running jammer seat', () async {
+      final (:engine, :channel, :state) = await setupEngine();
+      await sendAndPump(channel, {
+        'ScoreBoard.CurrentGame.Team(1).Skater(uuid-a).RosterNumber': '42',
+        'ScoreBoard.CurrentGame.Team(1).Skater(uuid-b).RosterNumber': '77',
+        'ScoreBoard.CurrentGame.Team(1).Skater(uuid-a).Role': 'Jammer',
+        'ScoreBoard.CurrentGame.InJam': true,
+      });
+      state.startSeatAnonymously(state.team1Jammer);
+      expect(state.team1Jammer.skaterNumber, '42');
+      expect(state.team1Jammer.isRunning, isTrue);
+
+      await sendAndPump(channel, {
+        'ScoreBoard.CurrentGame.Team(1).Skater(uuid-a).Role': 'Blocker',
+        'ScoreBoard.CurrentGame.Team(1).Skater(uuid-b).Role': 'Jammer',
+      });
+
+      expect(state.jammerNumber(1), '77');
+      expect(state.team1Jammer.skaterNumber, '42');
+      expect(state.team1Jammer.isRunning, isTrue);
+      expect(state.team1Jammer.penaltyCount, 1);
+      await engine.dispose();
+    });
+
+    test('is forgotten when the scoreboard benches the jammer', () async {
+      final (:engine, :channel, :state) = await setupEngine();
+      await sendAndPump(channel, {
+        'ScoreBoard.CurrentGame.Team(1).Skater(uuid-a).RosterNumber': '42',
+        'ScoreBoard.CurrentGame.Team(1).Skater(uuid-a).Role': 'Jammer',
+      });
+      expect(state.jammerNumber(1), '42');
+
+      // CRG resets roles like this when the next jam starts.
+      await sendAndPump(channel, {
+        'ScoreBoard.CurrentGame.Team(1).Skater(uuid-a).Role': 'Bench',
+      });
+
+      expect(state.jammerNumber(1), isNull);
+      state.startSeatAnonymously(state.team1Jammer);
+      expect(state.team1Jammer.skaterNumber, '?');
+      await engine.dispose();
+    });
+
+    test('is kept across jams when the scoreboard sends no reset', () async {
+      // CRG leaves a jammer who is still in the penalty box as Jammer while
+      // resetting the other team's.
+      final (:engine, :channel, :state) = await setupEngine();
+      await sendAndPump(channel, {
+        'ScoreBoard.CurrentGame.Team(1).Skater(boxed).RosterNumber': '42',
+        'ScoreBoard.CurrentGame.Team(1).Skater(boxed).Role': 'Jammer',
+        'ScoreBoard.CurrentGame.Team(2).Skater(free).RosterNumber': '7',
+        'ScoreBoard.CurrentGame.Team(2).Skater(free).Role': 'Jammer',
+        'ScoreBoard.CurrentGame.InJam': true,
+      });
+      await sendAndPump(channel, {'ScoreBoard.CurrentGame.InJam': false});
+      await sendAndPump(channel, {
+        'ScoreBoard.CurrentGame.InJam': true,
+        'ScoreBoard.CurrentGame.Team(2).Skater(free).Role': 'Bench',
+      });
+
+      expect(state.jammerNumber(1), '42');
+      expect(state.jammerNumber(2), isNull);
+      await engine.dispose();
+    });
+
+    test('resolves a role that arrives before the roster number', () async {
+      final (:engine, :channel, :state) = await setupEngine();
+      await sendAndPump(channel, {
+        'ScoreBoard.CurrentGame.Team(2).Skater(uuid-9).Role': 'Jammer',
+      });
+      await sendAndPump(channel, {
+        'ScoreBoard.CurrentGame.Team(2).Skater(uuid-9).RosterNumber': '7',
+      });
+
+      state.startSeatAnonymously(state.team2Jammer);
+      expect(state.team2Jammer.skaterNumber, '7');
+      await engine.dispose();
+    });
+
+    test('a jammer role does not start a timer when the jam starts', () async {
+      final (:engine, :channel, :state) = await setupEngine();
+      await sendAndPump(channel, {
+        'ScoreBoard.CurrentGame.Team(1).Skater(uuid-123).RosterNumber': '42',
+        'ScoreBoard.CurrentGame.Team(1).Skater(uuid-123).Role': 'Jammer',
+        'ScoreBoard.CurrentGame.InJam': true,
+      });
+
+      expect(state.jamRunning, isTrue);
+      expect(state.team1Jammer.isOccupied, isFalse);
+      expect(state.team1Jammer.isRunning, isFalse);
+      await engine.dispose();
+    });
+  });
+
   testWidgets('local timers continue after the server disconnects', (
     tester,
   ) async {

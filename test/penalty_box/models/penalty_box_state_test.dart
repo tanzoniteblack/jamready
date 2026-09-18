@@ -182,6 +182,82 @@ void main() {
       state.startSeatAnonymously(state.team1Blocker1);
       expect(state.team1Blocker1.isRunning, isFalse);
     });
+
+    group('scoreboard jammer auto-fill', () {
+      setUp(() {
+        state.updateRoster(1, '17', 'uuid-j1');
+        state.updateRoster(2, '99', 'uuid-j2');
+        state.updateSkaterRole(1, 'uuid-j1', 'Jammer');
+        state.updateSkaterRole(2, 'uuid-j2', 'Jammer');
+      });
+
+      test('a reported jammer does not occupy the seat', () {
+        expect(state.team1Jammer.isOccupied, isFalse);
+        expect(state.team1Jammer.isRunning, isFalse);
+        expect(state.jammerNumber(1), '17');
+      });
+
+      test('fills the jammer number when a jammer timer is started', () {
+        state.startSeatAnonymously(state.team1Jammer);
+        expect(state.team1Jammer.skaterNumber, '17');
+        expectTimeRemaining(state.team1Jammer, const Duration(seconds: 30));
+      });
+
+      test('uses each team\'s own jammer', () {
+        state.startSeatAnonymously(state.team2Jammer);
+        expect(state.team2Jammer.skaterNumber, '99');
+      });
+
+      test('does not fill blocker seats', () {
+        state.startSeatAnonymously(state.team1Blocker1);
+        expect(state.team1Blocker1.skaterNumber, '?');
+      });
+
+      test('follows a jammer change', () {
+        state.updateRoster(1, '23', 'uuid-j1b');
+        state.updateSkaterRole(1, 'uuid-j1b', 'Jammer');
+        state.updateSkaterRole(1, 'uuid-j1', 'Blocker');
+        state.startSeatAnonymously(state.team1Jammer);
+        expect(state.team1Jammer.skaterNumber, '23');
+      });
+
+      test('a jammer change arriving in either order keeps the new jammer', () {
+        state.updateRoster(1, '23', 'uuid-j1b');
+        state.updateSkaterRole(1, 'uuid-j1', 'Blocker');
+        state.updateSkaterRole(1, 'uuid-j1b', 'Jammer');
+        expect(state.jammerNumber(1), '23');
+      });
+
+      test('falls back to placeholder once the jammer leaves the position', () {
+        state.updateSkaterRole(1, 'uuid-j1', 'Bench');
+        state.startSeatAnonymously(state.team1Jammer);
+        expect(state.team1Jammer.skaterNumber, '?');
+      });
+
+      test('a jammer change leaves a running jammer seat untouched', () {
+        state.jamRunning = true;
+        state.startSeatAnonymously(state.team1Jammer);
+        state.tick(const Duration(seconds: 5));
+        state.setSkaterNumber(state.team1Jammer, '17');
+        final seat = state.team1Jammer;
+
+        state.updateRoster(1, '23', 'uuid-j1b');
+        state.updateSkaterRole(1, 'uuid-j1b', 'Jammer');
+        state.updateSkaterRole(1, 'uuid-j1', 'Blocker');
+
+        expect(state.jammerNumber(1), '23');
+        expect(seat.skaterNumber, '17');
+        expect(seat.isRunning, isTrue);
+        expectTimeRemaining(seat, const Duration(seconds: 25));
+        expect(seat.penaltyCount, 1);
+        expect(seat.unmatchedPenalties, 1);
+      });
+
+      test('a new game forgets the jammer', () {
+        state.clearRemoteRosters();
+        expect(state.jammerNumber(1), isNull);
+      });
+    });
   });
 
   // ---------------------------------------------------------------------------
@@ -366,11 +442,6 @@ void main() {
 
     test('lookupSkaterId returns null for unknown number', () {
       expect(state.lookupSkaterId(1, '999'), isNull);
-    });
-
-    test('skaterNumberByUuid reverse lookup', () {
-      state.updateRoster(1, '42', 'uuid-abc');
-      expect(state.skaterNumberByUuid(1, 'uuid-abc'), '42');
     });
 
     test('roster is team-scoped', () {

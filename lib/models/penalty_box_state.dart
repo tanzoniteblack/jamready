@@ -160,6 +160,7 @@ class PenaltyBoxState extends ChangeNotifier {
     _rosterTeam2.clear();
     _uuidToNumber1.clear();
     _uuidToNumber2.clear();
+    _jammerUuids.clear();
   }
 
   SkaterSeat get team1Jammer => seats[0];
@@ -225,7 +226,7 @@ class PenaltyBoxState extends ChangeNotifier {
     } else {
       _rosterTeam2[skaterNumber] = skaterId;
     }
-    recordSkaterUuid(teamIdx, skaterId, skaterNumber);
+    _uuidToNumber(teamIdx)[skaterId] = skaterNumber;
     addKnownNumber(teamIdx, skaterNumber);
     // no listener notification needed — roster changes don't affect UI directly
   }
@@ -236,24 +237,36 @@ class PenaltyBoxState extends ChangeNotifier {
         : _rosterTeam2[skaterNumber];
   }
 
-  // Reverse UUID→number lookup (used by engine for Role=Jammer mapping)
+  // Reverse UUID→number lookup, used to resolve the scoreboard's jammer.
   final Map<String, String> _uuidToNumber1 = {};
   final Map<String, String> _uuidToNumber2 = {};
+  Map<String, String> _uuidToNumber(int teamIdx) =>
+      teamIdx == 1 ? _uuidToNumber1 : _uuidToNumber2;
 
-  void recordSkaterUuid(int teamIdx, String uuid, String number) {
-    (teamIdx == 1 ? _uuidToNumber1 : _uuidToNumber2)[uuid] = number;
+  // The skater the scoreboard currently reports as jammer, per team. This is
+  // deliberately not a seat: being on the track as jammer is not a penalty.
+  final Map<int, String> _jammerUuids = {};
+
+  /// Records a skater's role on the scoreboard. Only tracks who the jammer is;
+  /// seats are never touched.
+  void updateSkaterRole(int teamIdx, String uuid, String role) {
+    if (role == 'Jammer') {
+      _jammerUuids[teamIdx] = uuid;
+    } else if (_jammerUuids[teamIdx] == uuid) {
+      _jammerUuids.remove(teamIdx);
+    }
   }
 
-  String? skaterNumberByUuid(int teamIdx, String uuid) =>
-      (teamIdx == 1 ? _uuidToNumber1 : _uuidToNumber2)[uuid];
+  /// Roster number of the team's current jammer on the scoreboard, if known.
+  String? jammerNumber(int teamIdx) {
+    final uuid = _jammerUuids[teamIdx];
+    return uuid == null ? null : _uuidToNumber(teamIdx)[uuid];
+  }
 
   VoidCallback? _onKnownNumbersChanged;
 
   void setKnownNumbersSaveCallback(VoidCallback? cb) =>
       _onKnownNumbersChanged = cb;
-
-  /// Publishes a state mutation made by a remote game update.
-  void notifyFromRemote() => notifyListeners();
 
   List<String> knownNumbers(int teamIdx) {
     final s = teamIdx == 1 ? _knownNumbersTeam1 : _knownNumbersTeam2;
@@ -406,9 +419,13 @@ class PenaltyBoxState extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Starts a seat immediately with placeholder number '?' — timer runs if jam is running.
+  /// Starts a seat immediately — timer runs if jam is running. The number is
+  /// the scoreboard's current jammer for a jammer seat, otherwise placeholder '?'.
   void startSeatAnonymously(SkaterSeat seat) {
-    seat.skaterNumber = '?';
+    final jammer = seat.position == SkaterPosition.jammer
+        ? jammerNumber(seat.teamIndex)
+        : null;
+    seat.skaterNumber = jammer ?? '?';
     seat.timeRemaining = const Duration(seconds: 30);
     seat.penaltyCount = 1;
     seat.unmatchedPenalties = 1;
