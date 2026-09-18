@@ -255,7 +255,19 @@ Future<void> _testFullGameFlow(WidgetTester tester, Ruleset ruleset) async {
 // ---------------------------------------------------------------------------
 
 void main() {
+  // Orientations requested via SystemChrome, most recent call last.
+  final requestedOrientations = <List<Object?>>[];
+
   setUpAll(() {
+    // app.main() awaits SystemChrome.setPreferredOrientations before runApp;
+    // without a handler that call never completes and the app never starts.
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(SystemChannels.platform, (call) async {
+          if (call.method == 'SystemChrome.setPreferredOrientations') {
+            requestedOrientations.add(call.arguments as List<Object?>);
+          }
+          return null;
+        });
     // Mock the wakelock channel – LocalGameEngine.initialize() calls
     // WakelockPlus.enable(), which needs a channel handler even in widget tests.
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
@@ -279,6 +291,17 @@ void main() {
       expect(find.text('CHOOSE YOUR ROLE'), findsOneWidget);
       expect(find.text('Jam Timer Operator'), findsOneWidget);
       expect(find.text('Penalty Box'), findsOneWidget);
+    });
+
+    testWidgets('app is restricted to portrait', (tester) async {
+      requestedOrientations.clear();
+      SharedPreferences.setMockInitialValues({});
+      app.main();
+      await tester.pump(const Duration(milliseconds: 500));
+
+      expect(requestedOrientations, [
+        ['DeviceOrientation.portraitUp', 'DeviceOrientation.portraitDown'],
+      ]);
     });
 
     testWidgets('jam timer role navigates to game setup', (tester) async {
