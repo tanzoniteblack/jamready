@@ -59,6 +59,16 @@ confirm() {
   [[ "$answer" =~ ^[Yy]$ ]]
 }
 
+# Opens the given text in $VISUAL/$EDITOR and echoes the edited result.
+edit_text() {
+  local file
+  file=$(mktemp "${TMPDIR:-/tmp}/changelog.XXXXXX")
+  print -r -- "$1" > "$file"
+  ${=VISUAL:-${EDITOR:-vi}} "$file" </dev/tty >/dev/tty
+  cat "$file"
+  rm -f "$file"
+}
+
 # ---------------------------------------------------------------------------
 # Pre-flight checks
 # ---------------------------------------------------------------------------
@@ -169,12 +179,16 @@ else
   CHANGELOG=$(echo "$COMMITS" | claude -p "$PROMPT")
 fi
 
-echo ""
-echo "--- Changelog ---"
-echo "$CHANGELOG"
-echo "-----------------"
-echo ""
-confirm "Proceed with this changelog?" || { echo "Aborted. Edit and re-run."; exit 0; }
+while true; do
+  echo ""
+  echo "--- Changelog ---"
+  echo "$CHANGELOG"
+  echo "-----------------"
+  echo ""
+  confirm "Proceed with this changelog?" && break
+  CHANGELOG=$(edit_text "$CHANGELOG")
+  [[ -n "${CHANGELOG//[[:space:]]/}" ]] || { echo "Changelog is empty. Aborted."; exit 0; }
+done
 
 # ---------------------------------------------------------------------------
 # Commit and tag
