@@ -55,8 +55,12 @@ jobs:
           flutter build apk --release
           mv build/app/outputs/flutter-apk/app-release.apk "$APK_NAME"
 
+      # actions/checkout replaces the annotated tag with a lightweight one, so
+      # re-fetch the real tag before reading its annotation.
       - name: Extract changelog from tag annotation
-        run: git tag -l --format='%(contents)' "${{ github.ref_name }}" > release-notes.txt
+        run: |
+          git fetch --force origin "refs/tags/${{ github.ref_name }}:refs/tags/${{ github.ref_name }}"
+          git tag -l --format='%(contents)' "${{ github.ref_name }}" > release-notes.txt
 
       - name: Add APK download link to release notes
         run: |
