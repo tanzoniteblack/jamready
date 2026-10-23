@@ -199,7 +199,8 @@ rm -f "$PUBSPEC.bak"
 
 git add "$PUBSPEC"
 git commit -m "Bump version to $TAG"
-git tag -a "$TAG" -m "$CHANGELOG"
+# verbatim keeps markdown headings, which the default cleanup strips as comments
+git tag -a "$TAG" --cleanup=verbatim -m "$CHANGELOG"
 
 echo ""
 echo "Created commit and annotated tag $TAG."
