@@ -5,17 +5,67 @@ on:
     tags:
       - 'v*.*.*'
 
+permissions:
+  contents: write  # create the release and upload the APK
+
 jobs:
   release:
     runs-on: ubuntu-latest
+
+    env:
+      APK_NAME: jamready-${{ github.ref_name }}.apk
 
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0  # needed to read the full tag annotation
 
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.44.8'
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get --enforce-lockfile
+
+      # Sign with a shared beta key (not the Play Store release key) so that
+      # sideloaded builds can be installed as updates over one another.
+      - name: Configure APK signing
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_BETA_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_BETA_KEYSTORE_PASSWORD }}
+        run: |
+          keystore="$RUNNER_TEMP/jamready-beta.jks"
+          echo "$KEYSTORE_BASE64" | base64 --decode > "$keystore"
+          cat > android/key.properties <<EOF
+          storeFile=$keystore
+          storePassword=$KEYSTORE_PASSWORD
+          keyPassword=$KEYSTORE_PASSWORD
+          keyAlias=jamready-beta
+          EOF
+
+      - name: Build APK
+        run: |
+          flutter build apk --release
+          mv build/app/outputs/flutter-apk/app-release.apk "$APK_NAME"
+
       - name: Extract changelog from tag annotation
         run: git tag -l --format='%(contents)' "${{ github.ref_name }}" > release-notes.txt
+
+      - name: Add APK download link to release notes
+        run: |
+          {
+            echo
+            echo "## Download"
+            echo
+            echo "[$APK_NAME](${{ github.server_url }}/${{ github.repository }}/releases/download/${{ github.ref_name }}/$APK_NAME) (Android, sideload)"
+          } >> release-notes.txt
 
       - name: Determine pre-release
         id: meta
@@ -31,3 +81,4 @@ jobs:
         with:
           prerelease: ${{ steps.meta.outputs.prerelease }}
           body_path: release-notes.txt
+          files: ${{ env.APK_NAME }}
