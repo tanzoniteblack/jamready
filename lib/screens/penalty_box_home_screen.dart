@@ -34,8 +34,6 @@ class _PenaltyBoxHomeScreenState extends State<PenaltyBoxHomeScreen> {
   PenaltyEngine? _previewEngine;
   PenaltyBoxState? _previewState;
   PenaltyEngine? _activeEngine;
-  String _team1Name = 'Salt';
-  String _team2Name = 'Pepper';
   Timer? _teamNameTimer;
   VoidCallback? _teamNameListener;
 
@@ -75,25 +73,21 @@ class _PenaltyBoxHomeScreenState extends State<PenaltyBoxHomeScreen> {
         'http://${_hostController.text.trim()}:${_portController.text.trim()}';
     engine.connect(url);
 
-    // Listen for team names to arrive, with a 3-second timeout fallback
+    // Wait for team names to arrive, with a 3-second timeout fallback. The
+    // role selector reads names from state, so later updates still show up.
     _teamNameListener = () {
-      if (state.teamNamesFromRemote) {
-        _advanceToRoleSelector(state.team1.name, state.team2.name);
-      }
+      if (state.teamNamesFromRemote) _advanceToRoleSelector();
     };
     state.addListener(_teamNameListener!);
     _teamNameTimer = Timer(
       const Duration(seconds: 3),
-      () => _advanceToRoleSelector(
-        _previewState?.team1.name ?? 'Salt',
-        _previewState?.team2.name ?? 'Pepper',
-      ),
+      _advanceToRoleSelector,
     );
 
     if (mounted) setState(() => _isLoading = false);
   }
 
-  void _advanceToRoleSelector(String t1, String t2) {
+  void _advanceToRoleSelector() {
     _teamNameTimer?.cancel();
     _teamNameTimer = null;
     if (_teamNameListener != null) {
@@ -101,11 +95,7 @@ class _PenaltyBoxHomeScreenState extends State<PenaltyBoxHomeScreen> {
       _teamNameListener = null;
     }
     if (!mounted) return;
-    setState(() {
-      _team1Name = t1.isNotEmpty ? t1 : 'Salt';
-      _team2Name = t2.isNotEmpty ? t2 : 'Pepper';
-      _showRoleSelector = true;
-    });
+    setState(() => _showRoleSelector = true);
   }
 
   Future<void> _goOffline() async {
@@ -118,38 +108,14 @@ class _PenaltyBoxHomeScreenState extends State<PenaltyBoxHomeScreen> {
 
     _previewState = state;
     _previewEngine = engine;
-    _attachTeamNameListener(state);
 
     if (!mounted) return;
-    setState(() {
-      _team1Name = 'Salt';
-      _team2Name = 'Pepper';
-      _showRoleSelector = true;
-    });
-  }
-
-  void _attachTeamNameListener(PenaltyBoxState state) {
-    state.addListener(() {
-      if (mounted) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) {
-            setState(() {
-              _team1Name = state.team1.name;
-              _team2Name = state.team2.name;
-            });
-          }
-        });
-      }
-    });
+    setState(() => _showRoleSelector = true);
   }
 
   void _resetConnection() {
     _disposePreview();
-    setState(() {
-      _showRoleSelector = false;
-      _team1Name = 'Salt';
-      _team2Name = 'Pepper';
-    });
+    setState(() => _showRoleSelector = false);
   }
 
   void _disposePreview() {
@@ -204,15 +170,8 @@ class _PenaltyBoxHomeScreenState extends State<PenaltyBoxHomeScreen> {
       setState(() {
         _previewEngine = returned;
         _previewState = returned.state;
-        _team1Name = returned.state.team1.name;
-        _team2Name = returned.state.team2.name;
         _showRoleSelector = true;
       });
-
-      // Re-attach listener for offline mode to keep team names in sync
-      if (_previewEngine?.isLocal == true && _previewState != null) {
-        _attachTeamNameListener(_previewState!);
-      }
     }
   }
 
@@ -460,15 +419,23 @@ class _PenaltyBoxHomeScreenState extends State<PenaltyBoxHomeScreen> {
                               ),
                             ),
                             const SizedBox(height: 12),
-                            RoleSelector(
-                              team1Name: _team1Name,
-                              team2Name: _team2Name,
-                              team1Color:
-                                  _previewState?.team1.color ?? Colors.white,
-                              team2Color:
-                                  _previewState?.team2.color ?? Colors.black,
-                              onTap: _startGame,
-                            ),
+                            if (_previewState != null)
+                              ListenableBuilder(
+                                listenable: _previewState!,
+                                builder: (context, _) => RoleSelector(
+                                  team1Name: _nameOr(
+                                    _previewState!.team1.name,
+                                    'Salt',
+                                  ),
+                                  team2Name: _nameOr(
+                                    _previewState!.team2.name,
+                                    'Pepper',
+                                  ),
+                                  team1Color: _previewState!.team1.color,
+                                  team2Color: _previewState!.team2.color,
+                                  onTap: _startGame,
+                                ),
+                              ),
                             const SizedBox(height: 24),
                           ],
                         )
@@ -481,6 +448,9 @@ class _PenaltyBoxHomeScreenState extends State<PenaltyBoxHomeScreen> {
       ),
     );
   }
+
+  static String _nameOr(String name, String fallback) =>
+      name.isNotEmpty ? name : fallback;
 
   InputDecoration _inputDecoration(String label, String hint) {
     return InputDecoration(
