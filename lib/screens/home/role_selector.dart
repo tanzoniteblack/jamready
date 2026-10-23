@@ -96,7 +96,8 @@ class _RoleSelectorState extends State<RoleSelector> {
   }
 }
 
-enum _ViewChoice { allPlayers, jammersOnly, singleTeam, blockersOnly }
+/// Ordered by how likely each view is to be used, most likely first.
+enum _ViewChoice { blockersOnly, singleTeam, jammersOnly, allPlayers }
 
 extension on _ViewChoice {
   String get label => switch (this) {
