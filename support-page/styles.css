@@ -123,6 +123,25 @@ h1 {
   margin-top: 1.4rem;
 }
 
+.android-note {
+  margin-top: 1.2rem;
+  max-width: 48ch;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--healthy);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.01));
+  border-radius: var(--radius);
+  padding: 1rem;
+}
+
+.android-note h2 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.hero-copy .android-note p {
+  margin: 0.45rem 0 0;
+}
+
 .hero-actions {
   display: flex;
   gap: 0.75rem;
