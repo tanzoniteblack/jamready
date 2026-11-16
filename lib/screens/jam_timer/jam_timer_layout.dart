@@ -355,7 +355,12 @@ extension _JamTimerLayout on _JamTimerScreenState {
             ),
             if (inOverlapTimeoutState) ...[
               SizedBox(height: 16 * scaleFactor),
-              _buildTimeoutTypeSection(state, controlsEnabled, scaleFactor),
+              _buildTimeoutTypeSection(
+                state,
+                controlsEnabled,
+                scaleFactor,
+                showEndTimeout: false,
+              ),
             ],
           ],
           SizedBox(height: 10 * scaleFactor),

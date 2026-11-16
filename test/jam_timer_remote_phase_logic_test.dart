@@ -184,6 +184,34 @@ void main() {
     expect(find.text('PERIOD 0'), findsNothing);
   });
 
+  testWidgets(
+    'post-timeout lineup keeps owner buttons but hides END TIMEOUT',
+    (tester) async {
+      // CRG keeps the Timeout clock running after a timeout ends, alongside
+      // the lineup, until the next jam starts. The timeout is already over, so
+      // END TIMEOUT must not be offered; assigning the owner still is.
+      tester.view.physicalSize = const Size(800, 1600);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final state = ScoreboardState();
+      state.setConnectionStatus('Connected');
+      state.clocks['Period']!.number = 1;
+      state.clocks['Lineup']!.running = true;
+      state.clocks['Timeout']!.running = true;
+      state.timeoutOwner = 'O';
+      state.labelStart = 'Start Jam';
+      state.labelStop = '---';
+
+      await tester.pumpWidget(buildHarness(state));
+      await tester.pump();
+
+      expect(find.text('START JAM'), findsOneWidget);
+      expect(find.text('OFFICIAL TIMEOUT'), findsOneWidget);
+      expect(find.text('END TIMEOUT'), findsNothing);
+    },
+  );
+
   testWidgets('second-lineup overlap shows lineup clock as active', (
     tester,
   ) async {
