@@ -32,9 +32,12 @@ bump_version() {
   esac
 }
 
-# Returns the most recent tag matching the given extended-regex pattern, or empty.
+# Returns the most recent tag reachable from HEAD matching the given
+# extended-regex pattern, or empty. Tags only on other branches (e.g. an
+# experimental v2.0.0-jambox) are ignored so they don't skew version bumps
+# or the changelog range.
 last_tag() {
-  git tag -l | sort -rV | grep -E "$1" | head -1 || true
+  git tag -l --merged HEAD | sort -rV | grep -E "$1" | head -1 || true
 }
 
 # Given a tag like v1.0.0-rc1, echo the base semver (1.0.0).
@@ -115,7 +118,11 @@ fi
 if [[ -n "$LAST_PRERELEASE" ]]; then
   PREV_BASE=$(prerelease_base "$LAST_PRERELEASE")
   NEXT_SUFFIX=$(next_prerelease_suffix "$LAST_PRERELEASE")
-  BUMP_MENU="same   → v${PREV_BASE}-${NEXT_SUFFIX}\npatch  → $(bump_version "$PREV_BASE" patch)\nminor  → $(bump_version "$PREV_BASE" minor)\nmajor  → $(bump_version "$PREV_BASE" major)\nmanual"
+  # "same" only makes sense when the suffix has a number to increment
+  # (rc1 → rc2); for e.g. "beta" it would produce an empty suffix.
+  SAME_OPTION=""
+  [[ -n "$NEXT_SUFFIX" ]] && SAME_OPTION="same   → v${PREV_BASE}-${NEXT_SUFFIX}\n"
+  BUMP_MENU="${SAME_OPTION}patch  →$(bump_version "$PREV_BASE" patch)\nminor  → $(bump_version "$PREV_BASE" minor)\nmajor  → $(bump_version "$PREV_BASE" major)\nmanual"
   BUMP=$(printf "$BUMP_MENU" | pick "Bump ($CURRENT_NAME, build $CURRENT_BUILD)") || { echo "Aborted."; exit 0; }
   case "${BUMP%% *}" in
     same)   NEW_NAME="$PREV_BASE"; DEFAULT_SUFFIX="$NEXT_SUFFIX" ;;
