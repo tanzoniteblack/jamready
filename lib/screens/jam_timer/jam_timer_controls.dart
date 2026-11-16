@@ -320,6 +320,7 @@ extension _JamTimerControls on _JamTimerScreenState {
   Widget _buildOvertimeDecisionSection(
     ScoreboardState state,
     bool isEnabled,
+    bool timeoutEnabled,
     double scaleFactor,
   ) {
     return Column(
@@ -339,6 +340,13 @@ extension _JamTimerControls on _JamTimerScreenState {
         _isLocalMode
             ? _buildEndGameButton(isEnabled, scaleFactor)
             : SizedBox(height: 56 * scaleFactor),
+        SizedBox(height: 16 * scaleFactor),
+        CallTimeoutButton(
+          label: state.labelTimeout,
+          enabled: timeoutEnabled,
+          onPressed: () => _engine?.startTimeout(),
+          scaleFactor: scaleFactor,
+        ),
       ],
     );
   }

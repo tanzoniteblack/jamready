@@ -629,6 +629,107 @@ void main() {
       },
     );
 
+    // Regression: when the period clock runs out during a lineup (e.g. right
+    // after an OTO late in the period), a team may still have requested a
+    // timeout (WFTDA Officiating Procedures §4.7), so the timeout button must
+    // stay usable after the period ends.
+    group('after the period ends', () {
+      Future<(ScoreboardState, LocalGameEngine)> endPeriodDuringLineup(
+        WidgetTester tester,
+      ) async {
+        tester.view.physicalSize = const Size(800, 1600);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+
+        final (state, engine) = await _setupGame(tester);
+        addTearDown(engine.dispose);
+
+        await swipeToStartLineup(tester);
+        await tapJamControl(tester, state.labelStart);
+        await tapJamControl(tester, state.labelStop);
+        expect(engine.phase, GamePhase.lineup);
+        await _setClock(tester, engine, 'Period', 0);
+        return (state, engine);
+      }
+
+      testWidgets('timeout during halftime pauses and resumes intermission', (
+        tester,
+      ) async {
+        final (state, engine) = await endPeriodDuringLineup(tester);
+        await validateActiveDisplay(tester, ActiveDisplay.intermission);
+
+        await tapButton(tester, find.text('TIMEOUT'));
+        expect(engine.phase, GamePhase.timeout);
+        expect(state.clocks['Intermission']!.running, isFalse);
+
+        await tapButton(tester, find.text('OFFICIAL TIMEOUT'));
+        await tapButton(tester, find.text('END TIMEOUT'));
+
+        expect(engine.phase, GamePhase.intermission);
+        expect(state.clocks['Intermission']!.running, isTrue);
+        expect(state.clocks['Period']!.number, 1);
+        await validateActiveDisplay(tester, ActiveDisplay.intermission);
+      });
+
+      testWidgets(
+        'restoring period time during the timeout resumes the period',
+        (tester) async {
+          final (state, engine) = await endPeriodDuringLineup(tester);
+          await validateActiveDisplay(tester, ActiveDisplay.intermission);
+          final jamNumber = state.clocks['Jam']!.number;
+
+          await tapButton(tester, find.text('TIMEOUT'));
+          // §4.7: timeout was requested with 3s left; officials restore it.
+          await _setClock(tester, engine, 'Period', 3000);
+          await tapButton(tester, find.text('END TIMEOUT'));
+
+          expect(engine.phase, GamePhase.lineup);
+          expect(state.clocks['Intermission']!.running, isFalse);
+          // Period clock stays stopped until the next jam starts.
+          expect(state.clocks['Period']!.running, isFalse);
+
+          await tapJamControl(tester, state.labelStart);
+          expect(engine.phase, GamePhase.jam);
+          expect(state.clocks['Period']!.number, 1);
+          expect(state.clocks['Period']!.running, isTrue);
+          expect(state.clocks['Jam']!.number, jamNumber + 1);
+        },
+      );
+
+      testWidgets('timeout after the final period returns to unofficial score', (
+        tester,
+      ) async {
+        tester.view.physicalSize = const Size(800, 1600);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+
+        final ruleset = Ruleset.wftda();
+        final (state, engine) = await _setupGame(tester, ruleset: ruleset);
+        addTearDown(engine.dispose);
+        for (int p = 1; p < ruleset.periodCount; p++) {
+          await _runNonFinalPeriod(tester, engine, state);
+        }
+        await swipeToStartLineup(tester);
+        await tapJamControl(tester, state.labelStart);
+        await _setClock(tester, engine, 'Period', 0);
+        await tapJamControl(tester, state.labelStop);
+        await validateActiveDisplay(tester, ActiveDisplay.unofficialScore);
+
+        final initialReviews = state.team2.officialReviews;
+        await tapButton(tester, find.text('TIMEOUT'));
+        expect(engine.phase, GamePhase.timeout);
+
+        await tapButton(tester, find.text('REVIEW').last);
+        expect(state.team2.officialReviews, initialReviews - 1);
+        await tapButton(tester, find.text('END TIMEOUT'));
+
+        expect(engine.phase, GamePhase.unofficialScore);
+        await validateActiveDisplay(tester, ActiveDisplay.unofficialScore);
+      });
+    });
+
     testWidgets('timeout from lineup does not require a prior jam', (
       tester,
     ) async {
