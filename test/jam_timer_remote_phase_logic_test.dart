@@ -14,6 +14,8 @@ class _FakeRemoteEngine implements GameEngine {
   _FakeRemoteEngine(this._state);
 
   final ScoreboardState _state;
+  int startTimeoutCalls = 0;
+  int startJamCalls = 0;
 
   @override
   bool get isActive => true;
@@ -52,10 +54,10 @@ class _FakeRemoteEngine implements GameEngine {
   void setTimeoutOwner(String owner, {bool isOfficialReview = false}) {}
 
   @override
-  void startJam() {}
+  void startJam() => startJamCalls++;
 
   @override
-  void startTimeout() {}
+  void startTimeout() => startTimeoutCalls++;
 
   @override
   void stopJam() {}
@@ -85,8 +87,8 @@ void main() {
     vibrationCalls.clear();
   });
 
-  Widget buildHarness(ScoreboardState state) {
-    final engine = _FakeRemoteEngine(state);
+  Widget buildHarness(ScoreboardState state, {_FakeRemoteEngine? engine}) {
+    engine ??= _FakeRemoteEngine(state);
     return MultiProvider(
       providers: [ChangeNotifierProvider.value(value: state)],
       child: MaterialApp(home: JamTimerScreen(engine: engine)),
@@ -380,6 +382,63 @@ void main() {
       expect(find.text('READY'), findsNothing);
     },
   );
+
+  group('timeout after the period has ended', () {
+    // Regression: CRG restarts the period clock when an OTO ends in the last
+    // seconds of a period. If it expires during the lineup, the period ends
+    // while a team may still be requesting a timeout (WFTDA Officiating
+    // Procedures §4.7), so the timeout button must stay usable.
+    Future<_FakeRemoteEngine> pumpFixture(
+      WidgetTester tester,
+      String fixture,
+    ) async {
+      tester.view.physicalSize = const Size(800, 1600);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final state = stateFromFixture(fixture);
+      final engine = _FakeRemoteEngine(state);
+      await tester.pumpWidget(buildHarness(state, engine: engine));
+      await tester.pump();
+      return engine;
+    }
+
+    testWidgets('halftime intermission: timeout callable, start jam locked', (
+      tester,
+    ) async {
+      final engine = await pumpFixture(tester, 'end-of-period-1.json');
+
+      await tester.tap(find.text('TIMEOUT'));
+      await tester.tap(find.text('START JAM'), warnIfMissed: false);
+      await tester.pump();
+
+      expect(engine.startTimeoutCalls, 1);
+      expect(engine.startJamCalls, 0);
+    });
+
+    testWidgets('unofficial score with overtime possible: timeout callable', (
+      tester,
+    ) async {
+      final engine = await pumpFixture(
+        tester,
+        'unofficial-score-overtime-possible.json',
+      );
+
+      await tester.tap(find.text('TIMEOUT'));
+      await tester.pump();
+
+      expect(engine.startTimeoutCalls, 1);
+    });
+
+    testWidgets('pre-game countdown: timeout not callable', (tester) async {
+      final engine = await pumpFixture(tester, 'pre-game-time-to-derby.json');
+
+      await tester.tap(find.text('TIMEOUT'), warnIfMissed: false);
+      await tester.pump();
+
+      expect(engine.startTimeoutCalls, 0);
+    });
+  });
 
   testWidgets('official and unlabeled timeouts do not trigger threshold haptics', (
     tester,

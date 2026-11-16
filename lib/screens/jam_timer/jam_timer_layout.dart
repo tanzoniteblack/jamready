@@ -289,6 +289,11 @@ extension _JamTimerLayout on _JamTimerScreenState {
         !_isGameOver(state) &&
         !_isHalftimeIntermission(state) &&
         !(_isUnofficialScore(state) && state.noMoreJam);
+    // Timeouts remain callable after a period ends: a timeout requested as
+    // the period clock expires must still be awarded (WFTDA Officiating
+    // Procedures §4.7), and teams may request an Official Review after the
+    // final Jam (Rules §1.3.2). Only pre-game and official final are locked.
+    final timeoutEnabled = _isTimeoutCallable(state, isEnabled);
     final timeoutRunning = state.clocks['Timeout']?.running ?? false;
     final lineupRunning = state.clocks['Lineup']?.running ?? false;
     final inOverlapTimeoutState =
@@ -320,7 +325,12 @@ extension _JamTimerLayout on _JamTimerScreenState {
           if (_isUnofficialScore(state) &&
               (_isLocalMode ||
                   state.labelStop.toLowerCase().contains('overtime')))
-            _buildOvertimeDecisionSection(state, isEnabled, scaleFactor)
+            _buildOvertimeDecisionSection(
+              state,
+              isEnabled,
+              timeoutEnabled,
+              scaleFactor,
+            )
           else if (showTimeoutOnly)
             _buildTimeoutTypeSection(state, controlsEnabled, scaleFactor)
           else ...[
@@ -335,6 +345,7 @@ extension _JamTimerLayout on _JamTimerScreenState {
               timeoutLabel: state.labelTimeout,
               alertColor: alertColor,
               enabled: controlsEnabled,
+              timeoutEnabled: timeoutEnabled,
               scaleFactor: scaleFactor,
               jamClockNumber: state.clocks['Jam']?.number ?? 0,
               lineupClockNumber: state.clocks['Lineup']?.number ?? 0,

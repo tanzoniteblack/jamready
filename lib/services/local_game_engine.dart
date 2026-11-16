@@ -46,6 +46,10 @@ class LocalGameEngine with WidgetsBindingObserver implements GameEngine {
   bool _isActive = false;
 
   GamePhase _phase = GamePhase.preGame;
+
+  /// Set when a timeout is called after the period has ended (intermission or
+  /// unofficial score), so ending the timeout can return to that phase.
+  GamePhase? _postPeriodPhase;
   int _currentPeriod = 0;
   int _currentJam = 0;
 
@@ -634,6 +638,15 @@ class LocalGameEngine with WidgetsBindingObserver implements GameEngine {
       _endJam();
     }
 
+    // A timeout after the period has ended (e.g. requested as the period
+    // clock expired — WFTDA Officiating Procedures §4.7 — or an Official
+    // Review after the final jam) pauses the intermission, matching CRG.
+    if (_phase == GamePhase.intermission ||
+        _phase == GamePhase.unofficialScore) {
+      _postPeriodPhase = _phase;
+      _state.clocks['Intermission']!.running = false;
+    }
+
     // Stop lineup clock
     _state.clocks['Lineup']!.running = false;
     _state.clocks['Period']!.running = false;
@@ -656,8 +669,38 @@ class LocalGameEngine with WidgetsBindingObserver implements GameEngine {
     _state.timeoutOwner = "";
     _state.officialReview = "false";
 
+    final postPeriodPhase = _postPeriodPhase;
+    _postPeriodPhase = null;
+
+    if (postPeriodPhase != null && _internalClockTimes['Period']! <= 0) {
+      // Period is still over: go back to the intermission / unofficial score.
+      _phase = postPeriodPhase;
+      _state.clocks['Intermission']!.running =
+          postPeriodPhase == GamePhase.intermission;
+      _state.notify();
+      return;
+    }
+
+    if (postPeriodPhase != null) {
+      // The operator put time back on the period clock during the timeout
+      // (§4.7), so the period resumes: cancel the intermission and line up
+      // for another jam in this period.
+      _resumeEndedPeriod();
+    }
+
     // Return to lineup
     _startLineup();
+  }
+
+  /// Undoes the intermission bookkeeping done by [_endPeriod] so play can
+  /// continue in the current period.
+  void _resumeEndedPeriod() {
+    final intermission = _state.clocks['Intermission']!;
+    intermission.running = false;
+    intermission.time = 0;
+    intermission.number = _currentPeriod - 1;
+    _internalClockTimes['Intermission'] = 0;
+    _state.noMoreJam = false;
   }
 
   @override
@@ -823,6 +866,7 @@ class LocalGameEngine with WidgetsBindingObserver implements GameEngine {
           _state.timeoutOwner = "";
           _state.officialReview = "false";
           _state.clocks['Timeout']!.running = false;
+          _postPeriodPhase = null;
         }
 
         // Calculate jam time accounting for elapsed time since stop

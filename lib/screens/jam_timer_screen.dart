@@ -8,6 +8,7 @@ import 'package:vibration/vibration.dart';
 import '../models/scoreboard_state.dart';
 import '../services/game_engine.dart';
 import '../services/remote_game_engine.dart';
+import '../widgets/call_timeout_button.dart';
 import '../widgets/clock_display.dart';
 import '../widgets/jam_controls.dart';
 import '../widgets/prominent_period_clock.dart';

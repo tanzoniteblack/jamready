@@ -398,6 +398,69 @@ void main() {
       },
     );
 
+    test('Timeout after period expires during post-OTO lineup', () async {
+      // Regression: CRG restarts the period clock as soon as an OTO ends in
+      // the last seconds of a period (WFTDA Officiating Procedures §3.2.2), so
+      // the period can expire mid-lineup. The server must still accept a
+      // timeout in the resulting intermission (Procedures §4.7).
+      final gameId = await startGame();
+
+      log('action: stopJam (start lineup)');
+      await clockAction(() => engine.stopJam());
+      await waitUntil(
+        () => state.clocks['Lineup']!.running,
+        label: 'lineup clock starts',
+        debugState: state,
+      );
+      log('action: startJam');
+      await clockAction(() => engine.startJam());
+      await waitUntil(
+        () => state.inJam,
+        label: 'jam starts',
+        debugState: state,
+      );
+      operatorClient.setClockTime(gameId, 'Period', 6000);
+      await waitUntil(
+        () => state.clocks['Period']!.time <= 6000,
+        label: 'Period clock reflects 6s remaining',
+        debugState: state,
+      );
+      log('action: stopJam (end jam)');
+      await clockAction(() => engine.stopJam());
+
+      log('action: startTimeout + official timeout');
+      await clockAction(() => engine.startTimeout());
+      await clockAction(() => engine.setTimeoutOwner('O'));
+      log('action: endTimeout');
+      await clockAction(() => engine.endTimeout());
+
+      await waitUntil(
+        () => state.clocks['Intermission']!.running,
+        timeout: const Duration(seconds: 10),
+        label: 'period expires during post-OTO lineup',
+        debugState: state,
+      );
+
+      log('action: startTimeout during intermission');
+      await clockAction(() => engine.startTimeout());
+      await waitUntil(
+        () =>
+            state.labelStop == 'End Timeout' &&
+            !state.clocks['Intermission']!.running,
+        label: 'timeout starts and intermission pauses',
+        debugState: state,
+      );
+
+      log('action: endTimeout');
+      await clockAction(() => engine.endTimeout());
+      await waitUntil(
+        () => state.clocks['Intermission']!.running,
+        label: 'intermission resumes after timeout',
+        debugState: state,
+      );
+      expect(state.clocks['Period']!.number, 1);
+    });
+
     test(
       'Full game start/stop',
       () async {

@@ -20,6 +20,7 @@ Widget _buildControls({
   bool isPrePeriod = false,
   bool isIntermission = false,
   bool enabled = true,
+  bool? timeoutEnabled,
   String startLabel = 'Start Jam',
   String stopLabel = 'Stop Jam',
   String timeoutLabel = 'Timeout',
@@ -38,6 +39,7 @@ Widget _buildControls({
       stopLabel: stopLabel,
       timeoutLabel: timeoutLabel,
       enabled: enabled,
+      timeoutEnabled: timeoutEnabled,
       jamClockNumber: jamClockNumber,
       lineupClockNumber: lineupClockNumber,
       onStartJam: onStartJam ?? () {},
@@ -284,6 +286,27 @@ void main() {
       await tester.pump();
 
       expect(callCount, 0);
+    });
+
+    testWidgets(
+        'timeoutEnabled override keeps timeout live while jam button is locked',
+        (tester) async {
+      var timeouts = 0;
+      var starts = 0;
+      await tester.pumpWidget(_buildControls(
+        enabled: false,
+        isIntermission: true,
+        timeoutEnabled: true,
+        onTimeout: () => timeouts++,
+        onStartJam: () => starts++,
+      ));
+
+      await tester.tap(find.text('TIMEOUT'));
+      await tester.tap(find.text('START JAM'), warnIfMissed: false);
+      await tester.pump();
+
+      expect(timeouts, 1);
+      expect(starts, 0);
     });
   });
 }
