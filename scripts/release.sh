@@ -1,6 +1,8 @@
 #!/usr/bin/env zsh
 # Create a new release: bumps pubspec version, generates a changelog via claude,
-# commits, tags, and (optionally) pushes to trigger the GitHub Actions release workflow.
+# commits, tags, and opens a release PR against main. Once you merge the PR
+# (with a merge commit), the tag is pushed to trigger the GitHub Actions
+# release workflow — the script can wait and do that for you.
 #
 # Usage: ./scripts/release.sh
 
@@ -86,8 +88,19 @@ if ! command -v claude &>/dev/null; then
   exit 1
 fi
 
+if ! command -v gh &>/dev/null; then
+  echo "error: 'gh' CLI not found — needed to open the release PR (brew install gh)" >&2
+  exit 1
+fi
+
 if ! git diff --quiet || ! git diff --cached --quiet; then
   echo "error: working tree has uncommitted changes — commit or stash first" >&2
+  exit 1
+fi
+
+BASE_BRANCH=main
+if [[ "$(git branch --show-current)" != "$BASE_BRANCH" ]]; then
+  echo "error: run releases from $BASE_BRANCH" >&2
   exit 1
 fi
 
@@ -212,8 +225,74 @@ git tag -a "$TAG" --cleanup=verbatim -m "$CHANGELOG"
 echo ""
 echo "Created commit and annotated tag $TAG."
 echo ""
-if confirm "Push to origin now?"; then
-  git push --atomic origin HEAD "$TAG"
+
+# ---------------------------------------------------------------------------
+# Release PR and tag push
+# ---------------------------------------------------------------------------
+# main is protected (changes via PR, required CI), so the bump lands through a
+# PR. The tag is pushed only after that PR is merged with a merge commit, so the
+# tagged commit is part of main's history.
+
+RELEASE_BRANCH="release/$TAG"
+RELEASE_COMMIT=$(git rev-parse HEAD)
+
+print_manual_steps() {
+  echo "Next steps:"
+  echo "  1. Merge the release PR with \"Create a merge commit\" (not squash/rebase)."
+  echo "  2. git push origin $TAG"
+  echo "  3. git pull --ff-only origin $BASE_BRANCH"
+}
+
+confirm "Push $RELEASE_BRANCH and open a release PR?" || {
   echo ""
-  echo "Pushed. GitHub Actions will build and publish the release."
+  echo "Nothing pushed. To publish later:"
+  echo "  git push -u origin HEAD:refs/heads/$RELEASE_BRANCH"
+  echo "  gh pr create --base $BASE_BRANCH --head $RELEASE_BRANCH"
+  print_manual_steps
+  exit 0
+}
+
+git push -u origin "HEAD:refs/heads/$RELEASE_BRANCH"
+
+PR_BODY="Version bump for \`$TAG\` (\`pubspec.yaml\` → \`$NEW_VERSION\`), created by \`scripts/release.sh\`.
+
+**Merge with \"Create a merge commit\"** (not squash/rebase) so the tagged commit stays in \`$BASE_BRANCH\`'s history. The annotated tag \`$TAG\` is pushed after merging, which triggers the release workflow.
+
+## Changelog
+
+$CHANGELOG"
+
+PR_URL=$(gh pr create --base "$BASE_BRANCH" --head "$RELEASE_BRANCH" \
+  --title "Bump version to $TAG" --body "$PR_BODY")
+echo ""
+echo "Opened release PR: $PR_URL"
+echo ""
+
+if ! confirm "Wait here for the PR to be merged, then push $TAG?"; then
+  print_manual_steps
+  exit 0
 fi
+
+echo "Waiting for $PR_URL to be merged (Ctrl-C to stop; the tag stays local)..."
+while true; do
+  PR_STATE=$(gh pr view "$PR_URL" --json state -q .state)
+  [[ "$PR_STATE" == MERGED ]] && break
+  if [[ "$PR_STATE" == CLOSED ]]; then
+    echo "PR was closed without merging; tag $TAG was not pushed." >&2
+    exit 1
+  fi
+  sleep 15
+done
+
+git fetch -q origin "$BASE_BRANCH"
+if ! git merge-base --is-ancestor "$RELEASE_COMMIT" "origin/$BASE_BRANCH"; then
+  echo "error: $RELEASE_COMMIT is not in origin/$BASE_BRANCH (squash or rebase merge?)." >&2
+  echo "Re-point the tag at the merged commit before pushing:" >&2
+  echo "  git tag -f -a $TAG --cleanup=verbatim -m \"\$(git tag -l --format='%(contents)' $TAG)\" <merged-sha>" >&2
+  exit 1
+fi
+
+git push origin "$TAG"
+git pull -q --ff-only origin "$BASE_BRANCH" || true
+echo ""
+echo "Pushed $TAG. GitHub Actions will build and publish the release."
