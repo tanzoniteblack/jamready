@@ -1,3 +1,4 @@
+import 'package:fake_async/fake_async.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:jam_ready/models/game_config.dart';
@@ -83,6 +84,167 @@ void main() {
       expect(state.lineupDuration, 30000);
       expect(state.clocks['Jam']!.time, 60000); // RDCL: 1 min jams
       expect(state.clocks['Period']!.time, 15 * 60 * 1000); // RDCL: 15 min periods
+    });
+  });
+
+  group('LocalGameEngine clock accuracy', () {
+    test('running clocks track elapsed time without drift', () {
+      fakeAsync((async) {
+        engine = LocalGameEngine(
+          state,
+          GameConfig(
+            ruleset: Ruleset.wftda(),
+            team1Name: 'Team A',
+            team2Name: 'Team B',
+          ),
+        );
+        engine.initialize();
+        async.flushMicrotasks();
+
+        engine.stopJam(); // preGame -> lineup
+        engine.startJam(); // lineup -> jam, period clock starts
+        async.elapse(const Duration(seconds: 90));
+
+        expect(state.clocks['Jam']!.time, 30 * 1000);
+        expect(state.clocks['Period']!.time, (30 * 60 - 90) * 1000);
+
+        engine.dispose();
+      });
+    });
+  });
+
+  group('LocalGameEngine clock timing', () {
+    const step = Duration(milliseconds: 16);
+    const stepMs = 16; // tick interval: timing assertions allow one tick
+    const periodMs = 30 * 60 * 1000;
+
+    void startEngine(FakeAsync async) {
+      engine = LocalGameEngine(
+        state,
+        GameConfig(
+          ruleset: Ruleset.wftda(),
+          team1Name: 'Team A',
+          team2Name: 'Team B',
+        ),
+      );
+      engine.initialize();
+      async.flushMicrotasks();
+    }
+
+    /// Steps time forward until [done] is true; returns elapsed ms.
+    int elapseUntil(FakeAsync async, bool Function() done) {
+      var ms = 0;
+      while (!done()) {
+        async.elapse(step);
+        ms += stepMs;
+      }
+      return ms;
+    }
+
+    Duration ms(int milliseconds) => Duration(milliseconds: milliseconds);
+
+    // Starting part-way through a second must not change how long the first
+    // second is displayed, nor the jam's length.
+    for (final phaseMs in [300, 700]) {
+      test('jam started ${phaseMs}ms into a second runs exactly 2:00', () {
+        fakeAsync((async) {
+          startEngine(async);
+          engine.stopJam(); // preGame -> lineup
+          engine.startJam(); // first jam starts the period clock
+          async.elapse(const Duration(seconds: 10));
+          engine.stopJam();
+
+          async.elapse(ms(20000 + phaseMs));
+          engine.startJam();
+
+          final jam = state.clocks['Jam']!;
+          final untilFirstTick = elapseUntil(async, () => jam.time != 120000);
+          expect(untilFirstTick, inInclusiveRange(1000 - stepMs, 1000 + stepMs));
+          expect(jam.time, 119000);
+
+          final rest = elapseUntil(async, () => engine.phase != GamePhase.jam);
+          expect(untilFirstTick + rest,
+              inInclusiveRange(120000 - 2 * stepMs, 120000 + stepMs));
+
+          // The lineup started on expiry also shows 0 for a full second.
+          final lineup = state.clocks['Lineup']!;
+          final untilLineupTick = elapseUntil(async, () => lineup.time != 0);
+          expect(untilLineupTick, inInclusiveRange(1000 - stepMs, 1000 + stepMs));
+
+          engine.dispose();
+        });
+      });
+    }
+
+    test('undoing the first jam restores the period clock and keeps lineup',
+        () {
+      fakeAsync((async) {
+        startEngine(async);
+        engine.stopJam(); // preGame -> lineup
+        async.elapse(const Duration(seconds: 10));
+        engine.startJam();
+        async.elapse(const Duration(seconds: 5));
+
+        engine.undo();
+
+        expect(engine.phase, GamePhase.lineup);
+        expect(state.clocks['Period']!.running, false);
+        expect(state.clocks['Period']!.time, periodMs);
+        // Lineup carries on as though the jam never started.
+        expect(state.clocks['Lineup']!.running, true);
+        expect(state.clocks['Lineup']!.time, 15000);
+
+        async.elapse(const Duration(seconds: 2));
+        expect(state.clocks['Period']!.time, periodMs);
+        expect(state.clocks['Lineup']!.time, 17000);
+
+        engine.dispose();
+      });
+    });
+
+    test('undoing a later jam start keeps lineup and period running', () {
+      fakeAsync((async) {
+        startEngine(async);
+        engine.stopJam();
+        engine.startJam();
+        async.elapse(const Duration(seconds: 10));
+        engine.stopJam(); // lineup, period at 29:50
+        async.elapse(const Duration(seconds: 20));
+        engine.startJam();
+        // 34s total lands on a 16ms tick, so the period display is current.
+        async.elapse(const Duration(seconds: 4));
+
+        engine.undo();
+
+        expect(engine.phase, GamePhase.lineup);
+        expect(state.clocks['Lineup']!.time, 24000);
+        expect(state.clocks['Period']!.running, true);
+        expect(state.clocks['Period']!.time, periodMs - 34000);
+
+        engine.dispose();
+      });
+    });
+
+    test('undoing a jam stop during a timeout restores lost period time', () {
+      fakeAsync((async) {
+        startEngine(async);
+        engine.stopJam();
+        engine.startJam();
+        async.elapse(const Duration(seconds: 10));
+        engine.stopJam(); // period at 29:50
+        async.elapse(const Duration(seconds: 2));
+        engine.startTimeout(); // stops the period clock
+        async.elapse(const Duration(seconds: 3));
+
+        engine.undo();
+
+        expect(engine.phase, GamePhase.jam);
+        expect(state.clocks['Jam']!.time, 120000 - 15000);
+        expect(state.clocks['Period']!.running, true);
+        expect(state.clocks['Period']!.time, periodMs - 15000);
+
+        engine.dispose();
+      });
     });
   });
 
