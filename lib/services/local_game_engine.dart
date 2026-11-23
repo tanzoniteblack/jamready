@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:math';
+import 'package:clock/clock.dart';
 import 'package:flutter/widgets.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 import '../models/game_config.dart';
@@ -41,7 +43,11 @@ class LocalGameEngine with WidgetsBindingObserver implements GameEngine {
   final GameConfig _config;
 
   Timer? _tickTimer;
-  DateTime? _lastTickTime;
+
+  // Monotonic time source for ticks. Elapsed time is derived from the
+  // stopwatch's running total so sub-millisecond remainders are never lost.
+  Stopwatch _tickStopwatch = clock.stopwatch();
+  int _lastTickTotalMs = 0;
   DateTime? _backgroundedAt;
   bool _isActive = false;
 
@@ -55,9 +61,6 @@ class LocalGameEngine with WidgetsBindingObserver implements GameEngine {
 
   // Internal clock state (precise millisecond values)
   final Map<String, int> _internalClockTimes = {};
-
-  // Master clock for synchronization - tracks milliseconds since last full second
-  int _masterClockMs = 0;
 
   // Clock snapshot for background timing
   Map<String, int>? _backgroundClockSnapshot;
@@ -205,21 +208,19 @@ class LocalGameEngine with WidgetsBindingObserver implements GameEngine {
 
   void _startTickTimer() {
     _tickTimer?.cancel();
-    _lastTickTime = DateTime.now();
+    _tickStopwatch = clock.stopwatch()..start();
+    _lastTickTotalMs = 0;
     _tickTimer = Timer.periodic(const Duration(milliseconds: 16), (_) {
       _tick();
     });
   }
 
   void _tick() {
-    final now = DateTime.now();
-    final elapsed = now.difference(_lastTickTime!).inMilliseconds;
-    _lastTickTime = now;
+    final totalMs = _tickStopwatch.elapsedMilliseconds;
+    final elapsed = totalMs - _lastTickTotalMs;
+    _lastTickTotalMs = totalMs;
 
-    // Check if master clock crossed a second boundary
-    final oldMasterClockMs = _masterClockMs;
-    _masterClockMs = (_masterClockMs + elapsed) % 1000;
-    final crossedSecondBoundary = _masterClockMs < oldMasterClockMs;
+    var displayChanged = false;
 
     // Update internal times for all running clocks
     for (final entry in _state.clocks.entries) {
@@ -227,7 +228,7 @@ class LocalGameEngine with WidgetsBindingObserver implements GameEngine {
       if (!clock.running) continue;
 
       final clockName = entry.key;
-      final isCountUp = clockName == 'Lineup' || clockName == 'Timeout';
+      final isCountUp = _isCountUp(clockName);
 
       // Update internal precise time
       int newInternalTime = _internalClockTimes[clockName] ?? clock.time;
@@ -239,15 +240,22 @@ class LocalGameEngine with WidgetsBindingObserver implements GameEngine {
       }
       _internalClockTimes[clockName] = newInternalTime;
 
+      // Each clock updates its display as soon as its own displayed second
+      // changes, so clocks never lag and are never nudged into sync with each
+      // other (which would alter jam/lineup/timeout durations).
+      final displayTime = _getDisplayTime(newInternalTime, isCountUp);
+      if (displayTime != clock.time) {
+        clock.time = displayTime;
+        displayChanged = true;
+      }
+
       // Handle clock expiration (using internal time for precision)
       if (!isCountUp && newInternalTime <= 0) {
         _handleClockExpiration(clockName);
       }
     }
 
-    // Update display times only when master clock crosses second boundary
-    if (crossedSecondBoundary) {
-      _updateAllDisplayTimes();
+    if (displayChanged) {
       _checkUndoValidity();
       _state.notify();
     }
@@ -259,25 +267,12 @@ class LocalGameEngine with WidgetsBindingObserver implements GameEngine {
     if (_lastAction == null || _actionTimestamp == null) return;
 
     if (_lastAction!.type == _UndoType.unstopJam) {
-      final elapsed = DateTime.now().difference(_actionTimestamp!).inMilliseconds;
+      final elapsed = clock.now().difference(_actionTimestamp!).inMilliseconds;
       final projectedJamTime = (_lastAction!.jamTimeInternal ?? 0) - elapsed;
 
       if (projectedJamTime <= 0) {
         _clearUndo();
       }
-    }
-  }
-
-  /// Update display times for all clocks based on their internal times.
-  /// Called only when master clock crosses a full second boundary.
-  void _updateAllDisplayTimes() {
-    for (final entry in _state.clocks.entries) {
-      final clockName = entry.key;
-      final clock = entry.value;
-      final internalTime = _internalClockTimes[clockName] ?? clock.time;
-      final isCountUp = clockName == 'Lineup' || clockName == 'Timeout';
-
-      clock.time = _getDisplayTime(internalTime, isCountUp);
     }
   }
 
@@ -293,6 +288,9 @@ class LocalGameEngine with WidgetsBindingObserver implements GameEngine {
       return (internalMs / 1000).ceil() * 1000;
     }
   }
+
+  static bool _isCountUp(String clockName) =>
+      clockName == 'Lineup' || clockName == 'Timeout';
 
   void _handleClockExpiration(String clockName) {
     switch (clockName) {
@@ -318,7 +316,7 @@ class LocalGameEngine with WidgetsBindingObserver implements GameEngine {
   }
 
   void _onBackgrounded() {
-    _backgroundedAt = DateTime.now();
+    _backgroundedAt = clock.now();
     _tickTimer?.cancel();
 
     // Snapshot clock states (use internal time for precision)
@@ -336,7 +334,7 @@ class LocalGameEngine with WidgetsBindingObserver implements GameEngine {
       return;
     }
 
-    final elapsed = DateTime.now().difference(_backgroundedAt!).inMilliseconds;
+    final elapsed = clock.now().difference(_backgroundedAt!).inMilliseconds;
     _backgroundedAt = null;
 
     // Reconstruct clock states
@@ -348,7 +346,7 @@ class LocalGameEngine with WidgetsBindingObserver implements GameEngine {
       if (!wasRunning) continue;
 
       final snapshotTime = _backgroundClockSnapshot![clockName]!;
-      final isCountUp = clockName == 'Lineup' || clockName == 'Timeout';
+      final isCountUp = _isCountUp(clockName);
 
       int newInternalTime;
       if (isCountUp) {
@@ -406,6 +404,8 @@ class LocalGameEngine with WidgetsBindingObserver implements GameEngine {
       _UndoType.unstartJam,
       lineupTime: _state.clocks['Lineup']!.time,
       lineupTimeInternal: _internalClockTimes['Lineup'],
+      periodTime: _state.clocks['Period']!.time,
+      periodTimeInternal: _internalClockTimes['Period'],
       periodWasRunning: _state.clocks['Period']!.running,
     );
 
@@ -503,6 +503,7 @@ class LocalGameEngine with WidgetsBindingObserver implements GameEngine {
           _UndoType.unstopJam,
           jamTime: _state.clocks['Jam']!.time,
           jamTimeInternal: _internalClockTimes['Jam'],
+          periodWasRunning: false,
           periodEndedDuringJam: true,
           wasGameOver: _currentPeriod >= ruleset.periodCount,
         );
@@ -519,6 +520,8 @@ class LocalGameEngine with WidgetsBindingObserver implements GameEngine {
         _UndoType.unstopJam,
         jamTime: _state.clocks['Jam']!.time,
         jamTimeInternal: _internalClockTimes['Jam'],
+        periodTimeInternal: _internalClockTimes['Period'],
+        periodWasRunning: _state.clocks['Period']!.running,
       );
     } else {
       _clearUndo();
@@ -782,8 +785,8 @@ class LocalGameEngine with WidgetsBindingObserver implements GameEngine {
 
     _internalClockTimes[clockName] = newInternal;
 
-    // Update display time (synchronized with master clock)
-    final isCountUp = clockName == 'Lineup' || clockName == 'Timeout';
+    // Update display time
+    final isCountUp = _isCountUp(clockName);
     clock.time = _getDisplayTime(newInternal, isCountUp);
 
     _state.notify();
@@ -801,7 +804,7 @@ class LocalGameEngine with WidgetsBindingObserver implements GameEngine {
     _internalClockTimes[clockName] = newInternal;
 
     // Update display time
-    final isCountUp = clockName == 'Lineup' || clockName == 'Timeout';
+    final isCountUp = _isCountUp(clockName);
     clock.time = _getDisplayTime(newInternal, isCountUp);
 
     _state.notify();
@@ -842,7 +845,7 @@ class LocalGameEngine with WidgetsBindingObserver implements GameEngine {
     if (_lastAction == null || _actionTimestamp == null) return;
 
     final action = _lastAction!;
-    final elapsed = DateTime.now().difference(_actionTimestamp!).inMilliseconds;
+    final elapsed = clock.now().difference(_actionTimestamp!).inMilliseconds;
 
     _lastAction = null;
     _actionTimestamp = null;
@@ -894,9 +897,12 @@ class LocalGameEngine with WidgetsBindingObserver implements GameEngine {
           _state.clocks['Period']!.running = false;
           _state.clocks['Lineup']!.running = false;
         } else {
-          // Normal unstop: period was still running
+          // Normal unstop. The period clock carries on as if the jam had never
+          // stopped, even if a timeout has since stopped it.
           _state.clocks['Lineup']!.running = false;
-          _state.clocks['Period']!.running = true;
+          if (action.periodWasRunning == true) {
+            _resumeClockAfter('Period', action.periodTimeInternal!, elapsed);
+          }
         }
 
         // Restore jam state with adjusted time
@@ -911,10 +917,14 @@ class LocalGameEngine with WidgetsBindingObserver implements GameEngine {
       case _UndoType.unstartJam:
         // Go back to lineup
         _state.clocks['Jam']!.running = false;
-        _state.clocks['Period']!.running = action.periodWasRunning!;
-        _state.clocks['Lineup']!.time = action.lineupTime!;
-        _internalClockTimes['Lineup'] = action.lineupTimeInternal!;
-        _state.clocks['Lineup']!.running = true;
+        if (!action.periodWasRunning!) {
+          // The jam started the period clock; put back the time it ran.
+          _state.clocks['Period']!.running = false;
+          _state.clocks['Period']!.time = action.periodTime!;
+          _internalClockTimes['Period'] = action.periodTimeInternal!;
+        }
+        // The lineup carries on as if the jam had never started.
+        _resumeClockAfter('Lineup', action.lineupTimeInternal!, elapsed);
         _state.inJam = false;
         _currentJam--;
         _state.clocks['Jam']!.number = _currentJam;
@@ -938,6 +948,18 @@ class LocalGameEngine with WidgetsBindingObserver implements GameEngine {
     _state.notify();
   }
 
+  /// Runs [clockName] from [internalMs] as if it had kept running for
+  /// [elapsedMs]. Expiry is left to the next tick.
+  void _resumeClockAfter(String clockName, int internalMs, int elapsedMs) {
+    final isCountUp = _isCountUp(clockName);
+    final newInternal = isCountUp
+        ? internalMs + elapsedMs
+        : max(0, internalMs - elapsedMs);
+    _internalClockTimes[clockName] = newInternal;
+    _state.clocks[clockName]!.time = _getDisplayTime(newInternal, isCountUp);
+    _state.clocks[clockName]!.running = true;
+  }
+
   void _clearUndo() {
     _lastAction = null;
     _actionTimestamp = null;
@@ -956,7 +978,7 @@ class LocalGameEngine with WidgetsBindingObserver implements GameEngine {
     bool? periodEndedDuringJam,
     bool? wasGameOver,
   }) {
-    _actionTimestamp = DateTime.now();
+    _actionTimestamp = clock.now();
     _lastAction = _UndoAction(
       type: type,
       jamTime: jamTime,
