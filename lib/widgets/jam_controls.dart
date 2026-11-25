@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import '../styles/text_styles.dart';
+import 'call_timeout_button.dart';
 import 'swipe_button.dart';
 
 class JamControls extends StatefulWidget {
@@ -13,6 +14,12 @@ class JamControls extends StatefulWidget {
   final String timeoutLabel;
   final Color? alertColor;
   final bool enabled;
+
+  /// Overrides whether the timeout button is tappable. Timeouts stay legal
+  /// after a period ends (WFTDA Officiating Procedures §4.7 / §4.9), so the
+  /// caller may enable it while the jam button itself is locked. Defaults to
+  /// `enabled && !isIntermission`.
+  final bool? timeoutEnabled;
   final double scaleFactor;
   final int jamClockNumber;
   final int lineupClockNumber;
@@ -33,6 +40,7 @@ class JamControls extends StatefulWidget {
     required this.timeoutLabel,
     this.alertColor,
     this.enabled = true,
+    this.timeoutEnabled,
     this.scaleFactor = 1.0,
     this.jamClockNumber = 0,
     this.lineupClockNumber = 0,
@@ -159,7 +167,8 @@ class _JamControlsState extends State<JamControls> {
     // Show gradient/shadow when the widget is enabled (including confirmation)
     final bool showActive = widget.enabled;
 
-    final bool timeoutEnabled = widget.enabled && !widget.isIntermission;
+    final bool timeoutEnabled =
+        widget.timeoutEnabled ?? (widget.enabled && !widget.isIntermission);
 
     return Column(
       children: [
@@ -185,12 +194,11 @@ class _JamControlsState extends State<JamControls> {
                 ),
         ),
         SizedBox(height: 24 * widget.scaleFactor),
-        _buildDepthOutlinedButton(
-          label: widget.timeoutLabel.toUpperCase(),
-          color: Colors.amber.shade700,
+        CallTimeoutButton(
+          label: widget.timeoutLabel,
           enabled: timeoutEnabled,
           onPressed: widget.onTimeout,
-          height: 52 * widget.scaleFactor,
+          scaleFactor: widget.scaleFactor,
         ),
       ],
     );
@@ -256,69 +264,6 @@ class _JamControlsState extends State<JamControls> {
                   fontSize: fontSize,
                   color: showActive ? Colors.white : Colors.white38,
                   letterSpacing: 0.35,
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildDepthOutlinedButton({
-    required String label,
-    required Color color,
-    required bool enabled,
-    required VoidCallback onPressed,
-    double height = 56,
-  }) {
-    final fillTop = enabled
-        ? color.withValues(alpha: 0.12)
-        : Colors.white.withValues(alpha: 0.05);
-    final fillBottom = enabled
-        ? color.withValues(alpha: 0.04)
-        : Colors.white.withValues(alpha: 0.02);
-
-    return Container(
-      height: height,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(12 * widget.scaleFactor),
-        boxShadow: enabled
-            ? [
-                BoxShadow(
-                  color: color.withValues(alpha: 0.12),
-                  blurRadius: 6 * widget.scaleFactor,
-                  offset: Offset(0, 1.5 * widget.scaleFactor),
-                ),
-              ]
-            : [],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: enabled ? onPressed : null,
-          borderRadius: BorderRadius.circular(12 * widget.scaleFactor),
-          child: Ink(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [fillTop, fillBottom],
-              ),
-              borderRadius: BorderRadius.circular(12 * widget.scaleFactor),
-              border: Border.all(
-                color: enabled ? color : Colors.white12,
-                width: 1.5 * widget.scaleFactor,
-              ),
-            ),
-            child: Container(
-              alignment: Alignment.center,
-              child: Text(
-                label,
-                style: AppTextStyles.buttonText.copyWith(
-                  fontSize: 16 * widget.scaleFactor,
-                  color: enabled ? Colors.amber.shade200 : Colors.white38,
-                  letterSpacing: 0.45,
                 ),
               ),
             ),

@@ -42,6 +42,7 @@ dependencies:
   wakelock_plus: ^1.4.0
   logger: ^2.6.2
   mobile_scanner: ^7.2.0
+  clock: ^1.1.1
 
 dev_dependencies:
   flutter_test:

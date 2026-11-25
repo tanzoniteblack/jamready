@@ -75,11 +75,15 @@ extension _JamTimerControls on _JamTimerScreenState {
     );
   }
 
+  /// Timeout owner/type buttons. [showEndTimeout] is false in CRG's
+  /// post-timeout lineup, where the timeout has already ended but the owner
+  /// can still be assigned until the next jam starts.
   Widget _buildTimeoutTypeSection(
     ScoreboardState state,
     bool isEnabled,
-    double scaleFactor,
-  ) {
+    double scaleFactor, {
+    bool showEndTimeout = true,
+  }) {
     final owner = state.timeoutOwner;
     final isOr = state.isOfficialReview;
 
@@ -196,10 +200,10 @@ extension _JamTimerControls on _JamTimerScreenState {
           ],
         ),
 
-        SizedBox(height: 20 * scaleFactor),
-
-        // End Timeout button
-        _buildEndTimeoutButton(isEnabled, scaleFactor),
+        if (showEndTimeout) ...[
+          SizedBox(height: 20 * scaleFactor),
+          _buildEndTimeoutButton(isEnabled, scaleFactor),
+        ],
       ],
     );
   }
@@ -320,6 +324,7 @@ extension _JamTimerControls on _JamTimerScreenState {
   Widget _buildOvertimeDecisionSection(
     ScoreboardState state,
     bool isEnabled,
+    bool timeoutEnabled,
     double scaleFactor,
   ) {
     return Column(
@@ -339,6 +344,13 @@ extension _JamTimerControls on _JamTimerScreenState {
         _isLocalMode
             ? _buildEndGameButton(isEnabled, scaleFactor)
             : SizedBox(height: 56 * scaleFactor),
+        SizedBox(height: 16 * scaleFactor),
+        CallTimeoutButton(
+          label: state.labelTimeout,
+          enabled: timeoutEnabled,
+          onPressed: () => _engine?.startTimeout(),
+          scaleFactor: scaleFactor,
+        ),
       ],
     );
   }

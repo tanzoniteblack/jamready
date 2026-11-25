@@ -179,4 +179,13 @@ extension _JamTimerLogic on _JamTimerScreenState {
   bool _isGameOver(ScoreboardState state) {
     return state.officialScore;
   }
+
+  /// Whether a timeout may be called: any time after the game has started
+  /// until the score is official — including intermission and unofficial
+  /// score, since the period can end while a timeout is being requested.
+  bool _isTimeoutCallable(ScoreboardState state, bool isEnabled) {
+    return isEnabled &&
+        !_isGameOver(state) &&
+        (state.clocks['Period']?.number ?? 0) > 0;
+  }
 }
