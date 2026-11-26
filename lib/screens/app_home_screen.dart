@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../styles/background.dart';
 import '../styles/text_styles.dart';
+import 'about_screen.dart';
 import 'home_screen.dart';
 import 'penalty_box_home_screen.dart';
 
@@ -15,9 +16,23 @@ class AppHomeScreen extends StatelessWidget {
         backgroundColor: Colors.transparent,
         appBar: AppBar(
           toolbarHeight: 78,
-          titleSpacing: 16,
+          // Match title position on screens that have a leading back/home button.
+          titleSpacing: kToolbarHeight + 16,
           title: Text('JamReady', style: AppTextStyles.appBarTitle),
           centerTitle: false,
+          actions: [
+            IconButton(
+              tooltip: 'About',
+              onPressed: () => Navigator.of(
+                context,
+              ).push(MaterialPageRoute(builder: (_) => const AboutScreen())),
+              icon: const Icon(
+                Icons.info_outline_rounded,
+                color: Colors.white70,
+              ),
+            ),
+            const SizedBox(width: 8),
+          ],
           backgroundColor: Colors.transparent,
           elevation: 0,
           scrolledUnderElevation: 0,
