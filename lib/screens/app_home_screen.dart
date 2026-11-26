@@ -96,6 +96,7 @@ class AppHomeScreen extends StatelessWidget {
                         )
                       else
                         Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
                             cards[0],
                             const SizedBox(height: 14),
@@ -115,6 +116,8 @@ class AppHomeScreen extends StatelessWidget {
 }
 
 class _FocusCard extends StatelessWidget {
+  static const double _height = 170;
+
   final String title;
   final String subtitle;
   final IconData icon;
@@ -138,7 +141,7 @@ class _FocusCard extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(8),
         child: Container(
-          constraints: const BoxConstraints(minHeight: 170),
+          height: _height,
           padding: const EdgeInsets.all(18),
           decoration: BoxDecoration(
             border: Border.all(
@@ -147,22 +150,36 @@ class _FocusCard extends StatelessWidget {
             ),
             borderRadius: BorderRadius.circular(8),
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Icon(icon, color: color, size: 34),
-              const SizedBox(height: 28),
-              Text(title, style: AppTextStyles.teamName.copyWith(fontSize: 22)),
-              const SizedBox(height: 8),
-              Text(
-                subtitle,
-                style: AppTextStyles.infoText.copyWith(
-                  color: Colors.white60,
-                  fontSize: 14,
-                  height: 1.25,
+          // Card size is fixed; content scales down when it doesn't fit.
+          child: LayoutBuilder(
+            builder: (context, constraints) => FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.topLeft,
+              child: SizedBox(
+                width: constraints.maxWidth,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(icon, color: color, size: 34),
+                    const SizedBox(height: 28),
+                    Text(
+                      title,
+                      style: AppTextStyles.teamName.copyWith(fontSize: 22),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      subtitle,
+                      style: AppTextStyles.infoText.copyWith(
+                        color: Colors.white60,
+                        fontSize: 14,
+                        height: 1.25,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            ],
+            ),
           ),
         ),
       ),
