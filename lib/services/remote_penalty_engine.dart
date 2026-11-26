@@ -55,6 +55,9 @@ class RemotePenaltyEngine extends PenaltyEngine {
   static final _reSkaterRole = RegExp(
     r'ScoreBoard\.CurrentGame\.Team\((\d)\)\.Skater\(([^)]+)\)\.Role$',
   );
+  static final _reLineupJammer = RegExp(
+    r'ScoreBoard\.CurrentGame\.Team\((\d)\)\.Position\(Jammer\)\.Skater$',
+  );
   static final _reLegacySkater = RegExp(r'Game\.Team\((\d)\)\.Skater$');
 
   RemotePenaltyEngine(
@@ -199,6 +202,10 @@ class RemotePenaltyEngine extends PenaltyEngine {
       // Skater role, so a jammer penalty timer can auto-fill the jammer number
       'ScoreBoard.CurrentGame.Team(1).Skater(*).Role',
       'ScoreBoard.CurrentGame.Team(2).Skater(*).Role',
+      // Lineup jammer: between jams this is the upcoming jam's jammer, which
+      // skater roles only reflect once that jam starts.
+      'ScoreBoard.CurrentGame.Team(1).Position(Jammer).Skater',
+      'ScoreBoard.CurrentGame.Team(2).Position(Jammer).Skater',
     ];
 
     _log.d('Registering paths');
@@ -311,6 +318,13 @@ class RemotePenaltyEngine extends PenaltyEngine {
         continue;
       }
 
+      final lineupJammerMatch = _reLineupJammer.firstMatch(key);
+      if (lineupJammerMatch != null) {
+        delta.lineupJammers[int.parse(lineupJammerMatch.group(1)!)] = value
+            ?.toString();
+        continue;
+      }
+
       final legacySkaterMatch = _reLegacySkater.firstMatch(key);
       if (legacySkaterMatch != null && value is Map) {
         delta.legacyRosters.add((
@@ -375,6 +389,7 @@ class RemotePenaltyEngine extends PenaltyEngine {
     for (final (t, uuid, role) in delta.skaterRoles) {
       _state.updateSkaterRole(t, uuid, role);
     }
+    delta.lineupJammers.forEach(_state.updateLineupJammer);
 
     final jamNowRunning = _state.jamRunning;
     if (!jamWasRunning && jamNowRunning) {
@@ -537,5 +552,6 @@ class _WsDelta {
   final Map<int, Map<String, String>> rosterNumbers =
       {}; // team -> {uuid: number}
   final List<(int team, String uuid, String role)> skaterRoles = [];
+  final Map<int, String?> lineupJammers = {}; // team -> uuid (null if empty)
   final List<(int team, Map<dynamic, dynamic> data)> legacyRosters = [];
 }

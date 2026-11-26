@@ -89,9 +89,14 @@ class ScoreboardOperatorClient {
   /// Puts a rostered skater in a team's jammer position, as the scoreboard's
   /// lineup screen does. This is what makes CRG report the skater's Role as
   /// "Jammer".
-  void setJammer(int teamNumber, String skaterId) {
+  void setJammer(int teamNumber, String skaterId) =>
+      setPosition(teamNumber, 'Jammer', skaterId);
+
+  /// Puts a rostered skater in a team's lineup [position] (Jammer, Pivot,
+  /// Blocker1, Blocker2 or Blocker3), as the scoreboard's lineup screen does.
+  void setPosition(int teamNumber, String position, String skaterId) {
     setValue(
-      'ScoreBoard.CurrentGame.Team($teamNumber).Position(Jammer).Skater',
+      'ScoreBoard.CurrentGame.Team($teamNumber).Position($position).Skater',
       skaterId,
     );
   }

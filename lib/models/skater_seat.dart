@@ -36,6 +36,10 @@ String _formatSeconds(int secs) =>
 class SkaterSeat {
   final String id;
   String skaterNumber;
+
+  // Number entered on an open seat before its timer is started. The seat stays
+  // empty (no time, no penalty) until the timer is started with this number.
+  String presetNumber;
   SkaterPosition position;
   int teamIndex; // 1 or 2
   Duration timeRemaining;
@@ -60,6 +64,7 @@ class SkaterSeat {
   SkaterSeat({
     required this.id,
     this.skaterNumber = '',
+    this.presetNumber = '',
     this.position = SkaterPosition.blocker,
     required this.teamIndex,
     this.timeRemaining = Duration.zero,
@@ -115,6 +120,7 @@ class SkaterSeat {
 
   void clear() {
     skaterNumber = '';
+    presetNumber = '';
     timeRemaining = Duration.zero;
     overtime = Duration.zero;
     isRunning = false;
@@ -130,6 +136,7 @@ class SkaterSeat {
     bool arrivedBetween = false,
   }) {
     skaterNumber = number;
+    presetNumber = '';
     position = pos;
     timeRemaining = const Duration(seconds: 30);
     overtime = Duration.zero;
@@ -141,6 +148,7 @@ class SkaterSeat {
 
   SkaterSeat copyWith({
     String? skaterNumber,
+    String? presetNumber,
     SkaterPosition? position,
     int? teamIndex,
     Duration? timeRemaining,
@@ -154,6 +162,7 @@ class SkaterSeat {
     return SkaterSeat(
       id: id,
       skaterNumber: skaterNumber ?? this.skaterNumber,
+      presetNumber: presetNumber ?? this.presetNumber,
       position: position ?? this.position,
       teamIndex: teamIndex ?? this.teamIndex,
       timeRemaining: timeRemaining ?? this.timeRemaining,

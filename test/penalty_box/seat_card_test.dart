@@ -122,13 +122,71 @@ void main() {
     );
     await tester.pump();
 
-    expect(
-      find.text('BOTH JAMMERS IN THE BOX'),
-      findsOneWidget,
-    );
+    expect(find.text('BOTH JAMMERS IN THE BOX'), findsOneWidget);
 
     state.tick(const Duration(seconds: 10)); // T2 finishes serving.
     await tester.pump(const Duration(milliseconds: 300));
     expect(find.textContaining('BOTH JAMMERS IN THE BOX'), findsNothing);
+  });
+
+  testWidgets(
+    'entering a number on an open card presets it without starting a timer',
+    (tester) async {
+      final state = makeState()..onJamStart();
+      final seat = state.team1Blocker1;
+
+      await tester.pumpWidget(
+        ChangeNotifierProvider.value(
+          value: state,
+          child: MaterialApp(
+            home: Scaffold(
+              body: SizedBox(
+                width: 400,
+                height: 300,
+                child: SeatCard(seat: seat),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('#?'));
+      await tester.pump(const Duration(milliseconds: 500));
+      await tester.enterText(find.byType(TextField), '7');
+      await tester.testTextInput.receiveAction(TextInputAction.done);
+      await tester.pump(const Duration(milliseconds: 500));
+
+      state.tick(const Duration(seconds: 3));
+      await tester.pump();
+
+      expect(find.text('#7'), findsOneWidget);
+      expect(find.text('OPEN'), findsOneWidget);
+      expect(find.text('RELEASE'), findsNothing);
+      expect(seat.isEmpty, isTrue);
+      expect(seat.overtime, Duration.zero);
+
+      await tester.tap(find.text('OPEN'));
+      await tester.pump();
+
+      expect(seat.skaterNumber, '7');
+      expect(seat.isRunning, isTrue);
+      expect(find.text('SEATED'), findsOneWidget);
+    },
+  );
+
+  testWidgets('open jammer card shows the scoreboard jammer number', (
+    tester,
+  ) async {
+    final state = makeState();
+    await tester.pumpWidget(_jammerCard(state, 1));
+    expect(find.text('#?'), findsOneWidget);
+
+    state.updateRoster(1, '17', 'uuid-j1');
+    state.updateSkaterRole(1, 'uuid-j1', 'Jammer');
+    await tester.pump();
+
+    expect(find.text('#17'), findsOneWidget);
+    expect(find.text('OPEN'), findsOneWidget);
+    expect(state.team1Jammer.isRunning, isFalse);
   });
 }

@@ -188,6 +188,156 @@ void main() {
     },
   );
 
+  // Entering a lineup is bookkeeping for the scoreboard: it must never start,
+  // pause or release a penalty timer. The only effect on the box is that an
+  // open jammer card shows the lineup's jammer number.
+  test('setting a lineup leaves penalty timers alone and fills open jammer '
+      'card numbers', () async {
+    // Skater IDs are unique per game, unlike the IDs reused by other tests.
+    String id(int n) =>
+        'eeeeeeee-1111-2222-3333-${n.toString().padLeft(12, '0')}';
+    final team1Lineup = {
+      'Jammer': (id(1), '17'),
+      'Pivot': (id(2), '3'),
+      'Blocker1': (id(3), '4'),
+      'Blocker2': (id(4), '5'),
+      'Blocker3': (id(5), '6'),
+    };
+    final team2Lineup = {
+      'Jammer': (id(11), '98'),
+      'Pivot': (id(12), '30'),
+      'Blocker1': (id(13), '40'),
+    };
+    final team2BoxedJammer = (id(10), '99');
+
+    log('action: startNewGame');
+    await operatorClient.startNewGame();
+    await waitUntil(
+      () => !state.jamRunning,
+      label: 'remote game is between jams',
+    );
+
+    for (final (uuid, number) in team1Lineup.values) {
+      operatorClient.addSkater(1, uuid, number);
+    }
+    for (final (uuid, number) in [...team2Lineup.values, team2BoxedJammer]) {
+      operatorClient.addSkater(2, uuid, number);
+    }
+    await waitUntil(
+      () =>
+          team1Lineup.values.every(
+            (s) => state.lookupSkaterId(1, s.$2) != null,
+          ) &&
+          team2Lineup.values.every(
+            (s) => state.lookupSkaterId(2, s.$2) != null,
+          ) &&
+          state.lookupSkaterId(2, team2BoxedJammer.$2) != null,
+      label: 'roster skaters reach the penalty engine',
+    );
+    operatorClient.setJammer(2, team2BoxedJammer.$1);
+    await waitUntil(
+      () => state.jammerNumber(2) == '99',
+      label: 'team 2 jammer #99 reaches the penalty engine',
+    );
+
+    log('jam 1: put skaters in the box in every timer state');
+    await clockAction(operatorClient.stopJam);
+    await clockAction(operatorClient.startJam);
+    await waitUntil(() => state.jamRunning, label: 'jam 1 starts');
+
+    final running = state.team1Blocker1;
+    final paused = state.team1Blocker2;
+    final released = state.team2Blocker1;
+    final boxedJammer = state.team2Jammer;
+    state.seatSkater(
+      seat: running,
+      number: '42',
+      position: SkaterPosition.blocker,
+    );
+    state.seatSkater(
+      seat: paused,
+      number: '43',
+      position: SkaterPosition.blocker,
+    );
+    state.toggleSeatTimer(paused);
+    state.seatSkater(
+      seat: released,
+      number: '44',
+      position: SkaterPosition.blocker,
+    );
+    state.adjustTime(released, const Duration(seconds: -30));
+    state.startSeatAnonymously(boxedJammer);
+    expect(boxedJammer.skaterNumber, '99');
+    expect(released.state, SeatState.done);
+    operatorClient.setJammerInPenaltyBox(2, true);
+
+    await clockAction(operatorClient.stopJam);
+    await waitUntil(
+      () => !state.jamRunning && state.seats.every((s) => !s.isRunning),
+      label: 'jam 1 ends and pauses every seat',
+    );
+
+    snapshot(SkaterSeat s) => (
+      number: s.skaterNumber,
+      preset: s.presetNumber,
+      running: s.isRunning,
+      remaining: s.timeRemaining,
+      overtime: s.overtime,
+      penalties: s.penaltyCount,
+      unmatched: s.unmatchedPenalties,
+      state: s.state,
+    );
+    final before = state.seats.map(snapshot).toList();
+
+    log('action: set both lineups for jam 2');
+    team1Lineup.forEach((pos, s) => operatorClient.setPosition(1, pos, s.$1));
+    team2Lineup.forEach((pos, s) => operatorClient.setPosition(2, pos, s.$1));
+    await waitUntil(
+      () => state.jammerNumber(1) == '17' && state.jammerNumber(2) == '98',
+      label: 'both lineup jammers reach the penalty engine',
+    );
+    // Blocker roles have no observable effect; give them time to arrive.
+    await Future.delayed(const Duration(seconds: 1));
+
+    expect(
+      state.seats.map(snapshot).toList(),
+      before,
+      reason: 'a lineup never starts, pauses, or ends a penalty timer',
+    );
+    expect(state.team1Jammer.state, SeatState.empty);
+    expect(
+      state.displayNumber(state.team1Jammer),
+      '17',
+      reason: 'open jammer card shows the lineup jammer',
+    );
+    expect(
+      state.displayNumber(boxedJammer),
+      '99',
+      reason: 'a seated jammer keeps their own number',
+    );
+    for (final seat in [
+      state.team1Blocker1,
+      state.team1Blocker2,
+      state.team1Blocker3,
+      state.team2Blocker1,
+      state.team2Blocker2,
+      state.team2Blocker3,
+    ].where((s) => s.isEmpty)) {
+      expect(state.displayNumber(seat), isNull, reason: 'blockers not filled');
+    }
+
+    log('action: startJam (jam 2)');
+    await clockAction(operatorClient.startJam);
+    await waitUntil(
+      () => state.jamRunning && running.isRunning,
+      label: 'jam 2 starts and resumes serving seats',
+    );
+    expect(state.team1Jammer.isEmpty, isTrue, reason: 'jammer not boxed');
+    expect(state.team1Jammer.isRunning, isFalse);
+    expect(boxedJammer.isRunning, isTrue);
+    expect(released.state, SeatState.done);
+  });
+
   // CRG resets a team's jammer role when the next jam starts, except that a
   // jammer still in the penalty box carries over into that jam.
   test('scoreboard jammer is forgotten when the next jam starts, unless the '

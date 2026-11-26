@@ -162,6 +162,7 @@ class PenaltyBoxState extends ChangeNotifier {
     _uuidToNumber1.clear();
     _uuidToNumber2.clear();
     _jammerUuids.clear();
+    _lineupJammerUuids.clear();
   }
 
   SkaterSeat get team1Jammer => seats[0];
@@ -265,7 +266,8 @@ class PenaltyBoxState extends ChangeNotifier {
     }
     _uuidToNumber(teamIdx)[skaterId] = skaterNumber;
     addKnownNumber(teamIdx, skaterNumber);
-    // no listener notification needed — roster changes don't affect UI directly
+    // An open jammer seat shows the scoreboard jammer's number.
+    notifyListeners();
   }
 
   String? lookupSkaterId(int teamIdx, String skaterNumber) {
@@ -280,25 +282,72 @@ class PenaltyBoxState extends ChangeNotifier {
   Map<String, String> _uuidToNumber(int teamIdx) =>
       teamIdx == 1 ? _uuidToNumber1 : _uuidToNumber2;
 
-  // The skater the scoreboard currently reports as jammer, per team. This is
+  // The skater the scoreboard reports in the jammer role, per team. This is
   // deliberately not a seat: being on the track as jammer is not a penalty.
   final Map<int, String> _jammerUuids = {};
 
+  // The skater in each team's lineup jammer position. Between jams this is the
+  // upcoming jam's jammer, which CRG only reflects in skater roles once that
+  // jam starts.
+  final Map<int, String> _lineupJammerUuids = {};
+
+  String? _jammerUuid(int teamIdx) =>
+      _lineupJammerUuids[teamIdx] ?? _jammerUuids[teamIdx];
+
   /// Records a skater's role on the scoreboard. Only tracks who the jammer is;
-  /// seats are never touched.
-  void updateSkaterRole(int teamIdx, String uuid, String role) {
-    if (role == 'Jammer') {
-      _jammerUuids[teamIdx] = uuid;
-    } else if (_jammerUuids[teamIdx] == uuid) {
-      _jammerUuids.remove(teamIdx);
-    }
+  /// seat timers are never touched.
+  void updateSkaterRole(int teamIdx, String uuid, String role) =>
+      _updateJammer(teamIdx, () {
+        if (role == 'Jammer') {
+          _jammerUuids[teamIdx] = uuid;
+        } else if (_jammerUuids[teamIdx] == uuid) {
+          _jammerUuids.remove(teamIdx);
+        }
+      });
+
+  /// Records the skater in a team's lineup jammer position (null when the
+  /// position is empty). Seat timers are never touched.
+  void updateLineupJammer(int teamIdx, String? uuid) =>
+      _updateJammer(teamIdx, () {
+        if (uuid == null || uuid.isEmpty) {
+          _lineupJammerUuids.remove(teamIdx);
+        } else {
+          _lineupJammerUuids[teamIdx] = uuid;
+        }
+      });
+
+  /// Applies [change] to the jammer tracking. When the team's jammer changes,
+  /// any number preset on its open jammer seat is replaced by the new jammer.
+  void _updateJammer(int teamIdx, void Function() change) {
+    final before = _jammerUuid(teamIdx);
+    change();
+    if (_jammerUuid(teamIdx) == before) return;
+    final seat = jammerSeat(teamIdx);
+    if (seat.isEmpty) seat.presetNumber = '';
+    notifyListeners();
   }
 
-  /// Roster number of the team's current jammer on the scoreboard, if known.
+  /// Roster number of the team's current jammer on the scoreboard, if known:
+  /// the lineup jammer, else the skater in the jammer role.
   String? jammerNumber(int teamIdx) {
-    final uuid = _jammerUuids[teamIdx];
+    final uuid = _jammerUuid(teamIdx);
     return uuid == null ? null : _uuidToNumber(teamIdx)[uuid];
   }
+
+  /// Number an open seat will use when its timer is started: one entered on
+  /// the seat, else the scoreboard jammer for a jammer seat. Null if unknown
+  /// or if the seat is already occupied.
+  String? pendingNumber(SkaterSeat seat) {
+    if (seat.isOccupied) return null;
+    if (seat.presetNumber.isNotEmpty) return seat.presetNumber;
+    return seat.position == SkaterPosition.jammer
+        ? jammerNumber(seat.teamIndex)
+        : null;
+  }
+
+  /// Number shown on a seat card: the seated skater, else [pendingNumber].
+  String? displayNumber(SkaterSeat seat) =>
+      seat.isOccupied ? seat.skaterNumber : pendingNumber(seat);
 
   VoidCallback? _onKnownNumbersChanged;
 
@@ -471,12 +520,10 @@ class PenaltyBoxState extends ChangeNotifier {
   }
 
   /// Starts a seat immediately — timer runs if jam is running. The number is
-  /// the scoreboard's current jammer for a jammer seat, otherwise placeholder '?'.
+  /// the seat's [pendingNumber], otherwise placeholder '?'.
   void startSeatAnonymously(SkaterSeat seat) {
-    final jammer = seat.position == SkaterPosition.jammer
-        ? jammerNumber(seat.teamIndex)
-        : null;
-    seat.skaterNumber = jammer ?? '?';
+    seat.skaterNumber = pendingNumber(seat) ?? '?';
+    seat.presetNumber = '';
     _startJammerTrip(seat);
     seat.timeRemaining = const Duration(seconds: 30);
     seat.penaltyCount = 1;
@@ -489,13 +536,19 @@ class PenaltyBoxState extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Updates the skater number (and optionally position) on an already-running seat.
+  /// Updates the skater number (and optionally position) on a seat. On an
+  /// open seat the number is only preset: no time is started or assigned
+  /// until the seat's timer is started.
   void setSkaterNumber(
     SkaterSeat seat,
     String number, {
     SkaterPosition? position,
   }) {
-    seat.skaterNumber = number;
+    if (seat.isEmpty) {
+      seat.presetNumber = number;
+    } else {
+      seat.skaterNumber = number;
+    }
     if (position != null) seat.position = position;
     addKnownNumber(seat.teamIndex, number);
     notifyListeners();

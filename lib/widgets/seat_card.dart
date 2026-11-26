@@ -357,6 +357,8 @@ class _SeatCardState extends State<SeatCard>
     TeamInfo teamInfo,
   ) {
     final isEmpty = seatState == SeatState.empty;
+    final pendingNumber = state.pendingNumber(seat);
+    final shownNumber = state.displayNumber(seat);
     final isDone =
         seatState == SeatState.done ||
         (!isEmpty && seat.timeRemaining <= Duration.zero);
@@ -561,7 +563,7 @@ class _SeatCardState extends State<SeatCard>
         return Semantics(
           button: true,
           label:
-              '${isJammer ? 'Jammer' : 'Blocker'} seat ${seat.skaterNumber.isEmpty ? 'empty' : seat.skaterNumber}, $timeStr, $actionLabel$swapNote$bothNote',
+              '${isJammer ? 'Jammer' : 'Blocker'} seat ${isEmpty ? 'empty' : seat.skaterNumber}${pendingNumber == null ? '' : ' #$pendingNumber'}, $timeStr, $actionLabel$swapNote$bothNote',
           child: Stack(
             children: [
               // The header is its own edge-to-edge region. It never shares
@@ -573,9 +575,7 @@ class _SeatCardState extends State<SeatCard>
                 height: headerHeight,
                 child: _SeatHeader(
                   roleLabel: isJammer ? 'J' : 'B',
-                  numberLabel: isEmpty || seat.skaterNumber == '?'
-                      ? '#?'
-                      : '#${seat.skaterNumber}',
+                  numberLabel: '#${shownNumber ?? '?'}',
                   onTap: () => _onNumberTap(state),
                   teamInfo: teamInfo,
                   dimmed: isEmpty,

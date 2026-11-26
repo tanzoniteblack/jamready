@@ -188,6 +188,41 @@ void main() {
       await engine.dispose();
     });
 
+    test('the upcoming lineup jammer is shown before roles update', () async {
+      final (:engine, :channel, :state) = await setupEngine();
+      await sendAndPump(channel, {
+        'ScoreBoard.CurrentGame.Team(1).Skater(uuid-a).RosterNumber': '42',
+        'ScoreBoard.CurrentGame.Team(1).Skater(uuid-b).RosterNumber': '77',
+        'ScoreBoard.CurrentGame.Team(1).Skater(uuid-a).Role': 'Jammer',
+      });
+      // Between jams CRG moves the jammer position to the upcoming jam while
+      // the just-ended jam's role stays in place.
+      await sendAndPump(channel, {
+        'ScoreBoard.CurrentGame.Team(1).Position(Jammer).Skater': 'uuid-b',
+      });
+
+      expect(state.jammerNumber(1), '77');
+      expect(state.displayNumber(state.team1Jammer), '77');
+      expect(state.team1Jammer.isOccupied, isFalse);
+      expect(state.team1Jammer.isRunning, isFalse);
+      await engine.dispose();
+    });
+
+    test('an emptied lineup position falls back to the jammer role', () async {
+      final (:engine, :channel, :state) = await setupEngine();
+      await sendAndPump(channel, {
+        'ScoreBoard.CurrentGame.Team(1).Skater(uuid-a).RosterNumber': '42',
+        'ScoreBoard.CurrentGame.Team(1).Skater(uuid-a).Role': 'Jammer',
+        'ScoreBoard.CurrentGame.Team(1).Position(Jammer).Skater': 'uuid-a',
+      });
+      await sendAndPump(channel, {
+        'ScoreBoard.CurrentGame.Team(1).Position(Jammer).Skater': null,
+      });
+
+      expect(state.jammerNumber(1), '42');
+      await engine.dispose();
+    });
+
     test('resolves a role that arrives before the roster number', () async {
       final (:engine, :channel, :state) = await setupEngine();
       await sendAndPump(channel, {

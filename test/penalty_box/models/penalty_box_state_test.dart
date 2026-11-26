@@ -303,6 +303,93 @@ void main() {
   });
 
   // ---------------------------------------------------------------------------
+  // setSkaterNumber() on an open seat
+  // ---------------------------------------------------------------------------
+
+  group('setSkaterNumber() on an open seat', () {
+    for (final jamRunning in [false, true]) {
+      test('only presets the number (jam running: $jamRunning)', () {
+        state.jamRunning = jamRunning;
+        final seat = state.team1Blocker1;
+        state.setSkaterNumber(seat, '7');
+
+        expectSeatState(seat, SeatState.empty);
+        expect(seat.isRunning, isFalse);
+        expect(seat.timeRemaining, Duration.zero);
+        expect(seat.penaltyCount, 0);
+        expect(state.pendingNumber(seat), '7');
+        expect(state.displayNumber(seat), '7');
+        expect(state.knownNumbers(1), contains('7'));
+
+        state.tick(const Duration(seconds: 5));
+        expect(seat.overtime, Duration.zero, reason: 'no negative countdown');
+        expectSeatState(seat, SeatState.empty);
+      });
+    }
+
+    test('jam start does not start a preset seat', () {
+      final seat = state.team1Blocker1;
+      state.setSkaterNumber(seat, '7');
+      state.onJamStart();
+      state.tick(const Duration(seconds: 5));
+      expectSeatState(seat, SeatState.empty);
+      expect(seat.isRunning, isFalse);
+      expect(seat.overtime, Duration.zero);
+    });
+
+    test('starting the timer seats the preset number', () {
+      state.jamRunning = true;
+      final seat = state.team1Blocker1;
+      state.setSkaterNumber(seat, '7');
+      state.startSeatAnonymously(seat);
+
+      expect(seat.skaterNumber, '7');
+      expect(seat.presetNumber, isEmpty);
+      expect(seat.isRunning, isTrue);
+      expectTimeRemaining(seat, const Duration(seconds: 30));
+      expect(seat.penaltyCount, 1);
+    });
+
+    test('a preset jammer number overrides the scoreboard jammer', () {
+      state.updateRoster(1, '17', 'uuid-j1');
+      state.updateSkaterRole(1, 'uuid-j1', 'Jammer');
+      state.setSkaterNumber(state.team1Jammer, '5');
+      state.startSeatAnonymously(state.team1Jammer);
+      expect(state.team1Jammer.skaterNumber, '5');
+    });
+
+    test('a new scoreboard jammer replaces a preset jammer number', () {
+      state.setSkaterNumber(state.team1Jammer, '5');
+      state.updateRoster(1, '17', 'uuid-j1');
+      state.updateSkaterRole(1, 'uuid-j1', 'Jammer');
+      expect(state.displayNumber(state.team1Jammer), '17');
+    });
+
+    test('a repeated role update keeps a preset jammer number', () {
+      state.updateRoster(1, '17', 'uuid-j1');
+      state.updateSkaterRole(1, 'uuid-j1', 'Jammer');
+      state.setSkaterNumber(state.team1Jammer, '5');
+      state.updateSkaterRole(1, 'uuid-j1', 'Jammer');
+      expect(state.displayNumber(state.team1Jammer), '5');
+    });
+
+    test('clearing a seat forgets its preset number', () {
+      final seat = state.team1Blocker1;
+      state.setSkaterNumber(seat, '7');
+      state.clearSeat(seat);
+      expect(state.pendingNumber(seat), isNull);
+    });
+
+    test('an open jammer seat shows the scoreboard jammer', () {
+      state.updateRoster(1, '17', 'uuid-j1');
+      state.updateSkaterRole(1, 'uuid-j1', 'Jammer');
+      expect(state.displayNumber(state.team1Jammer), '17');
+      expect(state.displayNumber(state.team1Blocker1), isNull);
+      expectSeatState(state.team1Jammer, SeatState.empty);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
   // clearSeat() — local mode
   // ---------------------------------------------------------------------------
 
