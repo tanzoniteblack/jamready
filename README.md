@@ -50,7 +50,7 @@ Build the scoreboard images once before running either suite. You can build ever
 
 ```bash
 make build-scoreboards
-./scripts/build-scoreboard-images.sh --versions v2025.9,v2025.8
+./scripts/build-scoreboard-images.sh --versions v2027.1,v2027.0
 ```
 
 The source for each scoreboard version is cloned and compiled inside a multi-stage Docker build (`scripts/scoreboard.Dockerfile`).
@@ -71,7 +71,7 @@ The fast suite exercises `RemoteGameEngine` and `ScoreboardState` directly, with
 
 ```bash
 ./scripts/test-remote-engine-scoreboards.sh
-./scripts/test-remote-engine-scoreboards.sh --versions v2025.9,v2025.8
+./scripts/test-remote-engine-scoreboards.sh --versions v2027.1,v2027.0
 ./scripts/test-remote-engine-scoreboards.sh --jobs 2
 ```
 
@@ -96,7 +96,7 @@ The UI-driven suite builds and controls the Flutter app on Android emulators. Wh
 
 ```bash
 make test-scoreboards
-./scripts/test-all-scoreboards.sh --versions v2025.9,v2025.8
+./scripts/test-all-scoreboards.sh --versions v2027.1,v2027.0
 ./scripts/test-all-scoreboards.sh --jobs 2
 ```
 
