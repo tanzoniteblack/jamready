@@ -946,5 +946,53 @@ void main() {
       state.tick(const Duration(seconds: 10));
       expect(state.bothJammersSitting, isFalse);
     });
+
+    test('both sitting after a swap: swap time vs new penalty', () {
+      simpleSwap();
+      expect(state.bothSittingReason(1), isNull);
+      expect(state.bothSittingReason(2), isNull);
+      expect(state.firstJammerOut, isNull);
+
+      state.clearSeat(state.team1Jammer);
+      seatJammer(state, 1, '11');
+
+      expect(state.bothSittingReason(1), JammerBoxReason.newPenalty);
+      expect(state.bothSittingReason(2), JammerBoxReason.swapTime);
+      expect(state.firstJammerOut, same(state.team2Jammer));
+    });
+
+    test('swap time ends when that jammer is released', () {
+      simpleSwap();
+      state.clearSeat(state.team1Jammer);
+      state.tick(const Duration(seconds: 10));
+      state.clearSeat(state.team2Jammer);
+
+      // Both jammers now arrive in a later jam with no swap behind them.
+      state.onJamEnd();
+      seatJammer(state, 1, '11');
+      seatJammer(state, 2, '21');
+
+      expect(state.bothSittingReason(1), JammerBoxReason.inBox);
+      expect(state.bothSittingReason(2), JammerBoxReason.inBox);
+    });
+
+    test('both seated between jams with no swap are just in the box', () {
+      state.onJamEnd();
+      seatJammer(state, 1, '10');
+      seatJammer(state, 2, '20');
+
+      expect(state.bothSittingReason(1), JammerBoxReason.inBox);
+      expect(state.bothSittingReason(2), JammerBoxReason.inBox);
+    });
+
+    test('new game clears swap time', () {
+      simpleSwap();
+      state.clearTimersForNewGame();
+      state.onJamEnd();
+      seatJammer(state, 1, '10');
+      seatJammer(state, 2, '20');
+
+      expect(state.bothSittingReason(2), JammerBoxReason.inBox);
+    });
   });
 }

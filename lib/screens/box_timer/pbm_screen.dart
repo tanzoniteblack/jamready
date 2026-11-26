@@ -49,7 +49,7 @@ class PbmScreen extends StatelessWidget {
                           children: [
                             JamStatusBar(state: state, engine: engine),
                             const SizedBox(height: 16),
-                            _BothJammersBanner(show: state.bothJammersSitting),
+                            _BothJammersBanner(state: state),
                             Expanded(
                               child: isPortrait
                                   ? Column(
@@ -162,17 +162,34 @@ class _PbmTeamColumn extends StatelessWidget {
   }
 }
 
-/// Full-width alert shown while both jammers are serving time at once.
+/// Full-width banner shown while both jammers are serving time at once. It
+/// says why (no swap applies) and who leaves first, so the PBM can see the
+/// app expects both to be sitting.
 class _BothJammersBanner extends StatelessWidget {
-  final bool show;
+  final PenaltyBoxState state;
 
-  const _BothJammersBanner({required this.show});
+  const _BothJammersBanner({required this.state});
+
+  String _jammerName(SkaterSeat seat) {
+    final number = state.displayNumber(seat);
+    return number == null || number.isEmpty || number == '?'
+        ? state.teamInfo(seat.teamIndex).name.toUpperCase()
+        : '#$number';
+  }
 
   @override
   Widget build(BuildContext context) {
+    final firstOut = state.firstJammerOut;
+    final textStyle = AppTextStyles.alertLabel.copyWith(
+      color: Colors.white,
+      fontSize: 18,
+      fontWeight: FontWeight.w900,
+      letterSpacing: 0,
+      height: 1.1,
+    );
     return AnimatedSize(
       duration: const Duration(milliseconds: 200),
-      child: !show
+      child: firstOut == null
           ? const SizedBox(width: double.infinity)
           : Padding(
               padding: const EdgeInsets.only(bottom: 12),
@@ -189,21 +206,29 @@ class _BothJammersBanner extends StatelessWidget {
                 child: Row(
                   children: [
                     const Icon(
-                      Icons.warning_amber_rounded,
+                      Icons.link_rounded,
                       color: Colors.white,
                       size: 28,
                     ),
                     const SizedBox(width: 10),
                     Expanded(
-                      child: Text(
-                        'BOTH JAMMERS IN THE BOX',
-                        style: AppTextStyles.alertLabel.copyWith(
-                          color: Colors.white,
-                          fontSize: 18,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 0,
-                          height: 1.1,
-                        ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'NO SWAP — BOTH JAMMERS SERVE',
+                            style: textStyle,
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            '${_jammerName(firstOut)} OUT FIRST IN '
+                            '${formatPenaltyTime(firstOut.timeRemaining)}',
+                            style: textStyle.copyWith(
+                              fontSize: 15,
+                              color: Colors.white.withValues(alpha: 0.9),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],

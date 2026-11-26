@@ -305,16 +305,14 @@ class _SeatCardState extends State<SeatCard>
                 ),
               ),
               _buildContent(context, state, seat, seatState, teamInfo),
-              if (_showBothJammersAlert(state))
+              // Steady, not pulsing: pulsing means "act now" (stand, release).
+              if (_bothSittingReason(state) != null)
                 Positioned.fill(
                   child: IgnorePointer(
-                    child: FadeTransition(
-                      opacity: _pulseController,
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                          border: Border.all(color: bothJammersColor, width: 5),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        border: Border.all(color: bothJammersColor, width: 5),
+                        borderRadius: BorderRadius.circular(6),
                       ),
                     ),
                   ),
@@ -326,9 +324,10 @@ class _SeatCardState extends State<SeatCard>
     );
   }
 
-  bool _showBothJammersAlert(PenaltyBoxState state) =>
-      state.jammerSeat(widget.seat.teamIndex) == widget.seat &&
-      state.bothJammersSitting;
+  JammerBoxReason? _bothSittingReason(PenaltyBoxState state) =>
+      state.jammerSeat(widget.seat.teamIndex) == widget.seat
+      ? state.bothSittingReason(widget.seat.teamIndex)
+      : null;
 
   Color _teamSurfaceColor(TeamInfo teamInfo) {
     final source = teamInfo.bgColor;
@@ -390,11 +389,14 @@ class _SeatCardState extends State<SeatCard>
     final isJammer = seat.position == SkaterPosition.jammer;
     final isJammerSeat = state.jammerSeat(seat.teamIndex) == seat;
     final swapSat = isJammerSeat ? state.swapSatTime(seat.teamIndex) : null;
-    final showBothJammers = _showBothJammersAlert(state);
+    final bothReason = _bothSittingReason(state);
+    final showBothJammers = bothReason != null;
     final swapNote = swapSat == null
         ? ''
         : ', other jammer owes ${formatPenaltyTime(swapSat)}';
-    final bothNote = showBothJammers ? ', both jammers in the box' : '';
+    final bothNote = showBothJammers
+        ? ', both jammers in the box, ${bothJammersLabel(bothReason).toLowerCase()}'
+        : '';
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -605,8 +607,8 @@ class _SeatCardState extends State<SeatCard>
                       if (showBothJammers)
                         Flexible(
                           child: _BothJammersTag(
+                            label: bothJammersLabel(bothReason),
                             fontSize: footerFontSize,
-                            compact: tinyCard,
                           ),
                         )
                       else
@@ -674,13 +676,20 @@ class _SwapSatNote extends StatelessWidget {
   }
 }
 
-/// Bottom-left pill shown on both jammer cards while both jammers are serving
-/// time at once.
-class _BothJammersTag extends StatelessWidget {
-  final double fontSize;
-  final bool compact;
+/// Card tag explaining why a jammer is sitting while both jammers are.
+String bothJammersLabel(JammerBoxReason reason) => switch (reason) {
+  JammerBoxReason.swapTime => 'SWAP TIME',
+  JammerBoxReason.newPenalty => 'NEW PENALTY',
+  JammerBoxReason.inBox => 'IN BOX',
+};
 
-  const _BothJammersTag({required this.fontSize, required this.compact});
+/// Bottom-left pill on both jammer cards while both jammers are serving time
+/// at once, saying why this jammer is sitting.
+class _BothJammersTag extends StatelessWidget {
+  final String label;
+  final double fontSize;
+
+  const _BothJammersTag({required this.label, required this.fontSize});
 
   @override
   Widget build(BuildContext context) {
@@ -697,7 +706,7 @@ class _BothJammersTag extends StatelessWidget {
           borderRadius: BorderRadius.circular(fontSize),
         ),
         child: Text(
-          compact ? 'BOTH IN' : 'BOTH JAMMERS IN',
+          label,
           maxLines: 1,
           style: AppTextStyles.alertLabel.copyWith(
             color: Colors.white,

@@ -5,6 +5,18 @@ import 'skater_seat.dart';
 
 enum ConnectionStatus { disconnected, connecting, connected }
 
+/// Why a jammer is in the box while the other jammer is too.
+enum JammerBoxReason {
+  /// Serving time handed over by a §4.4 swap.
+  swapTime,
+
+  /// Returned with a new penalty that no swap can pair.
+  newPenalty,
+
+  /// Both are sitting for some other reason (e.g. both seated between jams).
+  inBox,
+}
+
 class TeamInfo {
   final int index;
   String name;
@@ -151,6 +163,7 @@ class PenaltyBoxState extends ChangeNotifier {
     }
     queue.clear();
     _jammerSwap = null;
+    _swapTimeTeam = null;
     notifyListeners();
   }
 
@@ -188,29 +201,50 @@ class PenaltyBoxState extends ChangeNotifier {
   Duration? swapSatTime(int teamIdx) =>
       _jammerSwap?.teamIndex == teamIdx ? _jammerSwap!.sat : null;
 
+  // Team whose jammer is serving time handed over by a §4.4 swap. Unlike
+  // [_jammerSwap], this survives the released jammer returning, so both
+  // jammer cards can explain why each is sitting.
+  int? _swapTimeTeam;
+
   /// Both jammers have penalty time left at once — no swap is releasing either.
   bool get bothJammersSitting => [
     team1Jammer,
     team2Jammer,
   ].every((s) => s.isOccupied && s.timeRemaining > Duration.zero);
 
+  /// Why this team's jammer is sitting while both jammers are, else null.
+  JammerBoxReason? bothSittingReason(int teamIdx) {
+    if (!bothJammersSitting) return null;
+    if (_swapTimeTeam == null) return JammerBoxReason.inBox;
+    return teamIdx == _swapTimeTeam
+        ? JammerBoxReason.swapTime
+        : JammerBoxReason.newPenalty;
+  }
+
+  /// While both jammers are sitting, the one with the least time left.
+  SkaterSeat? get firstJammerOut => !bothJammersSitting
+      ? null
+      : team1Jammer.timeRemaining <= team2Jammer.timeRemaining
+      ? team1Jammer
+      : team2Jammer;
+
   bool _isJammerSeat(SkaterSeat seat) =>
       identical(seat, jammerSeat(seat.teamIndex));
 
-  /// A new jammer trip in [seat] supersedes any swap note on that seat.
+  /// A new jammer trip in [seat] supersedes any swap state on that seat.
   void _startJammerTrip(SkaterSeat seat) {
-    if (_isJammerSeat(seat) && _jammerSwap?.teamIndex == seat.teamIndex) {
-      _jammerSwap = null;
-    }
+    if (!_isJammerSeat(seat)) return;
+    if (_jammerSwap?.teamIndex == seat.teamIndex) _jammerSwap = null;
+    if (_swapTimeTeam == seat.teamIndex) _swapTimeTeam = null;
   }
 
   /// The second jammer leaving the box ends the swap the note explains.
   void _endJammerTrip(SkaterSeat seat) {
-    if (_isJammerSeat(seat) &&
-        _jammerSwap != null &&
-        _jammerSwap!.teamIndex != seat.teamIndex) {
+    if (!_isJammerSeat(seat)) return;
+    if (_jammerSwap != null && _jammerSwap!.teamIndex != seat.teamIndex) {
       _jammerSwap = null;
     }
+    if (_swapTimeTeam == seat.teamIndex) _swapTimeTeam = null;
   }
 
   List<SkaterSeat> blockerSeats(int teamIdx) => teamIdx == 1
@@ -464,6 +498,7 @@ class PenaltyBoxState extends ChangeNotifier {
     if (sitting.timeRemaining <= Duration.zero) {
       sitting.isRunning = false;
       _jammerSwap = (teamIndex: sitting.teamIndex, sat: elapsed);
+      if (arrivingTime > Duration.zero) _swapTimeTeam = arriving.teamIndex;
     }
     if (arrivingTime <= Duration.zero) arriving.isRunning = false;
   }

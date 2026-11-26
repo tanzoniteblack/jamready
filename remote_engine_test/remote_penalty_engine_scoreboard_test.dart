@@ -492,6 +492,9 @@ void main() {
     expect(team2.timeRemaining, lessThanOrEqualTo(owedAtJamEnd));
     expect(state.swapSatTime(1), isNull, reason: 'new trip replaces note');
     expect(state.bothJammersSitting, isTrue);
+    expect(state.bothSittingReason(1), JammerBoxReason.newPenalty);
+    expect(state.bothSittingReason(2), JammerBoxReason.swapTime);
+    expect(state.firstJammerOut, same(team2));
 
     log('team 2 jammer finishes and is released');
     state.tick(team2.timeRemaining);

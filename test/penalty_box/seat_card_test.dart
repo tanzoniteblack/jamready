@@ -86,7 +86,8 @@ void main() {
     await tester.pumpWidget(_jammerCard(state, 1));
 
     expect(find.text('SAT 0:10'), findsOneWidget);
-    expect(find.text('BOTH JAMMERS IN'), findsNothing);
+    expect(find.text('NEW PENALTY'), findsNothing);
+    expect(find.text('SWAP TIME'), findsNothing);
   });
 
   testWidgets('second jammer card has no swap note', (tester) async {
@@ -95,14 +96,18 @@ void main() {
     expect(find.textContaining('SAT'), findsNothing);
   });
 
-  testWidgets('both jammer cards flag both jammers sitting', (tester) async {
+  testWidgets('both jammer cards say why each jammer is sitting', (
+    tester,
+  ) async {
     final state = _bothSittingState();
 
     await tester.pumpWidget(_jammerCard(state, 1));
-    expect(find.text('BOTH JAMMERS IN'), findsOneWidget);
+    expect(find.text('NEW PENALTY'), findsOneWidget);
+    expect(find.text('SWAP TIME'), findsNothing);
 
     await tester.pumpWidget(_jammerCard(state, 2));
-    expect(find.text('BOTH JAMMERS IN'), findsOneWidget);
+    expect(find.text('SWAP TIME'), findsOneWidget);
+    expect(find.text('NEW PENALTY'), findsNothing);
     // Swapping seats on the same card fires a stand haptic; let it finish.
     await tester.pump(const Duration(milliseconds: 200));
   });
@@ -122,11 +127,16 @@ void main() {
     );
     await tester.pump();
 
-    expect(find.text('BOTH JAMMERS IN THE BOX'), findsOneWidget);
+    expect(find.text('NO SWAP — BOTH JAMMERS SERVE'), findsOneWidget);
+    expect(find.text('#20 OUT FIRST IN 0:10'), findsOneWidget);
 
-    state.tick(const Duration(seconds: 10)); // T2 finishes serving.
+    state.tick(const Duration(seconds: 4));
+    await tester.pump();
+    expect(find.text('#20 OUT FIRST IN 0:06'), findsOneWidget);
+
+    state.tick(const Duration(seconds: 6)); // T2 finishes serving.
     await tester.pump(const Duration(milliseconds: 300));
-    expect(find.textContaining('BOTH JAMMERS IN THE BOX'), findsNothing);
+    expect(find.textContaining('NO SWAP'), findsNothing);
   });
 
   testWidgets(
