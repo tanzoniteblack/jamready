@@ -150,6 +150,7 @@ class PenaltyBoxState extends ChangeNotifier {
       seat.clear();
     }
     queue.clear();
+    _jammerSwap = null;
     notifyListeners();
   }
 
@@ -174,6 +175,42 @@ class PenaltyBoxState extends ChangeNotifier {
 
   SkaterSeat jammerSeat(int teamIdx) =>
       teamIdx == 1 ? team1Jammer : team2Jammer;
+
+  // The most recent §4.4 swap that released a sitting jammer: which team's
+  // jammer was released, and how long they had sat on the swapped penalties.
+  // Kept until the other jammer leaves the box so the PBM can see what the
+  // second jammer owes and why.
+  ({int teamIndex, Duration sat})? _jammerSwap;
+
+  /// How long this team's jammer sat before being released by a jammer swap,
+  /// while the opposing jammer is still serving that swapped time.
+  Duration? swapSatTime(int teamIdx) =>
+      _jammerSwap?.teamIndex == teamIdx ? _jammerSwap!.sat : null;
+
+  /// Both jammers have penalty time left at once — no swap is releasing either.
+  bool get bothJammersSitting => [
+    team1Jammer,
+    team2Jammer,
+  ].every((s) => s.isOccupied && s.timeRemaining > Duration.zero);
+
+  bool _isJammerSeat(SkaterSeat seat) =>
+      identical(seat, jammerSeat(seat.teamIndex));
+
+  /// A new jammer trip in [seat] supersedes any swap note on that seat.
+  void _startJammerTrip(SkaterSeat seat) {
+    if (_isJammerSeat(seat) && _jammerSwap?.teamIndex == seat.teamIndex) {
+      _jammerSwap = null;
+    }
+  }
+
+  /// The second jammer leaving the box ends the swap the note explains.
+  void _endJammerTrip(SkaterSeat seat) {
+    if (_isJammerSeat(seat) &&
+        _jammerSwap != null &&
+        _jammerSwap!.teamIndex != seat.teamIndex) {
+      _jammerSwap = null;
+    }
+  }
 
   List<SkaterSeat> blockerSeats(int teamIdx) => teamIdx == 1
       ? [team1Blocker1, team1Blocker2, team1Blocker3]
@@ -309,6 +346,7 @@ class PenaltyBoxState extends ChangeNotifier {
     // WFTDA 4.4: jammers who are done (0:00) at jam start are released
     for (final seat in [team1Jammer, team2Jammer]) {
       if (seat.isOccupied && seat.timeRemaining <= Duration.zero) {
+        _endJammerTrip(seat);
         seat.clear();
       }
     }
@@ -339,6 +377,8 @@ class PenaltyBoxState extends ChangeNotifier {
         ? sitting.timeRemaining
         : sittingMax;
     var arrivingTime = arrivingMax;
+    // Time the sitting jammer has already served on the eligible penalties.
+    final elapsed = sittingMax - sittingTime;
 
     // Cancel penalty pairs one-for-one (§4.4.2)
     while (sittingTime >= pd && arrivingTime >= pd) {
@@ -354,8 +394,9 @@ class PenaltyBoxState extends ChangeNotifier {
       arriving.unmatchedPenalties = arrivingMax.inSeconds ~/ 30;
     } else if (sittingMax <= arrivingMax) {
       // §4.4.1 (extended): sitting released; arriving serves elapsed + any
-      // extra unmatched penalties beyond what sitting had
-      final elapsed = sittingMax - sittingTime;
+      // extra unmatched penalties beyond what sitting had. sittingMax and
+      // sittingTime have shrunk by the same cancelled amount, so the
+      // remaining elapsed equals the original.
       arrivingTime = elapsed + (arrivingMax - sittingMax);
       sittingTime = Duration.zero;
       sitting.unmatchedPenalties = 0;
@@ -371,7 +412,10 @@ class PenaltyBoxState extends ChangeNotifier {
     if (sittingTime < sitting.timeRemaining) {
       sitting.timeRemaining = sittingTime;
     }
-    if (sitting.timeRemaining <= Duration.zero) sitting.isRunning = false;
+    if (sitting.timeRemaining <= Duration.zero) {
+      sitting.isRunning = false;
+      _jammerSwap = (teamIndex: sitting.teamIndex, sat: elapsed);
+    }
     if (arrivingTime <= Duration.zero) arriving.isRunning = false;
   }
 
@@ -414,6 +458,7 @@ class PenaltyBoxState extends ChangeNotifier {
     int penaltyCount = 1,
   }) {
     seat.setSkater(number: number, pos: position, arrivedBetween: !jamRunning);
+    _startJammerTrip(seat);
     // Add extra penalties before sync so the sync sees the full count
     for (var i = 1; i < penaltyCount; i++) {
       seat.addPenalty();
@@ -432,6 +477,7 @@ class PenaltyBoxState extends ChangeNotifier {
         ? jammerNumber(seat.teamIndex)
         : null;
     seat.skaterNumber = jammer ?? '?';
+    _startJammerTrip(seat);
     seat.timeRemaining = const Duration(seconds: 30);
     seat.penaltyCount = 1;
     seat.unmatchedPenalties = 1;
@@ -489,6 +535,7 @@ class PenaltyBoxState extends ChangeNotifier {
   }
 
   void clearSeat(SkaterSeat seat) {
+    _endJammerTrip(seat);
     final teamQueue = queueForTeam(seat.teamIndex);
     if (teamQueue.isNotEmpty && seat.position != SkaterPosition.jammer) {
       final next = teamQueue.first;

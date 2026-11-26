@@ -305,12 +305,30 @@ class _SeatCardState extends State<SeatCard>
                 ),
               ),
               _buildContent(context, state, seat, seatState, teamInfo),
+              if (_showBothJammersAlert(state))
+                Positioned.fill(
+                  child: IgnorePointer(
+                    child: FadeTransition(
+                      opacity: _pulseController,
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          border: Border.all(color: bothJammersColor, width: 5),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
             ],
           ),
         ),
       ),
     );
   }
+
+  bool _showBothJammersAlert(PenaltyBoxState state) =>
+      state.jammerSeat(widget.seat.teamIndex) == widget.seat &&
+      state.bothJammersSitting;
 
   Color _teamSurfaceColor(TeamInfo teamInfo) {
     final source = teamInfo.bgColor;
@@ -368,6 +386,13 @@ class _SeatCardState extends State<SeatCard>
       _ => Colors.white38,
     };
     final isJammer = seat.position == SkaterPosition.jammer;
+    final isJammerSeat = state.jammerSeat(seat.teamIndex) == seat;
+    final swapSat = isJammerSeat ? state.swapSatTime(seat.teamIndex) : null;
+    final showBothJammers = _showBothJammersAlert(state);
+    final swapNote = swapSat == null
+        ? ''
+        : ', other jammer owes ${formatPenaltyTime(swapSat)}';
+    final bothNote = showBothJammers ? ', both jammers in the box' : '';
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -396,6 +421,9 @@ class _SeatCardState extends State<SeatCard>
               32.0,
             );
         final showTapHint = isEmpty && height >= 132 && width >= 170;
+        final hasFooter = swapSat != null || showBothJammers;
+        final footerFontSize = (timerFontSize * 0.28).clamp(12.0, 28.0);
+        final footerHeight = hasFooter ? footerFontSize * 1.35 : 0.0;
 
         Widget timerBlock = Column(
           mainAxisSize: MainAxisSize.min,
@@ -533,7 +561,7 @@ class _SeatCardState extends State<SeatCard>
         return Semantics(
           button: true,
           label:
-              '${isJammer ? 'Jammer' : 'Blocker'} seat ${seat.skaterNumber.isEmpty ? 'empty' : seat.skaterNumber}, $timeStr, $actionLabel',
+              '${isJammer ? 'Jammer' : 'Blocker'} seat ${seat.skaterNumber.isEmpty ? 'empty' : seat.skaterNumber}, $timeStr, $actionLabel$swapNote$bothNote',
           child: Stack(
             children: [
               // The header is its own edge-to-edge region. It never shares
@@ -560,15 +588,126 @@ class _SeatCardState extends State<SeatCard>
               ),
               Positioned.fill(
                 top: headerHeight + bodyGap,
-                bottom: contentPadding,
+                bottom: contentPadding + footerHeight,
                 child: Center(
                   child: FittedBox(fit: BoxFit.scaleDown, child: timerBlock),
                 ),
               ),
+              if (hasFooter)
+                Positioned(
+                  left: contentPadding + 10,
+                  right: contentPadding,
+                  bottom: contentPadding * 0.6,
+                  height: footerHeight,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      if (showBothJammers)
+                        Flexible(
+                          child: _BothJammersTag(
+                            fontSize: footerFontSize,
+                            compact: tinyCard,
+                          ),
+                        )
+                      else
+                        const SizedBox.shrink(),
+                      if (swapSat != null)
+                        Flexible(
+                          child: _SwapSatNote(
+                            sat: swapSat,
+                            fontSize: footerFontSize,
+                            compact: tinyCard,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
             ],
           ),
         );
       },
+    );
+  }
+}
+
+/// Magenta used for every "both jammers in the box" indicator.
+const bothJammersColor = Color(0xFFFF2BD6);
+
+/// Small bottom-right note on the released jammer's card after a §4.4 swap:
+/// how long they sat, which is the time the other jammer now owes.
+class _SwapSatNote extends StatelessWidget {
+  final Duration sat;
+  final double fontSize;
+  final bool compact;
+
+  const _SwapSatNote({
+    required this.sat,
+    required this.fontSize,
+    required this.compact,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    const color = Colors.white70;
+    return FittedBox(
+      alignment: Alignment.centerRight,
+      fit: BoxFit.scaleDown,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.swap_horiz_rounded, color: color, size: fontSize * 1.1),
+          SizedBox(width: fontSize * 0.2),
+          Text(
+            compact ? formatPenaltyTime(sat) : 'SAT ${formatPenaltyTime(sat)}',
+            maxLines: 1,
+            style: AppTextStyles.clockTime.copyWith(
+              color: color,
+              fontSize: fontSize,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 0,
+              height: 1,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Bottom-left pill shown on both jammer cards while both jammers are serving
+/// time at once.
+class _BothJammersTag extends StatelessWidget {
+  final double fontSize;
+  final bool compact;
+
+  const _BothJammersTag({required this.fontSize, required this.compact});
+
+  @override
+  Widget build(BuildContext context) {
+    return FittedBox(
+      alignment: Alignment.centerLeft,
+      fit: BoxFit.scaleDown,
+      child: Container(
+        padding: EdgeInsets.symmetric(
+          horizontal: fontSize * 0.45,
+          vertical: fontSize * 0.12,
+        ),
+        decoration: BoxDecoration(
+          color: bothJammersColor,
+          borderRadius: BorderRadius.circular(fontSize),
+        ),
+        child: Text(
+          compact ? 'BOTH IN' : 'BOTH JAMMERS IN',
+          maxLines: 1,
+          style: AppTextStyles.alertLabel.copyWith(
+            color: Colors.white,
+            fontSize: fontSize * 0.8,
+            fontWeight: FontWeight.w900,
+            letterSpacing: 0,
+            height: 1.1,
+          ),
+        ),
+      ),
     );
   }
 }

@@ -764,4 +764,100 @@ void main() {
       expect(state.team1Jammer.unmatchedPenalties, 1);
     });
   });
+
+  // ---------------------------------------------------------------------------
+  // Jammer swap visibility for the PBM
+  // ---------------------------------------------------------------------------
+
+  group('jammer swap note and both-jammers-sitting', () {
+    setUp(() => state.onJamStart());
+
+    // T1 serves 10 seconds, then T2 arrives: T1 released, T2 owes 10 seconds.
+    void simpleSwap() {
+      seatJammer(state, 1, '10');
+      state.tick(const Duration(seconds: 10));
+      seatJammer(state, 2, '20');
+    }
+
+    test('swap records how long the released jammer sat', () {
+      simpleSwap();
+
+      expect(state.swapSatTime(1), const Duration(seconds: 10));
+      expect(state.swapSatTime(2), isNull);
+    });
+
+    test('note survives releasing the first jammer, cleared by the second', () {
+      simpleSwap();
+
+      state.clearSeat(state.team1Jammer);
+      expect(state.swapSatTime(1), const Duration(seconds: 10));
+
+      state.clearSeat(state.team2Jammer);
+      expect(state.swapSatTime(1), isNull);
+    });
+
+    test('a new trip for the first jammer clears the note', () {
+      simpleSwap();
+      state.clearSeat(state.team1Jammer);
+
+      seatJammer(state, 1, '11');
+
+      expect(state.swapSatTime(1), isNull);
+    });
+
+    test('second jammer auto-released at jam start clears the note', () {
+      simpleSwap();
+      state.tick(const Duration(seconds: 10));
+      state.onJamEnd();
+
+      state.onJamStart();
+
+      expect(state.team2Jammer.isEmpty, isTrue);
+      expect(state.swapSatTime(1), isNull);
+    });
+
+    test('arriving with extra penalties: note is time sat, not time owed', () {
+      seatJammer(state, 1, '10');
+      state.tick(const Duration(seconds: 10));
+
+      seatJammer(state, 2, '20', penalties: 2);
+
+      expect(state.team2Jammer.timeRemaining, const Duration(seconds: 40));
+      expect(state.swapSatTime(1), const Duration(seconds: 10));
+    });
+
+    test('no note when the sitting jammer keeps serving', () {
+      seatJammer(state, 1, '10');
+      state.addPenaltyToSeat(state.team1Jammer);
+      state.tick(const Duration(seconds: 20));
+
+      seatJammer(state, 2, '20');
+
+      expect(state.team1Jammer.timeRemaining, const Duration(seconds: 10));
+      expect(state.swapSatTime(1), isNull);
+      expect(state.swapSatTime(2), isNull);
+    });
+
+    test('new game clears the note', () {
+      simpleSwap();
+
+      state.clearTimersForNewGame();
+
+      expect(state.swapSatTime(1), isNull);
+    });
+
+    test('both sitting only when both jammers have time left', () {
+      expect(state.bothJammersSitting, isFalse);
+
+      simpleSwap();
+      expect(state.bothJammersSitting, isFalse);
+
+      state.clearSeat(state.team1Jammer);
+      seatJammer(state, 1, '11');
+      expect(state.bothJammersSitting, isTrue);
+
+      state.tick(const Duration(seconds: 10));
+      expect(state.bothJammersSitting, isFalse);
+    });
+  });
 }

@@ -254,4 +254,101 @@ void main() {
     state.startSeatAnonymously(state.team1Jammer);
     expect(state.team1Jammer.skaterNumber, '17');
   });
+
+  // WFTDA §4.4 jammer swap while CRG drives the jam. The test ticks seat time
+  // explicitly for the swap itself; real time also passes during each CRG
+  // round trip, so later checks use bounds instead of exact times.
+  test('jammer swap during a remote jam shows sat time, then flags both '
+      'jammers sitting when the first returns', () async {
+    // Skater IDs are unique per game, unlike the IDs reused by other tests.
+    const team1JammerId = 'cccccccc-1111-2222-3333-444444444444';
+    const team2JammerId = 'dddddddd-1111-2222-3333-444444444444';
+
+    log('action: startNewGame');
+    await operatorClient.startNewGame();
+    await waitUntil(
+      () => !state.jamRunning,
+      label: 'remote game is between jams',
+    );
+
+    operatorClient.addSkater(1, team1JammerId, '17');
+    operatorClient.addSkater(2, team2JammerId, '99');
+    await waitUntil(
+      () =>
+          state.lookupSkaterId(1, '17') != null &&
+          state.lookupSkaterId(2, '99') != null,
+      label: 'roster skaters reach the penalty engine',
+    );
+    operatorClient.setJammer(1, team1JammerId);
+    operatorClient.setJammer(2, team2JammerId);
+    await waitUntil(
+      () => state.jammerNumber(1) == '17' && state.jammerNumber(2) == '99',
+      label: 'both scoreboard jammers reach the penalty engine',
+    );
+
+    log('action: stopJam (start lineup)');
+    await clockAction(operatorClient.stopJam);
+    log('action: startJam');
+    await clockAction(operatorClient.startJam);
+    await waitUntil(() => state.jamRunning, label: 'remote jam starts');
+
+    final team1 = state.team1Jammer;
+    final team2 = state.team2Jammer;
+
+    log('team 1 jammer sits 12 seconds, then team 2 jammer arrives');
+    state.startSeatAnonymously(team1);
+    state.tick(const Duration(seconds: 12));
+    state.startSeatAnonymously(team2);
+
+    expect(team1.skaterNumber, '17');
+    expect(team2.skaterNumber, '99');
+    expect(team1.timeRemaining, Duration.zero, reason: 'swap releases #17');
+    expect(team2.timeRemaining, const Duration(seconds: 12));
+    expect(state.swapSatTime(1), const Duration(seconds: 12));
+    expect(state.swapSatTime(2), isNull);
+    expect(state.bothJammersSitting, isFalse);
+
+    log('team 1 jammer released; the sat note stays');
+    state.clearSeat(team1);
+    expect(state.swapSatTime(1), const Duration(seconds: 12));
+
+    log('action: stopJam (end jam) with team 2 jammer still serving');
+    await clockAction(operatorClient.stopJam);
+    await waitUntil(
+      () => !state.jamRunning && !team2.isRunning,
+      label: 'remote jam end pauses the swapped jammer timer',
+    );
+    final owedAtJamEnd = team2.timeRemaining;
+    expect(owedAtJamEnd, greaterThan(Duration.zero));
+    expect(owedAtJamEnd, lessThanOrEqualTo(const Duration(seconds: 12)));
+    expect(state.swapSatTime(1), const Duration(seconds: 12));
+
+    log('action: startJam (jam 2)');
+    await clockAction(operatorClient.startJam);
+    await waitUntil(
+      () => state.jamRunning && team2.isRunning,
+      label: 'next remote jam resumes the swapped jammer timer',
+    );
+
+    log('team 1 jammer returns while team 2 jammer is still serving');
+    operatorClient.setJammer(1, team1JammerId);
+    await waitUntil(
+      () => state.jammerNumber(1) == '17',
+      label: 'scoreboard jammer #17 reaches the penalty engine',
+    );
+    state.startSeatAnonymously(team1);
+    expect(team1.timeRemaining, const Duration(seconds: 30));
+    expect(team2.timeRemaining, greaterThan(Duration.zero));
+    expect(team2.timeRemaining, lessThanOrEqualTo(owedAtJamEnd));
+    expect(state.swapSatTime(1), isNull, reason: 'new trip replaces note');
+    expect(state.bothJammersSitting, isTrue);
+
+    log('team 2 jammer finishes and is released');
+    state.tick(team2.timeRemaining);
+    expect(team2.timeRemaining, Duration.zero);
+    expect(state.bothJammersSitting, isFalse);
+    state.clearSeat(team2);
+    expect(team1.isOccupied, isTrue);
+    expect(team1.timeRemaining, greaterThan(Duration.zero));
+  });
 }

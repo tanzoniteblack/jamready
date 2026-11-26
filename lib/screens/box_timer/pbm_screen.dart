@@ -49,6 +49,7 @@ class PbmScreen extends StatelessWidget {
                           children: [
                             JamStatusBar(state: state, engine: engine),
                             const SizedBox(height: 16),
+                            _BothJammersBanner(show: state.bothJammersSitting),
                             Expanded(
                               child: isPortrait
                                   ? Column(
@@ -157,6 +158,58 @@ class _PbmTeamColumn extends StatelessWidget {
         const SizedBox(height: 10),
         Expanded(child: SeatCard(seat: jammer)),
       ],
+    );
+  }
+}
+
+/// Full-width alert shown while both jammers are serving time at once.
+class _BothJammersBanner extends StatelessWidget {
+  final bool show;
+
+  const _BothJammersBanner({required this.show});
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedSize(
+      duration: const Duration(milliseconds: 200),
+      child: !show
+          ? const SizedBox(width: double.infinity)
+          : Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 10,
+                ),
+                decoration: BoxDecoration(
+                  color: bothJammersColor,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.warning_amber_rounded,
+                      color: Colors.white,
+                      size: 28,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'BOTH JAMMERS IN THE BOX',
+                        style: AppTextStyles.alertLabel.copyWith(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 0,
+                          height: 1.1,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
     );
   }
 }
