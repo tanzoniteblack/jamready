@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:jam_ready/models/penalty_box_state.dart';
 import 'package:jam_ready/models/skater_seat.dart';
 import 'package:jam_ready/services/remote_penalty_engine.dart';
+import 'package:flutter/widgets.dart';
 
 import '../test_helpers.dart';
 
@@ -328,6 +329,52 @@ void main() {
       expect(engine.isLocal, isFalse);
       expect(state.connectionStatus, ConnectionStatus.connected);
       await engine.dispose();
+    });
+  });
+
+  test('a jam ending while backgrounded stops timers when it ended', () {
+    fakeAsync((fake) {
+      final channel = FakeWebSocketChannel();
+      final state = makeState();
+      final alerts = FakeAlertScheduler();
+      final engine = RemotePenaltyEngine(
+        state,
+        alerts: alerts,
+        channelFactory: (_) => channel,
+        wakelockEnable: () {},
+        wakelockDisable: () {},
+      );
+      engine.connect('http://localhost:8000');
+      fake.flushMicrotasks();
+      channel.send({'ScoreBoard.CurrentGame.InJam': true});
+      fake.flushMicrotasks();
+      state.seatSkater(
+        seat: state.team1Blocker1,
+        number: '22',
+        position: SkaterPosition.blocker,
+      );
+
+      WidgetsBinding.instance.handleAppLifecycleStateChanged(
+        AppLifecycleState.paused,
+      );
+      fake.flushMicrotasks();
+      expect(alerts.scheduled, hasLength(2));
+      expect(alerts.scheduled!.last.body, contains('if the jam is still'));
+
+      // The socket stays up in the background and CRG ends the jam.
+      fake.elapse(const Duration(seconds: 4));
+      channel.send({'ScoreBoard.CurrentGame.InJam': false});
+      fake.flushMicrotasks();
+      expect(state.team1Blocker1.timeRemaining, const Duration(seconds: 26));
+      expect(alerts.scheduled, isEmpty);
+
+      fake.elapse(const Duration(seconds: 20));
+      WidgetsBinding.instance.handleAppLifecycleStateChanged(
+        AppLifecycleState.resumed,
+      );
+      expect(state.team1Blocker1.timeRemaining, const Duration(seconds: 26));
+      engine.dispose();
+      channel.dispose();
     });
   });
 }

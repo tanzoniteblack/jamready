@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:jam_ready/models/penalty_box_state.dart';
 import 'package:jam_ready/models/skater_seat.dart';
 import 'package:jam_ready/services/local_penalty_engine.dart';
+import 'package:jam_ready/services/penalty_alerts.dart';
 
 import '../test_helpers.dart';
 
@@ -420,10 +421,13 @@ void main() {
 
   group('App lifecycle', () {
     // Seats a running jammer under a ticking engine inside fake time.
-    LocalPenaltyEngine runningJammer(PenaltyBoxState state) {
+    LocalPenaltyEngine runningJammer(
+      PenaltyBoxState state, {
+      PenaltyAlertScheduler? alerts,
+    }) {
       state.jamRunning = true;
       state.jamNumber = 1;
-      final engine = LocalPenaltyEngine(state)..startTicker();
+      final engine = LocalPenaltyEngine(state, alerts: alerts)..startTicker();
       state.seatSkater(
         seat: state.team1Jammer,
         number: '10',
@@ -485,6 +489,30 @@ void main() {
         engine.didChangeAppLifecycleState(AppLifecycleState.resumed);
 
         expectTimeRemaining(state.team1Jammer, const Duration(seconds: 25));
+        engine.dispose();
+      });
+    });
+
+    test('backgrounding schedules alerts and resuming cancels them', () {
+      final state = makeState();
+      final alerts = FakeAlertScheduler();
+      fakeAsync((fake) {
+        final engine = runningJammer(state, alerts: alerts);
+        fake.elapse(const Duration(seconds: 5));
+
+        engine.didChangeAppLifecycleState(AppLifecycleState.paused);
+        fake.flushMicrotasks();
+        expect(alerts.scheduled?.map((a) => a.delay), [
+          const Duration(seconds: 13),
+          const Duration(seconds: 23),
+        ]);
+        expect(alerts.scheduled!.first.body, '10 seconds left.');
+
+        fake.elapse(const Duration(seconds: 3));
+        engine.didChangeAppLifecycleState(AppLifecycleState.resumed);
+        fake.flushMicrotasks();
+        expect(alerts.scheduled, isNull);
+        expect(alerts.cancels, 1);
         engine.dispose();
       });
     });

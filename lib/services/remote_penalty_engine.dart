@@ -8,6 +8,7 @@ import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:web_socket_channel/status.dart' as status;
 import '../models/penalty_box_state.dart';
+import 'penalty_alerts.dart';
 import 'penalty_engine.dart';
 import 'local_penalty_engine.dart';
 
@@ -58,13 +59,18 @@ class RemotePenaltyEngine extends PenaltyEngine {
 
   RemotePenaltyEngine(
     this._state, {
+    PenaltyAlertScheduler? alerts,
     @visibleForTesting WebSocketChannel Function(Uri)? channelFactory,
     @visibleForTesting void Function()? wakelockEnable,
     @visibleForTesting void Function()? wakelockDisable,
   }) : _channelFactoryOverride = channelFactory,
        _wakelockEnableOverride = wakelockEnable,
        _wakelockDisableOverride = wakelockDisable {
-    _localEngine = LocalPenaltyEngine(_state);
+    _localEngine = LocalPenaltyEngine(
+      _state,
+      alerts: alerts,
+      jamMayStop: () => _isConnected,
+    );
   }
 
   @override
@@ -317,8 +323,12 @@ class RemotePenaltyEngine extends PenaltyEngine {
     return delta;
   }
 
-  /// Phase 2: apply a parsed delta to state in the correct order.
-  void _applyDelta(_WsDelta delta) {
+  /// Phase 2: apply a parsed delta to state in the correct order, at the
+  /// current time so timers are caught up before the jam starts or stops.
+  void _applyDelta(_WsDelta delta) =>
+      _localEngine.applyNow(() => _applyDeltaNow(delta));
+
+  void _applyDeltaNow(_WsDelta delta) {
     final jamWasRunning = _state.jamRunning;
 
     final gameId = delta.gameId;

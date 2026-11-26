@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'models/scoreboard_state.dart';
 import 'screens/app_home_screen.dart';
+import 'services/penalty_alerts.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -15,6 +18,13 @@ void main() async {
     MultiProvider(
       providers: [ChangeNotifierProvider(create: (_) => ScoreboardState())],
       child: MyApp(),
+    ),
+  );
+
+  // Ask for notification permission at launch rather than mid-game.
+  unawaited(
+    NotificationAlertScheduler.instance.init().catchError(
+      (Object e) => debugPrint('Notification setup failed: $e'),
     ),
   );
 }

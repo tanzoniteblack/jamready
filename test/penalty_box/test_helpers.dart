@@ -7,6 +7,7 @@ import 'package:web_socket_channel/web_socket_channel.dart';
 
 import 'package:jam_ready/models/penalty_box_state.dart';
 import 'package:jam_ready/models/skater_seat.dart';
+import 'package:jam_ready/services/penalty_alerts.dart';
 
 // ---------------------------------------------------------------------------
 // Fake WebSocket infrastructure
@@ -187,4 +188,21 @@ void expectCommandNotSent(FakeWebSocketChannel channel, String keyFragment) {
     isEmpty,
     reason: 'Expected no Set command containing "$keyFragment"',
   );
+}
+
+/// Records what a penalty engine asks to be notified about.
+class FakeAlertScheduler implements PenaltyAlertScheduler {
+  int cancels = 0;
+
+  /// The pending alerts, or null when none have been scheduled.
+  List<PenaltyAlert>? scheduled;
+
+  @override
+  Future<void> schedule(List<PenaltyAlert> alerts) async => scheduled = alerts;
+
+  @override
+  Future<void> cancelAll() async {
+    cancels++;
+    scheduled = null;
+  }
 }

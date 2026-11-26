@@ -43,6 +43,8 @@ dependencies:
   logger: ^2.6.2
   mobile_scanner: ^7.2.0
   clock: ^1.1.1
+  flutter_local_notifications: ^23.0.4
+  timezone: ^0.11.2
 
 dev_dependencies:
   flutter_test:

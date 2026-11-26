@@ -3,6 +3,7 @@ import 'package:clock/clock.dart';
 import 'package:flutter/widgets.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/penalty_box_state.dart';
+import 'penalty_alerts.dart';
 import 'penalty_engine.dart';
 
 /// On-device penalty engine.
@@ -20,7 +21,18 @@ class LocalPenaltyEngine extends PenaltyEngine with WidgetsBindingObserver {
   // the monotonic clock may not advance while the device sleeps.
   DateTime? _backgroundedAt;
 
-  LocalPenaltyEngine(this._state);
+  final PenaltyAlertScheduler? _alerts;
+  final bool Function() _jamMayStop;
+
+  /// [alerts] notifies the user of stand and release times while the app is
+  /// backgrounded. [jamMayStop] reports whether something outside this app
+  /// (CRG) can stop the jam, which makes those times uncertain.
+  LocalPenaltyEngine(
+    this._state, {
+    PenaltyAlertScheduler? alerts,
+    bool Function()? jamMayStop,
+  }) : _alerts = alerts,
+       _jamMayStop = jamMayStop ?? (() => false);
 
   @override
   PenaltyBoxState get state => _state;
@@ -60,6 +72,7 @@ class LocalPenaltyEngine extends PenaltyEngine with WidgetsBindingObserver {
   Future<void> dispose() async {
     WidgetsBinding.instance.removeObserver(this);
     _stopTicker();
+    _bestEffort(_alerts?.cancelAll());
   }
 
   void _startTicker() {
@@ -99,28 +112,58 @@ class LocalPenaltyEngine extends PenaltyEngine with WidgetsBindingObserver {
     _tick(); // account for time since the last tick
     _ticker!.cancel();
     _backgroundedAt = clock.now();
+    _scheduleAlerts();
   }
 
   /// Penalty time keeps running while the app is backgrounded, so catch the
   /// timers up on the time spent away.
   void _onResumed() {
-    final backgroundedAt = _backgroundedAt;
-    if (backgroundedAt == null) return;
+    if (_backgroundedAt == null) return;
+    _catchUp();
     _backgroundedAt = null;
-    final away = clock.now().difference(backgroundedAt);
-    if (away > Duration.zero) _state.tick(away);
+    _bestEffort(_alerts?.cancelAll());
     _startTicker();
   }
 
+  /// Brings running timers up to the current time.
+  void _catchUp() {
+    final backgroundedAt = _backgroundedAt;
+    if (backgroundedAt != null) {
+      final now = clock.now();
+      final away = now.difference(backgroundedAt);
+      if (away > Duration.zero) _state.tick(away);
+      _backgroundedAt = now;
+    } else if (_ticker != null) {
+      _tick();
+    }
+  }
+
+  /// Applies [change] (such as a jam starting or stopping) at the current
+  /// time: timers are caught up first so time since the last tick, or spent
+  /// in the background, is counted under the state it was really spent in.
+  void applyNow(void Function() change) {
+    _catchUp();
+    change();
+    if (_backgroundedAt != null) _scheduleAlerts();
+  }
+
+  void _scheduleAlerts() => _bestEffort(
+    _alerts?.schedule(penaltyAlertsFor(_state, jamMayStop: _jamMayStop())),
+  );
+
+  /// Alerts are a convenience: a failure to deliver one must not break timing.
+  static void _bestEffort(Future<void>? task) =>
+      task?.catchError((Object e) => debugPrint('Penalty alert error: $e'));
+
   @override
-  void toggleJam() {
+  void toggleJam() => applyNow(() {
     if (_state.jamRunning) {
       _state.onJamEnd();
     } else {
       _state.jamNumber++;
       _state.onJamStart();
     }
-  }
+  });
 
   @override
   Future<void> reconnect() async {} // no-op in local mode

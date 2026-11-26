@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/penalty_box_state.dart';
 import '../models/skater_seat.dart';
 import '../services/local_penalty_engine.dart';
+import '../services/penalty_alerts.dart';
 import '../services/penalty_engine.dart';
 import '../services/remote_penalty_engine.dart';
 import '../styles/background.dart';
@@ -65,7 +66,10 @@ class _PenaltyBoxHomeScreenState extends State<PenaltyBoxHomeScreen> {
     _disposePreview();
 
     final state = PenaltyBoxState();
-    final engine = RemotePenaltyEngine(state);
+    final engine = RemotePenaltyEngine(
+      state,
+      alerts: NotificationAlertScheduler.instance,
+    );
     _previewState = state;
     _previewEngine = engine;
 
@@ -79,10 +83,7 @@ class _PenaltyBoxHomeScreenState extends State<PenaltyBoxHomeScreen> {
       if (state.teamNamesFromRemote) _advanceToRoleSelector();
     };
     state.addListener(_teamNameListener!);
-    _teamNameTimer = Timer(
-      const Duration(seconds: 3),
-      _advanceToRoleSelector,
-    );
+    _teamNameTimer = Timer(const Duration(seconds: 3), _advanceToRoleSelector);
 
     if (mounted) setState(() => _isLoading = false);
   }
@@ -103,7 +104,10 @@ class _PenaltyBoxHomeScreenState extends State<PenaltyBoxHomeScreen> {
     _disposePreview();
 
     final state = PenaltyBoxState();
-    final engine = LocalPenaltyEngine(state);
+    final engine = LocalPenaltyEngine(
+      state,
+      alerts: NotificationAlertScheduler.instance,
+    );
     await engine.initialize();
 
     _previewState = state;
