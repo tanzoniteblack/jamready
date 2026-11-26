@@ -286,6 +286,18 @@ a {
   color: #f7cf58;
 }
 
+/* Flows into up to 3 balanced columns, dropping to fewer on narrow screens. */
+.version-list {
+  columns: 3 6.5rem;
+  column-gap: 1.5rem;
+  max-width: 28rem;
+  margin: 0.55rem 0 0;
+}
+
+.version-list li {
+  break-inside: avoid;
+}
+
 .support {
   border: 1px solid rgba(214, 148, 52, 0.5);
   border-radius: var(--radius);

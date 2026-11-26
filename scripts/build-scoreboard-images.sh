@@ -25,6 +25,9 @@ ALL_VERSIONS=(
   v2025.7
   v2025.8
   v2025.9
+  v2025.10
+  v2027.0
+  v2027.1
 )
 
 OFFICIAL_SCOREBOARD_REPOSITORY="https://github.com/rollerderby/scoreboard.git"
