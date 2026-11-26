@@ -126,11 +126,7 @@ void main() {
         state.jamRunning = true;
         state.jamNumber = 1;
 
-        // Inject a clock that uses fake_async's fake time.
-        final engine = LocalPenaltyEngine(
-          state,
-          clock: () => fake.getClock(DateTime(2024)).now(),
-        );
+        final engine = LocalPenaltyEngine(state);
         engine.startTicker();
 
         state.seatSkater(
@@ -154,10 +150,7 @@ void main() {
 
       fakeAsync((fake) {
         state.jamRunning = false;
-        final engine = LocalPenaltyEngine(
-          state,
-          clock: () => fake.getClock(DateTime(2024)).now(),
-        );
+        final engine = LocalPenaltyEngine(state);
         engine.startTicker();
 
         state.seatSkater(
@@ -178,10 +171,7 @@ void main() {
 
       fakeAsync((fake) {
         state.jamRunning = true;
-        final engine = LocalPenaltyEngine(
-          state,
-          clock: () => fake.getClock(DateTime(2024)).now(),
-        );
+        final engine = LocalPenaltyEngine(state);
         engine.startTicker();
 
         state.seatSkater(
@@ -429,12 +419,103 @@ void main() {
   // ---------------------------------------------------------------------------
 
   group('App lifecycle', () {
-    test('resumed event resets tick baseline without throwing', () async {
+    // Seats a running jammer under a ticking engine inside fake time.
+    LocalPenaltyEngine runningJammer(PenaltyBoxState state) {
+      state.jamRunning = true;
+      state.jamNumber = 1;
+      final engine = LocalPenaltyEngine(state)..startTicker();
+      state.seatSkater(
+        seat: state.team1Jammer,
+        number: '10',
+        position: SkaterPosition.jammer,
+      );
+      state.team1Jammer.isRunning = true;
+      return engine;
+    }
+
+    test('running timers keep counting while backgrounded', () {
+      final state = makeState();
+      fakeAsync((fake) {
+        final engine = runningJammer(state);
+        fake.elapse(const Duration(milliseconds: 2050));
+
+        engine.didChangeAppLifecycleState(AppLifecycleState.paused);
+        fake.elapse(const Duration(seconds: 5));
+        engine.didChangeAppLifecycleState(AppLifecycleState.resumed);
+
+        expectTimeRemaining(
+          state.team1Jammer,
+          const Duration(seconds: 30) - const Duration(milliseconds: 7050),
+        );
+
+        // Ticking resumes afterwards.
+        fake.elapse(const Duration(seconds: 3));
+        expectTimeRemaining(
+          state.team1Jammer,
+          const Duration(seconds: 30) - const Duration(milliseconds: 10050),
+        );
+        engine.dispose();
+      });
+    });
+
+    test('timers expire with overtime if they run out while backgrounded', () {
+      final state = makeState();
+      fakeAsync((fake) {
+        final engine = runningJammer(state);
+        engine.didChangeAppLifecycleState(AppLifecycleState.paused);
+        fake.elapse(const Duration(minutes: 1));
+        engine.didChangeAppLifecycleState(AppLifecycleState.resumed);
+
+        expectTimeRemaining(state.team1Jammer, Duration.zero);
+        expect(state.team1Jammer.isRunning, isFalse);
+        expect(state.team1Jammer.state, SeatState.done);
+        expect(state.team1Jammer.overtime, const Duration(seconds: 30));
+        engine.dispose();
+      });
+    });
+
+    test('repeated lifecycle events do not double-count time away', () {
+      final state = makeState();
+      fakeAsync((fake) {
+        final engine = runningJammer(state);
+        engine.didChangeAppLifecycleState(AppLifecycleState.paused);
+        engine.didChangeAppLifecycleState(AppLifecycleState.paused);
+        fake.elapse(const Duration(seconds: 5));
+        engine.didChangeAppLifecycleState(AppLifecycleState.resumed);
+        engine.didChangeAppLifecycleState(AppLifecycleState.resumed);
+
+        expectTimeRemaining(state.team1Jammer, const Duration(seconds: 25));
+        engine.dispose();
+      });
+    });
+
+    test('resume without a prior pause leaves timers alone', () async {
       final state = makeState();
       final engine = await startEngine(state);
-
-      // Should not throw or cause negative time jumps.
       engine.didChangeAppLifecycleState(AppLifecycleState.resumed);
+      await engine.dispose();
+    });
+  });
+
+  group('Timer accuracy', () {
+    test('running seats track elapsed time without drift', () {
+      final state = makeState();
+      fakeAsync((fake) {
+        state.jamRunning = true;
+        state.jamNumber = 1;
+        final engine = LocalPenaltyEngine(state)..startTicker();
+        state.seatSkater(
+          seat: state.team1Jammer,
+          number: '10',
+          position: SkaterPosition.jammer,
+        );
+        state.team1Jammer.isRunning = true;
+
+        fake.elapse(const Duration(seconds: 20));
+
+        expectTimeRemaining(state.team1Jammer, const Duration(seconds: 10));
+        engine.dispose();
+      });
     });
   });
 }

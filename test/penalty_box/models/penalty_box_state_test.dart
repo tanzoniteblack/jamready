@@ -54,6 +54,48 @@ void main() {
       expectTimeRemaining(state.team1Jammer, Duration.zero);
     });
 
+    test('time past zero during a tick becomes overtime', () {
+      seatJammer(state, 1, '10');
+      state.jamRunning = true;
+      state.team1Jammer.isRunning = true;
+
+      state.tick(const Duration(seconds: 37));
+
+      expectTimeRemaining(state.team1Jammer, Duration.zero);
+      expect(state.team1Jammer.overtime, const Duration(seconds: 7));
+      expect(state.team1Jammer.timeLabel, '-0:07');
+    });
+
+    test('unreleased done seat keeps accruing overtime during the jam', () {
+      seatJammer(state, 1, '10');
+      state.jamRunning = true;
+      state.team1Jammer.isRunning = true;
+      state.tick(const Duration(seconds: 30));
+
+      state.tick(const Duration(seconds: 3));
+      expect(state.team1Jammer.overtime, const Duration(seconds: 3));
+
+      state.onJamEnd();
+      state.tick(const Duration(seconds: 10));
+      expect(state.team1Jammer.overtime, const Duration(seconds: 3));
+    });
+
+    test('adding time or releasing clears overtime', () {
+      seatBlocker(state, 1, '22');
+      final seat = state.team1Blocker1;
+      state.jamRunning = true;
+      seat.isRunning = true;
+      state.tick(const Duration(seconds: 35));
+
+      state.addPenaltyToSeat(seat);
+      expect(seat.overtime, Duration.zero);
+      expect(seat.timeLabel, '0:30');
+
+      state.tick(const Duration(seconds: 35));
+      state.clearSeat(seat);
+      expect(seat.overtime, Duration.zero);
+    });
+
     test('multiple seats tick independently', () {
       seatJammer(state, 1, '10');
       seatBlocker(state, 1, '22');

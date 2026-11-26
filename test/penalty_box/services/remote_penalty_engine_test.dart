@@ -1,3 +1,4 @@
+import 'package:fake_async/fake_async.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -225,7 +226,6 @@ void main() {
       channelFactory: (_) => channel,
       wakelockEnable: () {},
       wakelockDisable: () {},
-      localClock: () => tester.binding.clock.now(),
     );
     await engine.connect('http://localhost:8000');
     await tester.pump();
@@ -266,5 +266,68 @@ void main() {
     expect(penalties, hasLength(1));
     expect((penalties.single['data'] as Map)['skaterId'], 'uuid-abc');
     await engine.dispose();
+  });
+
+  group('reconnecting', () {
+    test('failed retries leave the locally stopped jam alone', () {
+      fakeAsync((fake) {
+        final state = makeState();
+        var attempts = 0;
+        final engine = RemotePenaltyEngine(
+          state,
+          channelFactory: (_) {
+            attempts++;
+            throw Exception('CRG unreachable');
+          },
+          wakelockEnable: () {},
+          wakelockDisable: () {},
+        );
+        engine.connect('http://localhost:8000');
+        fake.flushMicrotasks();
+        expect(engine.isLocal, isTrue);
+
+        state.seatSkater(
+          seat: state.team1Blocker1,
+          number: '22',
+          position: SkaterPosition.blocker,
+        );
+        engine.toggleJam(); // the real jam ended; the PBT stops it locally
+        expect(state.jamRunning, isFalse);
+
+        fake.elapse(const Duration(seconds: 10));
+        expect(attempts, greaterThan(1));
+
+        expect(state.jamRunning, isFalse);
+        expect(state.jamNumber, 1);
+        expect(state.team1Blocker1.isRunning, isFalse);
+        expect(state.team1Blocker1.timeRemaining, const Duration(seconds: 30));
+        engine.dispose();
+      });
+    });
+
+    test('the old socket closing late does not drop a reconnect', () async {
+      final channels = <FakeWebSocketChannel>[];
+      final state = makeState();
+      final engine = RemotePenaltyEngine(
+        state,
+        channelFactory: (_) {
+          final channel = FakeWebSocketChannel();
+          channels.add(channel);
+          return channel;
+        },
+        wakelockEnable: () {},
+        wakelockDisable: () {},
+      );
+      await engine.connect('http://localhost:8000');
+      await engine.reconnect();
+      expect(channels, hasLength(2));
+
+      channels.first.dispose(); // old socket finishes closing
+      await Future.microtask(() {});
+
+      expect(engine.isLocal, isFalse);
+      expect(state.connectionStatus, ConnectionStatus.connected);
+      await engine.dispose();
+    });
   });
 }

@@ -45,6 +45,13 @@ void main() {
       expectSeatState(seat, SeatState.running);
     });
 
+    test('running with just over 10s remaining → running (shows 0:11)', () {
+      final seat = occupiedSeat(
+        timeRemaining: const Duration(seconds: 10, milliseconds: 1),
+      );
+      expectSeatState(seat, SeatState.running);
+    });
+
     test('running with exactly 10s remaining → standing', () {
       final seat = occupiedSeat(timeRemaining: const Duration(seconds: 10));
       expectSeatState(seat, SeatState.standing);
@@ -217,6 +224,31 @@ void main() {
       final seat = occupiedSeat();
       expect(seat.isEmpty, isFalse);
       expect(seat.isOccupied, isTrue);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Display time
+  // ---------------------------------------------------------------------------
+
+  group('formatPenaltyTime', () {
+    test('rounds countdowns up to the next whole second', () {
+      expect(formatPenaltyTime(const Duration(seconds: 30)), '0:30');
+      expect(formatPenaltyTime(const Duration(milliseconds: 29001)), '0:30');
+      expect(formatPenaltyTime(const Duration(milliseconds: 29000)), '0:29');
+      expect(formatPenaltyTime(const Duration(milliseconds: 90500)), '1:31');
+    });
+
+    test('overtime shows as a negative time once a second has passed', () {
+      expect(formatOvertime(const Duration(milliseconds: 999)), '0:00');
+      expect(formatOvertime(const Duration(milliseconds: 7900)), '-0:07');
+      expect(formatOvertime(const Duration(seconds: 75)), '-1:15');
+    });
+
+    test('only shows 0:00 once time has run out', () {
+      expect(formatPenaltyTime(const Duration(milliseconds: 1)), '0:01');
+      expect(formatPenaltyTime(Duration.zero), '0:00');
+      expect(formatPenaltyTime(const Duration(seconds: -1)), '0:00');
     });
   });
 }

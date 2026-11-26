@@ -13,12 +13,36 @@ enum AppRole {
 
 enum SeatState { empty, running, paused, standing, done }
 
+/// Whole seconds displayed for [remaining]. Rounded up, matching CRG and the
+/// game clocks, so a timer only reads 0:00 once it has actually run out.
+int displaySeconds(Duration remaining) => remaining <= Duration.zero
+    ? 0
+    : (remaining.inMicroseconds / Duration.microsecondsPerSecond).ceil();
+
+/// Formats [remaining] as m:ss using [displaySeconds].
+String formatPenaltyTime(Duration remaining) =>
+    _formatSeconds(displaySeconds(remaining));
+
+/// Formats [overtime] as a negative m:ss, rounded down like CRG's count-up
+/// clocks, so it reads 0:00 until a full second has passed.
+String formatOvertime(Duration overtime) {
+  final secs = overtime.inSeconds;
+  return secs <= 0 ? '0:00' : '-${_formatSeconds(secs)}';
+}
+
+String _formatSeconds(int secs) =>
+    '${secs ~/ 60}:${(secs % 60).toString().padLeft(2, '0')}';
+
 class SkaterSeat {
   final String id;
   String skaterNumber;
   SkaterPosition position;
   int teamIndex; // 1 or 2
   Duration timeRemaining;
+
+  // Jam time that has passed since this seat's time ran out without the
+  // skater being released.
+  Duration overtime;
   bool isRunning;
   bool isInQueue;
 
@@ -39,6 +63,7 @@ class SkaterSeat {
     this.position = SkaterPosition.blocker,
     required this.teamIndex,
     this.timeRemaining = Duration.zero,
+    this.overtime = Duration.zero,
     this.isRunning = false,
     this.isInQueue = false,
     this.arrivedBetweenJams = false,
@@ -50,9 +75,14 @@ class SkaterSeat {
     if (skaterNumber.isEmpty) return SeatState.empty;
     if (timeRemaining <= Duration.zero) return SeatState.done;
     if (!isRunning) return SeatState.paused;
-    if (timeRemaining.inSeconds <= 10) return SeatState.standing;
+    if (displaySeconds(timeRemaining) <= 10) return SeatState.standing;
     return SeatState.running;
   }
+
+  /// Time shown on the seat: the countdown, or how far past zero it went.
+  String get timeLabel => overtime > Duration.zero
+      ? formatOvertime(overtime)
+      : formatPenaltyTime(timeRemaining);
 
   bool get isEmpty => skaterNumber.isEmpty;
   bool get isOccupied => !isEmpty;
@@ -74,6 +104,7 @@ class SkaterSeat {
 
   void addPenalty() {
     timeRemaining += const Duration(seconds: 30);
+    overtime = Duration.zero;
     penaltyCount++;
     unmatchedPenalties++;
   }
@@ -85,6 +116,7 @@ class SkaterSeat {
   void clear() {
     skaterNumber = '';
     timeRemaining = Duration.zero;
+    overtime = Duration.zero;
     isRunning = false;
     isInQueue = false;
     arrivedBetweenJams = false;
@@ -100,6 +132,7 @@ class SkaterSeat {
     skaterNumber = number;
     position = pos;
     timeRemaining = const Duration(seconds: 30);
+    overtime = Duration.zero;
     isRunning = false;
     arrivedBetweenJams = arrivedBetween;
     penaltyCount = 1;
@@ -111,6 +144,7 @@ class SkaterSeat {
     SkaterPosition? position,
     int? teamIndex,
     Duration? timeRemaining,
+    Duration? overtime,
     bool? isRunning,
     bool? isInQueue,
     bool? arrivedBetweenJams,
@@ -123,6 +157,7 @@ class SkaterSeat {
       position: position ?? this.position,
       teamIndex: teamIndex ?? this.teamIndex,
       timeRemaining: timeRemaining ?? this.timeRemaining,
+      overtime: overtime ?? this.overtime,
       isRunning: isRunning ?? this.isRunning,
       isInQueue: isInQueue ?? this.isInQueue,
       arrivedBetweenJams: arrivedBetweenJams ?? this.arrivedBetweenJams,

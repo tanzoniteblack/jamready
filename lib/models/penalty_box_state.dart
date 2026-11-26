@@ -382,17 +382,23 @@ class PenaltyBoxState extends ChangeNotifier {
   }
 
   /// Called each timer tick (typically every 100ms) to decrement running seats.
+  /// Seats whose time has run out accrue overtime while the jam runs, until
+  /// the skater is released.
   void tick(Duration elapsed) {
     bool changed = false;
     for (final seat in seats) {
       if (seat.isRunning && seat.timeRemaining > Duration.zero) {
-        seat.timeRemaining -= elapsed;
-        if (seat.timeRemaining < Duration.zero) {
+        final left = seat.timeRemaining - elapsed;
+        if (left > Duration.zero) {
+          seat.timeRemaining = left;
+        } else {
           seat.timeRemaining = Duration.zero;
-        }
-        if (seat.timeRemaining <= Duration.zero) {
+          seat.overtime += -left;
           seat.isRunning = false;
         }
+        changed = true;
+      } else if (jamRunning && seat.state == SeatState.done) {
+        seat.overtime += elapsed;
         changed = true;
       }
     }
@@ -464,6 +470,7 @@ class PenaltyBoxState extends ChangeNotifier {
         : newTime > const Duration(minutes: 5)
         ? const Duration(minutes: 5)
         : newTime;
+    if (seat.timeRemaining > Duration.zero) seat.overtime = Duration.zero;
     if (seat.timeRemaining > Duration.zero && !seat.isRunning && jamRunning) {
       seat.isRunning = true;
     }

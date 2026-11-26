@@ -24,7 +24,7 @@ final _log = Logger(
 /// Remote penalty engine that connects to CRG Scoreboard via WebSocket.
 /// Subscribes to jam clock and roster paths, reports penalties via Penalty command.
 /// Also drives on-device timers (via embedded LocalPenaltyEngine).
-class RemotePenaltyEngine extends PenaltyEngine with WidgetsBindingObserver {
+class RemotePenaltyEngine extends PenaltyEngine {
   WebSocketChannel? _channel;
   Timer? _heartbeatTimer;
   Timer? _reconnectTimer;
@@ -40,7 +40,6 @@ class RemotePenaltyEngine extends PenaltyEngine with WidgetsBindingObserver {
   final WebSocketChannel Function(Uri)? _channelFactoryOverride;
   final void Function()? _wakelockEnableOverride;
   final void Function()? _wakelockDisableOverride;
-  final DateTime Function()? _localClockOverride;
 
   // Cached regex patterns for _parsePath (compiled once, not per message)
   static final _reTeamName = RegExp(
@@ -62,12 +61,10 @@ class RemotePenaltyEngine extends PenaltyEngine with WidgetsBindingObserver {
     @visibleForTesting WebSocketChannel Function(Uri)? channelFactory,
     @visibleForTesting void Function()? wakelockEnable,
     @visibleForTesting void Function()? wakelockDisable,
-    @visibleForTesting DateTime Function()? localClock,
   }) : _channelFactoryOverride = channelFactory,
        _wakelockEnableOverride = wakelockEnable,
-       _wakelockDisableOverride = wakelockDisable,
-       _localClockOverride = localClock {
-    _localEngine = LocalPenaltyEngine(_state, clock: _localClockOverride);
+       _wakelockDisableOverride = wakelockDisable {
+    _localEngine = LocalPenaltyEngine(_state);
   }
 
   @override
@@ -76,11 +73,12 @@ class RemotePenaltyEngine extends PenaltyEngine with WidgetsBindingObserver {
   @override
   bool get isLocal => !_isConnected;
 
+  Future<void>? _localInit;
+
+  /// Sets up the local engine. Runs once: reconnect attempts call this too,
+  /// and re-initializing would restart the jam and reset the jam number.
   @override
-  Future<void> initialize() async {
-    WidgetsBinding.instance.addObserver(this);
-    await _localEngine.initialize();
-  }
+  Future<void> initialize() => _localInit ??= _localEngine.initialize();
 
   Future<void> connect(String url) async {
     if (_isConnected || _isConnecting) return;
@@ -105,8 +103,9 @@ class RemotePenaltyEngine extends PenaltyEngine with WidgetsBindingObserver {
       );
 
       final factory = _channelFactoryOverride ?? WebSocketChannel.connect;
-      _channel = factory(wsUrl);
-      await _channel!.ready;
+      final channel = factory(wsUrl);
+      _channel = channel;
+      await channel.ready;
 
       if (_manualDisconnect) {
         _closeChannel();
@@ -123,14 +122,22 @@ class RemotePenaltyEngine extends PenaltyEngine with WidgetsBindingObserver {
       );
       (_wakelockEnableOverride ?? WakelockPlus.enable)();
 
-      _channel!.stream.listen(
-        _handleMessage,
+      // Events from a connection that has since been closed or replaced
+      // must not tear down the current one.
+      bool isCurrent() => identical(_channel, channel);
+
+      channel.stream.listen(
+        (message) {
+          if (isCurrent()) _handleMessage(message);
+        },
         onDone: () {
+          if (!isCurrent()) return;
           _log.i('WebSocket closed');
           _disconnectCleanup();
           _scheduleReconnect();
         },
         onError: (error) {
+          if (!isCurrent()) return;
           _log.e('WebSocket error: $error');
           _disconnectCleanup(error: error.toString());
           _scheduleReconnect();
@@ -451,17 +458,9 @@ class RemotePenaltyEngine extends PenaltyEngine with WidgetsBindingObserver {
   }
 
   @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) {
-      _localEngine.didChangeAppLifecycleState(state);
-    }
-  }
-
-  @override
   Future<void> dispose() async {
     disconnect();
     await _localEngine.dispose();
-    WidgetsBinding.instance.removeObserver(this);
   }
 
   @override

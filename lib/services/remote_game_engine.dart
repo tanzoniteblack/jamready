@@ -78,8 +78,9 @@ class RemoteGameEngine implements GameEngine {
         queryParameters: {'source': 'companion', 'platform': 'mobile'},
       );
 
-      _channel = _channelFactory(wsUrl);
-      await _channel!.ready;
+      final channel = _channelFactory(wsUrl);
+      _channel = channel;
+      await channel.ready;
 
       if (_manualDisconnect) {
         _closeChannel();
@@ -94,16 +95,22 @@ class RemoteGameEngine implements GameEngine {
 
       WakelockPlus.enable();
 
-      _channel!.stream.listen(
+      // Events from a connection that has since been closed or replaced
+      // must not tear down the current one.
+      bool isCurrent() => identical(_channel, channel);
+
+      channel.stream.listen(
         (message) {
-          _handleMessage(message);
+          if (isCurrent()) _handleMessage(message);
         },
         onDone: () {
+          if (!isCurrent()) return;
           _log.i("Connection closed");
           _disconnectCleanup();
           _scheduleReconnect();
         },
         onError: (error) {
+          if (!isCurrent()) return;
           _log.e("Connection error: $error");
           _disconnectCleanup(error: error.toString());
           _scheduleReconnect();

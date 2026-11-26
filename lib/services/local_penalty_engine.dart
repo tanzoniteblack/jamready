@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:clock/clock.dart';
 import 'package:flutter/widgets.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/penalty_box_state.dart';
@@ -8,12 +9,18 @@ import 'penalty_engine.dart';
 /// Drives all timers locally; supports manual jam start/stop for offline use.
 class LocalPenaltyEngine extends PenaltyEngine with WidgetsBindingObserver {
   final PenaltyBoxState _state;
-  final DateTime Function() _clock;
   Timer? _ticker;
-  DateTime? _lastTick;
 
-  LocalPenaltyEngine(this._state, {DateTime Function()? clock})
-    : _clock = clock ?? DateTime.now;
+  // Monotonic time source for ticks, so wall-clock changes (e.g. a network
+  // time sync) never move running timers.
+  Stopwatch _tickStopwatch = clock.stopwatch();
+  Duration _lastTickTotal = Duration.zero;
+
+  // Wall-clock time the app was backgrounded. Wall clock is used here because
+  // the monotonic clock may not advance while the device sleeps.
+  DateTime? _backgroundedAt;
+
+  LocalPenaltyEngine(this._state);
 
   @override
   PenaltyBoxState get state => _state;
@@ -56,34 +63,53 @@ class LocalPenaltyEngine extends PenaltyEngine with WidgetsBindingObserver {
   }
 
   void _startTicker() {
-    _lastTick = _clock();
-    _ticker = Timer.periodic(const Duration(milliseconds: 100), _onTick);
+    _ticker?.cancel();
+    _tickStopwatch = clock.stopwatch()..start();
+    _lastTickTotal = Duration.zero;
+    _ticker = Timer.periodic(const Duration(milliseconds: 100), (_) => _tick());
   }
 
   void _stopTicker() {
     _ticker?.cancel();
     _ticker = null;
-    _lastTick = null;
+    _backgroundedAt = null;
   }
 
   @visibleForTesting
   void startTicker() => _startTicker();
 
-  void _onTick(Timer _) {
-    final now = _clock();
-    final elapsed = _lastTick != null
-        ? now.difference(_lastTick!)
-        : Duration.zero;
-    _lastTick = now;
+  void _tick() {
+    final total = _tickStopwatch.elapsed;
+    final elapsed = total - _lastTickTotal;
+    _lastTickTotal = total;
     _state.tick(elapsed);
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) {
-      // Reset tick baseline so we don't jump timers forward on resume
-      _lastTick = _clock();
+    if (state == AppLifecycleState.paused) {
+      _onBackgrounded();
+    } else if (state == AppLifecycleState.resumed) {
+      _onResumed();
     }
+  }
+
+  void _onBackgrounded() {
+    if (_ticker == null || _backgroundedAt != null) return;
+    _tick(); // account for time since the last tick
+    _ticker!.cancel();
+    _backgroundedAt = clock.now();
+  }
+
+  /// Penalty time keeps running while the app is backgrounded, so catch the
+  /// timers up on the time spent away.
+  void _onResumed() {
+    final backgroundedAt = _backgroundedAt;
+    if (backgroundedAt == null) return;
+    _backgroundedAt = null;
+    final away = clock.now().difference(backgroundedAt);
+    if (away > Duration.zero) _state.tick(away);
+    _startTicker();
   }
 
   @override

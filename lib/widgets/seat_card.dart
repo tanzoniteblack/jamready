@@ -145,10 +145,10 @@ class _SeatCardState extends State<SeatCard>
       _lastState = seatState;
     }
 
+    final secs = displaySeconds(seat.timeRemaining);
+
     // Pre-stand warn: triple heavy burst at 12s
-    if (seatState == SeatState.running &&
-        seat.timeRemaining.inSeconds <= 12 &&
-        !_preStandWarnGiven) {
+    if (seatState == SeatState.running && secs <= 12 && !_preStandWarnGiven) {
       _preStandWarnGiven = true;
       HapticFeedback.heavyImpact();
       Future.delayed(
@@ -160,13 +160,11 @@ class _SeatCardState extends State<SeatCard>
         HapticFeedback.heavyImpact,
       );
     }
-    if (_preStandWarnGiven &&
-        (seatState == SeatState.empty || seat.timeRemaining.inSeconds > 12)) {
+    if (_preStandWarnGiven && (seatState == SeatState.empty || secs > 12)) {
       _preStandWarnGiven = false;
     }
 
     // Release warn: quad burst at 1s and 2s remaining
-    final secs = seat.timeRemaining.inSeconds;
     final isRunningOrStanding =
         seatState == SeatState.running || seatState == SeatState.standing;
     if (isRunningOrStanding &&
@@ -347,7 +345,7 @@ class _SeatCardState extends State<SeatCard>
     final isStanding = !isDone && seatState == SeatState.standing;
     final hasSecondPenalty = seat.penaltyCount > 1;
     final canToggleSecondPenalty = !isEmpty && (!isDone || hasSecondPenalty);
-    final timeStr = isEmpty ? '0:30' : _formatTime(seat.timeRemaining);
+    final timeStr = isEmpty ? '0:30' : seat.timeLabel;
     final actionLabel = switch (seatState) {
       SeatState.standing => 'STAND',
       SeatState.done => 'RELEASE',
@@ -572,13 +570,6 @@ class _SeatCardState extends State<SeatCard>
         );
       },
     );
-  }
-
-  String _formatTime(Duration d) {
-    if (d <= Duration.zero) return '0:00';
-    final m = d.inMinutes;
-    final s = d.inSeconds % 60;
-    return '$m:${s.toString().padLeft(2, '0')}';
   }
 }
 
@@ -844,13 +835,6 @@ class _SeatAdjustSheetState extends State<_SeatAdjustSheet> {
     Navigator.of(context).pop();
   }
 
-  String _formatTime(Duration d) {
-    if (d <= Duration.zero) return '0:00';
-    final m = d.inMinutes;
-    final s = d.inSeconds % 60;
-    return '$m:${s.toString().padLeft(2, '0')}';
-  }
-
   String _posLabel(SkaterPosition pos) => switch (pos) {
     SkaterPosition.jammer => 'JAMMER',
     SkaterPosition.pivot => 'BLOCKER',
@@ -910,7 +894,7 @@ class _SeatAdjustSheetState extends State<_SeatAdjustSheet> {
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: Text(
-                  _formatTime(_displayTime),
+                  formatPenaltyTime(_displayTime),
                   style: AppTextStyles.clockTimeSmall.copyWith(fontSize: 48),
                 ),
               ),

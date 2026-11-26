@@ -240,4 +240,38 @@ void main() {
       expect(channels.length, 2);
     });
   });
+
+  test('a replaced connection closing late does not clobber the new one', () {
+    fakeAsync((async) {
+      final state = ScoreboardState();
+      TestWebSocketChannel newChannel([StreamController<dynamic>? incoming]) =>
+          TestWebSocketChannel(
+            incoming: incoming ?? StreamController<dynamic>(),
+            sink: FakeWebSocketSink(),
+            ready: Future.value(),
+          );
+      final oldIncoming = StreamController<dynamic>();
+      final oldChannel = newChannel(oldIncoming);
+      final oldEngine = RemoteGameEngine(
+        state,
+        channelFactory: (_) => oldChannel,
+      );
+      unawaited(oldEngine.connect('http://example.com'));
+      async.flushMicrotasks();
+
+      // Jam timer screen resumes: drops the old engine and connects a new one.
+      oldEngine.disconnect();
+      final current = newChannel();
+      final newEngine = RemoteGameEngine(state, channelFactory: (_) => current);
+      unawaited(newEngine.connect('http://example.com'));
+      async.flushMicrotasks();
+
+      // The old socket only finishes closing now.
+      oldIncoming.close();
+      async.flushMicrotasks();
+
+      expect(newEngine.isConnected, isTrue);
+      expect(state.connectionStatus, 'Connected');
+    });
+  });
 }
