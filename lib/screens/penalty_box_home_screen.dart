@@ -215,6 +215,7 @@ class _PenaltyBoxHomeScreenState extends State<PenaltyBoxHomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final preview = _previewState;
     return DynamicBackground(
       accentColor: Colors.deepOrange.shade400,
       child: Scaffold(
@@ -395,7 +396,7 @@ class _PenaltyBoxHomeScreenState extends State<PenaltyBoxHomeScreen> {
 
                             // Team settings (offline mode only)
                             if (_previewEngine?.isLocal == true &&
-                                _previewState != null) ...[
+                                preview != null) ...[
                               Text(
                                 'TEAM SETTINGS',
                                 style: AppTextStyles.clockLabel.copyWith(
@@ -405,7 +406,7 @@ class _PenaltyBoxHomeScreenState extends State<PenaltyBoxHomeScreen> {
                                 ),
                               ),
                               const SizedBox(height: 16),
-                              TeamSettingsSection(state: _previewState!),
+                              TeamSettingsSection(state: preview),
                               const SizedBox(height: 24),
                               Container(
                                 height: 1,
@@ -423,20 +424,20 @@ class _PenaltyBoxHomeScreenState extends State<PenaltyBoxHomeScreen> {
                               ),
                             ),
                             const SizedBox(height: 12),
-                            if (_previewState != null)
+                            if (preview != null)
                               ListenableBuilder(
-                                listenable: _previewState!,
+                                listenable: preview,
                                 builder: (context, _) => RoleSelector(
                                   team1Name: _nameOr(
-                                    _previewState!.team1.name,
+                                    preview.team1.name,
                                     'Salt',
                                   ),
                                   team2Name: _nameOr(
-                                    _previewState!.team2.name,
+                                    preview.team2.name,
                                     'Pepper',
                                   ),
-                                  team1Color: _previewState!.team1.color,
-                                  team2Color: _previewState!.team2.color,
+                                  team1Color: preview.team1.color,
+                                  team2Color: preview.team2.color,
                                   onTap: _startGame,
                                 ),
                               ),
