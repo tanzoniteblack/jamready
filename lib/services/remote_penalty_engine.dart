@@ -59,6 +59,18 @@ class RemotePenaltyEngine extends PenaltyEngine {
     r'ScoreBoard\.CurrentGame\.Team\((\d)\)\.Position\(Jammer\)\.Skater$',
   );
   static final _reLegacySkater = RegExp(r'Game\.Team\((\d)\)\.Skater$');
+  // Lineup tracking. CRG reports these under CurrentGame for our
+  // registrations, but under Game(<id>) for clients registered that way.
+  static const _game = r'ScoreBoard\.(?:CurrentGame|Game\([^)]+\))';
+  static final _reFielding = RegExp(
+    '$_game'
+    r'\.Period\((\d+)\)\.Jam\((\d+)\)\.TeamJam\((\d)\)'
+    r'\.Fielding\(([^)]+)\)\.SkaterNumber$',
+  );
+  static final _rePositionNumber = RegExp(
+    '$_game'
+    r'\.Team\((\d)\)\.Position\(([^)]+)\)\.RosterNumber$',
+  );
 
   RemotePenaltyEngine(
     this._state, {
@@ -206,6 +218,10 @@ class RemotePenaltyEngine extends PenaltyEngine {
       // skater roles only reflect once that jam starts.
       'ScoreBoard.CurrentGame.Team(1).Position(Jammer).Skater',
       'ScoreBoard.CurrentGame.Team(2).Position(Jammer).Skater',
+      // Lineup tracking, to show which skaters are on the track: per-jam
+      // fieldings, plus positions for the upcoming jam's lineup between jams.
+      'ScoreBoard.CurrentGame.Period(*).Jam(*).TeamJam(*).Fielding(*).SkaterNumber',
+      'ScoreBoard.CurrentGame.Team(*).Position(*).RosterNumber',
     ];
 
     _log.d('Registering paths');
@@ -325,6 +341,28 @@ class RemotePenaltyEngine extends PenaltyEngine {
         continue;
       }
 
+      final fieldingMatch = _reFielding.firstMatch(key);
+      if (fieldingMatch != null) {
+        delta.fieldings.add((
+          period: int.parse(fieldingMatch.group(1)!),
+          jam: int.parse(fieldingMatch.group(2)!),
+          team: int.parse(fieldingMatch.group(3)!),
+          position: fieldingMatch.group(4)!,
+          number: value?.toString(),
+        ));
+        continue;
+      }
+
+      final positionMatch = _rePositionNumber.firstMatch(key);
+      if (positionMatch != null) {
+        delta.positions.add((
+          team: int.parse(positionMatch.group(1)!),
+          position: positionMatch.group(2)!,
+          number: value?.toString(),
+        ));
+        continue;
+      }
+
       final legacySkaterMatch = _reLegacySkater.firstMatch(key);
       if (legacySkaterMatch != null && value is Map) {
         delta.legacyRosters.add((
@@ -390,6 +428,12 @@ class RemotePenaltyEngine extends PenaltyEngine {
       _state.updateSkaterRole(t, uuid, role);
     }
     delta.lineupJammers.forEach(_state.updateLineupJammer);
+    for (final f in delta.fieldings) {
+      _state.updateFielding(f.period, f.jam, f.team, f.position, f.number);
+    }
+    for (final p in delta.positions) {
+      _state.updatePosition(p.team, p.position, p.number);
+    }
 
     final jamNowRunning = _state.jamRunning;
     if (!jamWasRunning && jamNowRunning) {
@@ -554,4 +598,7 @@ class _WsDelta {
   final List<(int team, String uuid, String role)> skaterRoles = [];
   final Map<int, String?> lineupJammers = {}; // team -> uuid (null if empty)
   final List<(int team, Map<dynamic, dynamic> data)> legacyRosters = [];
+  final List<({int period, int jam, int team, String position, String? number})>
+  fieldings = [];
+  final List<({int team, String position, String? number})> positions = [];
 }

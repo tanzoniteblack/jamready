@@ -176,6 +176,8 @@ class PenaltyBoxState extends ChangeNotifier {
     _uuidToNumber2.clear();
     _jammerUuids.clear();
     _lineupJammerUuids.clear();
+    _fieldings.clear();
+    _positions.clear();
   }
 
   SkaterSeat get team1Jammer => seats[0];
@@ -349,6 +351,50 @@ class PenaltyBoxState extends ChangeNotifier {
           _lineupJammerUuids[teamIdx] = uuid;
         }
       });
+
+  // Lineup tracking from the scoreboard, as skater numbers. CRG records a
+  // fielding per started jam; a team's positions follow the running jam, or
+  // the upcoming jam's lineup between jams.
+  final Map<(int period, int jam, int team, String position), String>
+  _fieldings = {};
+  final Map<(int team, String position), String> _positions = {};
+
+  /// Records the skater number fielded in [position] for a team in a jam.
+  /// An empty or '?' number (CRG's placeholder) clears it.
+  void updateFielding(
+    int period,
+    int jam,
+    int teamIdx,
+    String position,
+    String? number,
+  ) => _setLineupNumber(_fieldings, (period, jam, teamIdx, position), number);
+
+  /// Records the skater number in a team's current lineup [position].
+  void updatePosition(int teamIdx, String position, String? number) =>
+      _setLineupNumber(_positions, (teamIdx, position), number);
+
+  void _setLineupNumber<K>(Map<K, String> map, K key, String? number) {
+    final before = map[key];
+    if (number == null || number.isEmpty || number == '?') {
+      map.remove(key);
+    } else {
+      map[key] = number;
+    }
+    if (map[key] != before) notifyListeners();
+  }
+
+  /// Numbers the scoreboard has on the track for a team: fielded in the
+  /// current jam, or in the team's current lineup (which between jams is the
+  /// upcoming jam). Empty when not connected or no lineup is tracked.
+  Set<String> onTrackNumbers(int teamIdx) {
+    if (connectionStatus != ConnectionStatus.connected) return const {};
+    return {
+      for (final MapEntry(key: (p, j, t, _), :value) in _fieldings.entries)
+        if (p == periodNumber && j == jamNumber && t == teamIdx) value,
+      for (final MapEntry(key: (t, _), :value) in _positions.entries)
+        if (t == teamIdx) value,
+    };
+  }
 
   /// Applies [change] to the jammer tracking. When the team's jammer changes,
   /// any number preset on its open jammer seat is replaced by the new jammer.

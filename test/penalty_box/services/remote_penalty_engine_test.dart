@@ -304,6 +304,109 @@ void main() {
     await engine.dispose();
   });
 
+  group('lineup tracking', () {
+    const fielding = 'ScoreBoard.CurrentGame.Period(1).Jam(6).TeamJam(1)';
+
+    test('marks skaters fielded in the current jam as on the track', () async {
+      final (:engine, :channel, :state) = await setupEngine();
+      await sendAndPump(channel, {
+        'ScoreBoard.CurrentGame.Clock(Period).Number': 1,
+        'ScoreBoard.CurrentGame.Clock(Jam).Number': 6,
+        '$fielding.Fielding(Jammer).SkaterNumber': '43',
+        '$fielding.Fielding(Blocker2).SkaterNumber': '21',
+        '$fielding.Fielding(Pivot).SkaterNumber': '?',
+        'ScoreBoard.CurrentGame.Period(1).Jam(5).TeamJam(1).Fielding(Blocker1).SkaterNumber':
+            '7',
+        'ScoreBoard.CurrentGame.Period(1).Jam(6).TeamJam(2).Fielding(Jammer).SkaterNumber':
+            '99',
+      });
+
+      expect(state.onTrackNumbers(1), {'43', '21'});
+      expect(state.onTrackNumbers(2), {'99'});
+      await engine.dispose();
+    });
+
+    test('accepts fieldings reported under the game id', () async {
+      final (:engine, :channel, :state) = await setupEngine();
+      await sendAndPump(channel, {
+        'ScoreBoard.CurrentGame.Clock(Period).Number': 1,
+        'ScoreBoard.CurrentGame.Clock(Jam).Number': 7,
+        'ScoreBoard.Game(473634e6).Period(1).Jam(7).TeamJam(1).Fielding(Jammer).SkaterNumber':
+            '43',
+      });
+
+      expect(state.onTrackNumbers(1), {'43'});
+      await engine.dispose();
+    });
+
+    test(
+      'a skater moved out of a fielding is no longer on the track',
+      () async {
+        final (:engine, :channel, :state) = await setupEngine();
+        await sendAndPump(channel, {
+          'ScoreBoard.CurrentGame.Clock(Jam).Number': 6,
+          '$fielding.Fielding(Blocker2).SkaterNumber': '21',
+        });
+        await sendAndPump(channel, {
+          '$fielding.Fielding(Blocker2).SkaterNumber': '?',
+        });
+
+        expect(state.onTrackNumbers(1), isEmpty);
+        await engine.dispose();
+      },
+    );
+
+    test('includes the upcoming lineup between jams', () async {
+      final (:engine, :channel, :state) = await setupEngine();
+      await sendAndPump(channel, {
+        'ScoreBoard.CurrentGame.Clock(Jam).Number': 6,
+        '$fielding.Fielding(Jammer).SkaterNumber': '43',
+        'ScoreBoard.CurrentGame.Team(1).Position(Blocker1).RosterNumber': '21',
+        'ScoreBoard.CurrentGame.Team(1).Position(Pivot).RosterNumber': '',
+      });
+
+      expect(state.onTrackNumbers(1), {'43', '21'});
+      await engine.dispose();
+    });
+
+    test('is forgotten for a new game', () async {
+      final (:engine, :channel, :state) = await setupEngine();
+      await sendAndPump(channel, {
+        'ScoreBoard.CurrentGame.Game': 'game-one',
+        'ScoreBoard.CurrentGame.Team(1).Position(Jammer).RosterNumber': '43',
+      });
+      await sendAndPump(channel, {'ScoreBoard.CurrentGame.Game': 'game-two'});
+
+      expect(state.onTrackNumbers(1), isEmpty);
+      await engine.dispose();
+    });
+
+    test('is not reported while disconnected', () async {
+      final (:engine, :channel, :state) = await setupEngine();
+      await sendAndPump(channel, {
+        'ScoreBoard.CurrentGame.Team(1).Position(Jammer).RosterNumber': '43',
+      });
+      engine.disconnect();
+
+      expect(state.onTrackNumbers(1), isEmpty);
+      await engine.dispose();
+    });
+
+    test('registers the lineup paths', () async {
+      final (:engine, :channel, state: _) = await setupEngine();
+      final paths = channel.sentWithAction('Register').single['paths'] as List;
+
+      expect(
+        paths,
+        containsAll([
+          'ScoreBoard.CurrentGame.Period(*).Jam(*).TeamJam(*).Fielding(*).SkaterNumber',
+          'ScoreBoard.CurrentGame.Team(*).Position(*).RosterNumber',
+        ]),
+      );
+      await engine.dispose();
+    });
+  });
+
   group('reconnecting', () {
     test('failed retries leave the locally stopped jam alone', () {
       fakeAsync((fake) {

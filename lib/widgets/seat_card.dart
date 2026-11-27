@@ -93,6 +93,8 @@ class _SeatCardState extends State<SeatCard>
       teamName: state.teamInfo(seat.teamIndex).name,
       barrierDismissible: true,
       knownNumbers: state.knownNumbers(seat.teamIndex),
+      onTrackNumbers: () => state.onTrackNumbers(seat.teamIndex),
+      lineupChanges: state,
     );
     if (result != null && mounted) {
       state.setSkaterNumber(seat, result.number, position: result.position);

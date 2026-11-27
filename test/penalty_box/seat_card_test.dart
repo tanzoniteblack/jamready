@@ -199,4 +199,37 @@ void main() {
     expect(find.text('OPEN'), findsOneWidget);
     expect(state.team1Jammer.isRunning, isFalse);
   });
+
+  testWidgets('number picker follows scoreboard lineup updates while open', (
+    tester,
+  ) async {
+    final state = makeState()
+      ..setConnectionStatus(ConnectionStatus.connected)
+      ..updateRoster(1, '21', 'uuid-21')
+      ..updateRoster(1, '43', 'uuid-43')
+      ..updatePosition(1, 'Jammer', '21');
+    await tester.pumpWidget(_jammerCard(state, 1));
+    await tester.tap(find.text('#?'));
+    await tester.pump(const Duration(milliseconds: 500));
+
+    BoxDecoration chip(String n) =>
+        tester
+                .widget<AnimatedContainer>(
+                  find.ancestor(
+                    of: find.text('#$n').last,
+                    matching: find.byType(AnimatedContainer),
+                  ),
+                )
+                .decoration
+            as BoxDecoration;
+    expect(chip('43').border, Border.all(color: Colors.white24));
+
+    state.updatePosition(1, 'Blocker1', '43');
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(chip('43').border, Border.all(color: Colors.blue.shade700));
+
+    state.updatePosition(1, 'Blocker1', '');
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(chip('43').border, Border.all(color: Colors.white24));
+  });
 }

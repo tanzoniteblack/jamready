@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 import '../models/skater_seat.dart';
 import '../styles/text_styles.dart';
 
+Set<String> _noneOnTrack() => const {};
+
 class SkaterEntryResult {
   final String number;
   final SkaterPosition position;
@@ -11,7 +13,10 @@ class SkaterEntryResult {
 }
 
 /// Shows the skater picker. If [knownNumbers] is non-empty, displays a button
-/// grid first; a "?" button falls back to keyboard entry.
+/// grid first; a keyboard button falls back to keyboard entry. Numbers in
+/// [onTrackNumbers] keep the team highlight; the rest are shown dimmed. The
+/// grid re-reads [onTrackNumbers] whenever [lineupChanges] notifies, so the
+/// highlight follows lineup updates while the picker is open.
 /// Set [barrierDismissible] to true when the timer is already running.
 Future<SkaterEntryResult?> showSkaterEntryDialog(
   BuildContext context, {
@@ -19,6 +24,8 @@ Future<SkaterEntryResult?> showSkaterEntryDialog(
   String? teamName,
   bool barrierDismissible = false,
   List<String> knownNumbers = const [],
+  Set<String> Function() onTrackNumbers = _noneOnTrack,
+  Listenable? lineupChanges,
 }) {
   return showDialog<SkaterEntryResult>(
     context: context,
@@ -27,6 +34,8 @@ Future<SkaterEntryResult?> showSkaterEntryDialog(
       initialPosition: initialPosition,
       teamName: teamName,
       knownNumbers: knownNumbers,
+      onTrackNumbers: onTrackNumbers,
+      lineupChanges: lineupChanges,
     ),
   );
 }
@@ -35,11 +44,15 @@ class _SkaterEntryDialog extends StatefulWidget {
   final SkaterPosition initialPosition;
   final String? teamName;
   final List<String> knownNumbers;
+  final Set<String> Function() onTrackNumbers;
+  final Listenable? lineupChanges;
 
   const _SkaterEntryDialog({
     required this.initialPosition,
     this.teamName,
     required this.knownNumbers,
+    required this.onTrackNumbers,
+    this.lineupChanges,
   });
 
   @override
@@ -107,14 +120,12 @@ class _SkaterEntryDialogState extends State<_SkaterEntryDialog> {
                     ),
                   ),
                 ),
-                if (widget.knownNumbers.isNotEmpty)
+                // Back to the number grid; the grid itself has a keyboard chip.
+                if (_keyboardMode && widget.knownNumbers.isNotEmpty)
                   GestureDetector(
-                    onTap: () => setState(() {
-                      _keyboardMode = !_keyboardMode;
-                      _selectedNumber = null;
-                    }),
-                    child: Icon(
-                      _keyboardMode ? Icons.grid_view_rounded : Icons.keyboard,
+                    onTap: () => setState(() => _keyboardMode = false),
+                    child: const Icon(
+                      Icons.grid_view_rounded,
                       color: Colors.white38,
                       size: 20,
                     ),
@@ -260,7 +271,12 @@ class _SkaterEntryDialogState extends State<_SkaterEntryDialog> {
     );
   }
 
-  Widget _buildGrid() {
+  Widget _buildGrid() => ListenableBuilder(
+    listenable: widget.lineupChanges ?? Listenable.merge(const []),
+    builder: (_, _) => _buildGridWith(widget.onTrackNumbers()),
+  );
+
+  Widget _buildGridWith(Set<String> onTrack) {
     final numbers = [...widget.knownNumbers]..sort();
 
     return Wrap(
@@ -271,10 +287,11 @@ class _SkaterEntryDialogState extends State<_SkaterEntryDialog> {
           (n) => _NumberChip(
             number: n,
             selected: _selectedNumber == n,
+            onTrack: onTrack.contains(n),
             onTap: () => _onChipTap(n),
           ),
         ),
-        // '?' = open keyboard to type manually
+        // Keyboard chip = type a number manually
         GestureDetector(
           onTap: () => setState(() {
             _keyboardMode = true;
@@ -287,13 +304,7 @@ class _SkaterEntryDialogState extends State<_SkaterEntryDialog> {
               border: Border.all(color: Colors.white24),
               borderRadius: BorderRadius.circular(10),
             ),
-            child: Text(
-              '?',
-              style: AppTextStyles.skaterNumber.copyWith(
-                fontSize: 22,
-                color: Colors.white38,
-              ),
-            ),
+            child: const Icon(Icons.keyboard, size: 26, color: Colors.white38),
           ),
         ),
       ],
@@ -304,39 +315,50 @@ class _SkaterEntryDialogState extends State<_SkaterEntryDialog> {
 class _NumberChip extends StatelessWidget {
   final String number;
   final bool selected;
+
+  /// Known to be on the track; otherwise dimmed like the keyboard chip.
+  final bool onTrack;
   final VoidCallback onTap;
 
   const _NumberChip({
     required this.number,
     required this.selected,
+    required this.onTrack,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
+    final (background, border, text) = selected
+        ? (
+            Colors.blue.withValues(alpha: 0.35),
+            Colors.blue.shade300,
+            Colors.white,
+          )
+        : onTrack
+        ? (
+            Colors.blue.withValues(alpha: 0.12),
+            Colors.blue.shade700,
+            Colors.white.withValues(alpha: 0.85),
+          )
+        : (
+            Colors.white.withValues(alpha: 0.06),
+            Colors.white24,
+            Colors.white38,
+          );
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 120),
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
         decoration: BoxDecoration(
-          color: selected
-              ? Colors.blue.withValues(alpha: 0.35)
-              : Colors.blue.withValues(alpha: 0.12),
-          border: Border.all(
-            color: selected ? Colors.blue.shade300 : Colors.blue.shade700,
-            width: selected ? 2 : 1,
-          ),
+          color: background,
+          border: Border.all(color: border, width: selected ? 2 : 1),
           borderRadius: BorderRadius.circular(10),
         ),
         child: Text(
           '#$number',
-          style: AppTextStyles.skaterNumber.copyWith(
-            fontSize: 22,
-            color: selected
-                ? Colors.white
-                : Colors.white.withValues(alpha: 0.85),
-          ),
+          style: AppTextStyles.skaterNumber.copyWith(fontSize: 22, color: text),
         ),
       ),
     );
