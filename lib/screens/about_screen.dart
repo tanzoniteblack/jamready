@@ -9,13 +9,23 @@ import '../styles/background.dart';
 const contactEmail = 'info@jamready.net';
 const developerCredit = 'Smithsonian (Ryan Smith)';
 
-/// Release builds show only the marketing version (e.g. "2.0.0");
+/// The git tag this build was cut from (e.g. "v2.0.0-beta3"), injected with
+/// `--dart-define=RELEASE_TAG=<tag>` by the release builds. Empty otherwise.
+const releaseTag = String.fromEnvironment('RELEASE_TAG');
+
+/// Tagged builds show the tag without its leading "v" (e.g. "2.0.0-beta3"),
+/// other release builds show only the marketing version (e.g. "2.0.0"), and
 /// local/debug builds include the build number (e.g. "2.0.0+8").
 String formatAppVersion(
   String version,
   String buildNumber, {
   bool isRelease = kReleaseMode,
-}) => isRelease || buildNumber.isEmpty ? version : '$version+$buildNumber';
+  String tag = releaseTag,
+}) => switch (tag) {
+  final t when t.isNotEmpty => t.replaceFirst(RegExp('^v'), ''),
+  _ when isRelease || buildNumber.isEmpty => version,
+  _ => '$version+$buildNumber',
+};
 
 class AboutScreen extends StatelessWidget {
   const AboutScreen({super.key});

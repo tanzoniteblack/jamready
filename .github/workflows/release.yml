@@ -52,7 +52,7 @@ jobs:
 
       - name: Build APK
         run: |
-          flutter build apk --release
+          flutter build apk --release --dart-define=RELEASE_TAG=${{ github.ref_name }}
           mv build/app/outputs/flutter-apk/app-release.apk "$APK_NAME"
 
       # actions/checkout replaces the annotated tag with a lightweight one, so

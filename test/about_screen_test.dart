@@ -19,6 +19,20 @@ void main() {
     test('omits empty build number', () {
       expect(formatAppVersion('1.2.0', '', isRelease: false), '1.2.0');
     });
+
+    test('shows the release tag without its leading v', () {
+      expect(
+        formatAppVersion('2.0.0', '9', isRelease: true, tag: 'v2.0.0-beta3'),
+        '2.0.0-beta3',
+      );
+    });
+
+    test('shows a stable release tag as the plain version', () {
+      expect(
+        formatAppVersion('2.0.0', '10', isRelease: true, tag: 'v2.0.0'),
+        '2.0.0',
+      );
+    });
   });
 
   testWidgets('info button on home screen opens About page', (tester) async {

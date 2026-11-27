@@ -1,3 +1,9 @@
+# The release tag the working tree matches (e.g. v2.0.0-beta3), shown on the
+# About screen. Empty when the code differs from the nearest tag, in which case
+# the app shows the pubspec version.
+RELEASE_TAG := $(shell ./scripts/release-tag.sh)
+DART_DEFINES := --dart-define=RELEASE_TAG=$(RELEASE_TAG)
+
 .PHONY: unit integration test serve-web build-scoreboards test-scoreboards build-ios build-android release
 
 # Run unit and widget tests only (fast, no device required)
@@ -25,13 +31,13 @@ test-scoreboards: build-scoreboards
 
 # Build iOS release archive only (tests must pass first)
 build-ios: test
-	flutter build ipa
+	flutter build ipa $(DART_DEFINES)
 
 # Build Android App Bundle only (tests must pass first)
 build-android: test
-	flutter build appbundle --release
+	flutter build appbundle --release $(DART_DEFINES)
 
 # Run all tests against all scoreboard versions, then build both release artifacts
 release: test test-scoreboards
-	flutter build ipa
-	flutter build appbundle --release
+	flutter build ipa $(DART_DEFINES)
+	flutter build appbundle --release $(DART_DEFINES)
