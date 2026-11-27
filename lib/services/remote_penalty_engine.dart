@@ -33,6 +33,10 @@ class RemotePenaltyEngine extends PenaltyEngine {
   bool _isConnected = false;
   bool _isConnecting = false;
   bool _manualDisconnect = false;
+  // Whether this connection's scoreboard reports InJam. Once it has, the jam
+  // clock no longer says whether a jam is running: without auto-end, CRG
+  // stops the clock at 2:00 while the jam goes on until it is called.
+  bool _inJamReported = false;
   String? _currentGameId;
   int _reconnectAttempts = 0;
   String? _lastUrl;
@@ -269,8 +273,7 @@ class RemotePenaltyEngine extends PenaltyEngine {
       final value = entry.value;
 
       if (key == 'ScoreBoard.CurrentGame.InJam') {
-        delta.jamRunning = value == true || value == 'true';
-        delta.jamRunningIsDefinitive = true;
+        delta.inJam = value == true || value == 'true';
         continue;
       }
       if (key == 'ScoreBoard.CurrentGame.Game') {
@@ -278,10 +281,7 @@ class RemotePenaltyEngine extends PenaltyEngine {
         continue;
       }
       if (key == 'ScoreBoard.CurrentGame.Clock(Jam).Running') {
-        // Only use as fallback if InJam not present in this message
-        if (!delta.jamRunningIsDefinitive) {
-          delta.jamRunning = value == true || value == 'true';
-        }
+        delta.jamClockRunning = value == true || value == 'true';
         continue;
       }
       if (key == 'ScoreBoard.CurrentGame.Clock(Jam).Number') {
@@ -393,9 +393,11 @@ class RemotePenaltyEngine extends PenaltyEngine {
       _currentGameId = gameId;
     }
 
-    if (delta.jamRunning != null) {
-      _state.jamRunning = delta.jamRunning!;
-    }
+    // The jam clock is only a fallback for scoreboards without InJam.
+    if (delta.inJam != null) _inJamReported = true;
+    final jamRunning =
+        delta.inJam ?? (_inJamReported ? null : delta.jamClockRunning);
+    if (jamRunning != null) _state.jamRunning = jamRunning;
     if (delta.jamNumber != null) _state.jamNumber = delta.jamNumber!;
     if (delta.periodNumber != null) _state.periodNumber = delta.periodNumber!;
 
@@ -481,6 +483,7 @@ class RemotePenaltyEngine extends PenaltyEngine {
   }
 
   void _disconnectCleanup({String? error}) {
+    _inJamReported = false;
     _isConnected = false;
     _isConnecting = false;
     _heartbeatTimer?.cancel();
@@ -586,8 +589,8 @@ class RemotePenaltyEngine extends PenaltyEngine {
 /// Built in phase 1 (_buildDelta) with no side effects, applied in phase 2 (_applyDelta).
 class _WsDelta {
   String? gameId;
-  bool? jamRunning;
-  bool jamRunningIsDefinitive = false;
+  bool? inJam;
+  bool? jamClockRunning;
   int? jamNumber;
   int? periodNumber;
   final Map<int, String> teamNames = {};

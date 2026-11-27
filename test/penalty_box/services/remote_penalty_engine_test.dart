@@ -88,6 +88,46 @@ void main() {
       await engine.dispose();
     });
 
+    test('the jam clock running out does not end the jam', () async {
+      final (:engine, :channel, :state) = await setupEngine();
+      await sendAndPump(channel, {
+        'ScoreBoard.CurrentGame.InJam': true,
+        'ScoreBoard.CurrentGame.Clock(Jam).Running': true,
+      });
+      state.seatSkater(
+        seat: state.team1Blocker1,
+        number: '22',
+        position: SkaterPosition.blocker,
+      );
+      expect(state.team1Blocker1.isRunning, isTrue);
+
+      // At 2:00 CRG stops the jam clock, but without auto-end the jam goes on
+      // until it is called.
+      await sendAndPump(channel, {
+        'ScoreBoard.CurrentGame.Clock(Jam).Running': false,
+      });
+      expect(state.jamRunning, isTrue);
+      expect(state.team1Blocker1.isRunning, isTrue);
+
+      await sendAndPump(channel, {'ScoreBoard.CurrentGame.InJam': false});
+      expect(state.jamRunning, isFalse);
+      expect(state.team1Blocker1.isRunning, isFalse);
+      await engine.dispose();
+    });
+
+    test('the jam clock drives jams for a scoreboard without InJam', () async {
+      final (:engine, :channel, :state) = await setupEngine();
+      await sendAndPump(channel, {
+        'ScoreBoard.CurrentGame.Clock(Jam).Running': true,
+      });
+      expect(state.jamRunning, isTrue);
+      await sendAndPump(channel, {
+        'ScoreBoard.CurrentGame.Clock(Jam).Running': false,
+      });
+      expect(state.jamRunning, isFalse);
+      await engine.dispose();
+    });
+
     test('updates mainstream metadata and rosters', () async {
       final (:engine, :channel, :state) = await setupEngine();
       await sendAndPump(channel, {

@@ -91,6 +91,46 @@ void main() {
     },
   );
 
+  test('the jam clock running out leaves the penalty timers running', () async {
+    log('action: startNewGame');
+    await operatorClient.startNewGame();
+    await waitUntil(
+      () => !state.jamRunning,
+      label: 'remote game is between jams',
+    );
+
+    final blocker = state.team1Blocker1;
+    state.seatSkater(
+      seat: blocker,
+      number: '42',
+      position: SkaterPosition.blocker,
+    );
+
+    log('action: stopJam (start lineup)');
+    await clockAction(operatorClient.stopJam);
+    log('action: startJam');
+    await clockAction(operatorClient.startJam);
+    await waitUntil(
+      () => state.jamRunning && blocker.isRunning,
+      label: 'remote jam start starts the occupied penalty seat timer',
+    );
+
+    // Without auto-end, CRG stops the jam clock at 2:00 but the jam goes on
+    // until it is called.
+    log('action: run the jam clock out');
+    operatorClient.setValue('ScoreBoard.CurrentGame.Clock(Jam).Time', '500');
+    await Future.delayed(const Duration(seconds: 2));
+    expect(state.jamRunning, isTrue, reason: 'the jam has not been called');
+    expect(blocker.isRunning, isTrue);
+
+    log('action: stopJam (end jam)');
+    await clockAction(operatorClient.stopJam);
+    await waitUntil(
+      () => !state.jamRunning && !blocker.isRunning,
+      label: 'calling the jam pauses the occupied penalty seat timer',
+    );
+  });
+
   test(
     'setting the jammer on the scoreboard does not start a penalty timer',
     () async {
